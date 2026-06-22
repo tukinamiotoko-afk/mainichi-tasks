@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "毎日やること",
-    "slug": "daily-tasks",
+    "name": "毎日タスク",
+    "slug": "mainichi-tasks",
     "version": "1.0.0",
     "orientation": "portrait",
     "backgroundColor": "#7a8aba",
