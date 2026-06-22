@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "name": "毎日やること",
+    "slug": "daily-tasks",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "backgroundColor": "#7a8aba",
+    "ios": { "supportsTablet": false },
+    "android": { "adaptiveIcon": { "backgroundColor": "#7a8aba" } },
+    "plugins": ["expo-sqlite"]
+  }
+}
