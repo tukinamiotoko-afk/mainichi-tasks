@@ -45,7 +45,9 @@ export default function StatsScreen({ navigation }: Props) {
 
   const load = useCallback(async () => {
     const allTasks = await getTasks(db);
-    const tasks = freqFilter === 'すべて' ? allTasks : allTasks.filter((t) => t.frequency === freqFilter);
+    const tasks = freqFilter === 'すべて'
+      ? allTasks
+      : allTasks.filter((t) => (freqFilter === '毎日' ? t.freq_type === 'daily' : t.freq_type !== 'daily'));
     if (tasks.length === 0) { setRates([]); return; }
     const computed = await Promise.all(tasks.map(async (task) => {
       let startDate: string;

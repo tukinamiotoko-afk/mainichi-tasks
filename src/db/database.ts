@@ -1,6 +1,13 @@
 import * as SQLite from 'expo-sqlite';
+import type { FreqType } from '../constants/taskMeta';
 
-export type Task = { id: number; title: string; sort_order: number; icon: string | null; priority: number; frequency: string };
+export type Task = {
+  id: number; title: string; sort_order: number;
+  icon: string | null; priority: number; frequency: string;
+  scheduled_time: string | null; notify: number; notify_id: string | null;
+  freq_type: FreqType; freq_days: string | null;
+  freq_week: number | null; freq_weekday: number | null; freq_day: number | null;
+};
 export type NotificationSetting = { id: number; time: string; notification_type: string; identifier: string | null; task_id: number | null };
 export type CompletionDetail = { task_id: number; title: string; icon: string | null; date: string; completed_at: string | null };
 export type TimeLog = { id: number; task_id: number; title: string; date: string; duration_seconds: number; started_at: string; ended_at: string };
@@ -14,7 +21,15 @@ export async function migrateDb(db: SQLite.SQLiteDatabase): Promise<void> {
       sort_order INTEGER DEFAULT 0,
       icon TEXT,
       priority INTEGER DEFAULT 1,
-      frequency TEXT NOT NULL DEFAULT '毎日'
+      frequency TEXT NOT NULL DEFAULT '毎日',
+      scheduled_time TEXT,
+      notify INTEGER NOT NULL DEFAULT 0,
+      notify_id TEXT,
+      freq_type TEXT NOT NULL DEFAULT 'daily',
+      freq_days TEXT,
+      freq_week INTEGER,
+      freq_weekday INTEGER,
+      freq_day INTEGER
     );
     CREATE TABLE IF NOT EXISTS completions (
       task_id INTEGER NOT NULL,
@@ -47,6 +62,14 @@ export async function migrateDb(db: SQLite.SQLiteDatabase): Promise<void> {
   try { await db.execAsync('ALTER TABLE tasks ADD COLUMN icon TEXT'); } catch {}
   try { await db.execAsync('ALTER TABLE tasks ADD COLUMN priority INTEGER DEFAULT 1'); } catch {}
   try { await db.execAsync("ALTER TABLE tasks ADD COLUMN frequency TEXT NOT NULL DEFAULT '毎日'"); } catch {}
+  try { await db.execAsync('ALTER TABLE tasks ADD COLUMN scheduled_time TEXT'); } catch {}
+  try { await db.execAsync('ALTER TABLE tasks ADD COLUMN notify INTEGER NOT NULL DEFAULT 0'); } catch {}
+  try { await db.execAsync('ALTER TABLE tasks ADD COLUMN notify_id TEXT'); } catch {}
+  try { await db.execAsync("ALTER TABLE tasks ADD COLUMN freq_type TEXT NOT NULL DEFAULT 'daily'"); } catch {}
+  try { await db.execAsync('ALTER TABLE tasks ADD COLUMN freq_days TEXT'); } catch {}
+  try { await db.execAsync('ALTER TABLE tasks ADD COLUMN freq_week INTEGER'); } catch {}
+  try { await db.execAsync('ALTER TABLE tasks ADD COLUMN freq_weekday INTEGER'); } catch {}
+  try { await db.execAsync('ALTER TABLE tasks ADD COLUMN freq_day INTEGER'); } catch {}
 }
 
 export function getToday(): string {
@@ -69,25 +92,30 @@ export async function getTasks(db: SQLite.SQLiteDatabase): Promise<Task[]> {
   return db.getAllAsync<Task>('SELECT * FROM tasks ORDER BY sort_order ASC, id ASC');
 }
 
-export type TaskFields = { title?: string; icon?: string | null; priority?: number; frequency?: string };
+export type TaskFields = {
+  title?: string; icon?: string | null; priority?: number;
+  scheduled_time?: string | null; notify?: number; notify_id?: string | null;
+  freq_type?: FreqType; freq_days?: string | null;
+  freq_week?: number | null; freq_weekday?: number | null; freq_day?: number | null;
+};
 
-export async function addTask(
-  db: SQLite.SQLiteDatabase, title: string, opts: Omit<TaskFields, 'title'> = {}
-): Promise<number> {
-  const result = await db.runAsync(
-    'INSERT INTO tasks (title, icon, priority, frequency) VALUES (?, ?, ?, ?)',
-    [title, opts.icon ?? null, opts.priority ?? 1, opts.frequency ?? '毎日']
-  );
+const TASK_COLUMNS: (keyof TaskFields)[] = [
+  'title', 'icon', 'priority', 'scheduled_time', 'notify', 'notify_id',
+  'freq_type', 'freq_days', 'freq_week', 'freq_weekday', 'freq_day',
+];
+
+export async function addTask(db: SQLite.SQLiteDatabase, title: string): Promise<number> {
+  const result = await db.runAsync('INSERT INTO tasks (title) VALUES (?)', [title]);
   return result.lastInsertRowId;
 }
 
 export async function updateTask(db: SQLite.SQLiteDatabase, id: number, fields: TaskFields): Promise<void> {
   const sets: string[] = [];
   const values: (string | number | null)[] = [];
-  if (fields.title !== undefined) { sets.push('title = ?'); values.push(fields.title); }
-  if (fields.icon !== undefined) { sets.push('icon = ?'); values.push(fields.icon); }
-  if (fields.priority !== undefined) { sets.push('priority = ?'); values.push(fields.priority); }
-  if (fields.frequency !== undefined) { sets.push('frequency = ?'); values.push(fields.frequency); }
+  for (const col of TASK_COLUMNS) {
+    const value = fields[col];
+    if (value !== undefined) { sets.push(`${col} = ?`); values.push(value); }
+  }
   if (sets.length === 0) return;
   values.push(id);
   await db.runAsync(`UPDATE tasks SET ${sets.join(', ')} WHERE id = ?`, values);
@@ -97,12 +125,17 @@ export async function deleteTask(db: SQLite.SQLiteDatabase, id: number): Promise
   const rows = await db.getAllAsync<{ identifier: string | null }>(
     'SELECT identifier FROM notification_settings WHERE task_id = ?', [id]
   );
+  const taskRow = await db.getFirstAsync<{ notify_id: string | null }>(
+    'SELECT notify_id FROM tasks WHERE id = ?', [id]
+  );
   await db.runAsync('DELETE FROM tasks WHERE id = ?', [id]);
   await db.runAsync('DELETE FROM completions WHERE task_id = ?', [id]);
   await db.runAsync('DELETE FROM notification_settings WHERE task_id = ?', [id]);
   await db.runAsync('DELETE FROM time_logs WHERE task_id = ?', [id]);
   await db.runAsync('DELETE FROM timer_settings WHERE task_id = ?', [id]);
-  return rows.map(r => r.identifier).filter(Boolean) as string[];
+  const ids = rows.map(r => r.identifier).filter(Boolean) as string[];
+  if (taskRow?.notify_id) ids.push(...taskRow.notify_id.split(',').filter(Boolean));
+  return ids;
 }
 
 export async function getCompletedTaskIds(db: SQLite.SQLiteDatabase, date: string): Promise<number[]> {
