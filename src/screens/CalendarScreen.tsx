@@ -18,8 +18,8 @@ const C = {
   primary:   '#60a5fa',
   onPrimary: '#ffffff',
   onDark:    '#2d3748',
-  muted:     '#93c5fd',
-  stone:     '#3b82f6',
+  muted:     '#111827',
+  stone:     '#111827',
   cellEmpty: '#eef4ff',
 };
 
@@ -35,7 +35,7 @@ export default function CalendarScreen({ navigation }: Props) {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
-  const [columns, setColumns] = useState<1 | 2 | 3>(2);
+  const [columns, setColumns] = useState<1 | 2>(2);
   const [tasks, setTasks] = useState<Task[]>([]);
   // task_id -> set of completed day-of-month numbers
   const [doneByTask, setDoneByTask] = useState<Record<number, Set<number>>>({});
@@ -61,8 +61,8 @@ export default function CalendarScreen({ navigation }: Props) {
 
   const screenW = Dimensions.get('window').width;
   const cardW = (screenW - PAGE_PAD * 2 - GRID_GAP * (columns - 1)) / columns;
-  const numSize = columns === 1 ? 13 : columns === 2 ? 11 : 9;
-  const labelSize = columns === 1 ? 11 : columns === 2 ? 10 : 8;
+  const numSize = columns === 1 ? 13 : 11;
+  const labelSize = columns === 1 ? 11 : 10;
 
   const firstDow = new Date(year, month - 1, 1).getDay();
   const daysInMonth = new Date(year, month, 0).getDate();
@@ -119,7 +119,7 @@ export default function CalendarScreen({ navigation }: Props) {
           </TouchableOpacity>
         </View>
         <View style={s.colRow}>
-          {([1, 2, 3] as const).map((n) => (
+          {([1, 2] as const).map((n) => (
             <TouchableOpacity
               key={n}
               style={[s.colChip, columns === n && s.colChipActive]}
@@ -183,7 +183,7 @@ const s = StyleSheet.create({
   colChip: { borderWidth: 1, borderColor: 'rgba(255,255,255,0.5)', borderRadius: 16, paddingHorizontal: 16, paddingVertical: 5 },
   colChipActive: { backgroundColor: '#ffffff', borderColor: '#ffffff' },
   colChipText: { color: 'rgba(255,255,255,0.9)', fontSize: 12, fontWeight: '700' },
-  colChipTextActive: { color: C.header },
+  colChipTextActive: { color: C.onDark },
 
   body: { flex: 1, backgroundColor: C.body },
   gridPage: { padding: PAGE_PAD, flexDirection: 'row', flexWrap: 'wrap', gap: GRID_GAP },
@@ -208,7 +208,7 @@ const s = StyleSheet.create({
   dayNum: { fontWeight: '600', color: C.onDark },
   dayNumDone: { color: C.onPrimary, fontWeight: '800' },
   sun: { color: '#e53e3e' },
-  sat: { color: '#3182ce' },
+  sat: { color: C.onDark },
 
   empty: { paddingVertical: 60, alignItems: 'center', gap: 8 },
   emptyTitle: { color: C.stone, fontSize: 16, fontWeight: '700' },

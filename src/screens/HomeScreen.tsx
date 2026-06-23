@@ -13,7 +13,7 @@ import * as Notifications from 'expo-notifications';
 import { RootStackParamList } from '../../App';
 import {
   Task, TaskFields, getToday, getTasks, addTask, updateTask, deleteTask,
-  getCompletedTaskIds, markComplete, markIncomplete,
+  getCompletedTaskIds, markComplete, markIncomplete, updateTaskSortOrders,
 } from '../db/database';
 import {
   TASK_ICONS, PRIORITIES, priorityMeta, WEEKDAYS,
@@ -30,8 +30,8 @@ const C = {
   primary:   '#60a5fa',
   onPrimary: '#ffffff',
   onDark:    '#2d3748',
-  muted:     '#93c5fd',
-  stone:     '#3b82f6',
+  muted:     '#111827',
+  stone:     '#111827',
   error:     '#e52020',
 };
 
@@ -39,6 +39,8 @@ type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'Home'>
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const daysToCsv = (days: number[]) => days.slice().sort((a, b) => a - b).join(',');
+const DRAG_ROW_HEIGHT = 88;
+const SWIPE_DELETE_THRESHOLD = 92;
 
 // Minimal shape required to schedule a task's reminder.
 type Schedulable = {
@@ -109,6 +111,7 @@ export default function HomeScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const screen = Dimensions.get('window');
   const [tasks, setTasks] = useState<Task[]>([]);
+  const tasksRef = useRef<Task[]>([]);
   const [completedIds, setCompletedIds] = useState<Set<number>>(new Set());
   const [showThumb, setShowThumb] = useState(false);
   const thumbAnim = useRef(new Animated.Value(0)).current;
@@ -116,6 +119,9 @@ export default function HomeScreen({ navigation }: Props) {
   const fabPosition = useRef({ x: Math.max(screen.width - 72, 20), y: Math.max(screen.height - 150, 120) });
   const fabStartPosition = useRef(fabPosition.current);
   const fabAnim = useRef(new Animated.ValueXY(fabPosition.current)).current;
+  const dragState = useRef({ taskId: null as number | null, startIndex: 0, currentIndex: 0, changed: false });
+  const swipeState = useRef({ taskId: null as number | null });
+  const swipeAnim = useRef(new Animated.Value(0)).current;
   const today = getToday();
 
   // Add task sheet draft
@@ -148,6 +154,10 @@ export default function HomeScreen({ navigation }: Props) {
   }, [db, today]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  useEffect(() => {
+    tasksRef.current = tasks;
+  }, [tasks]);
 
   // Keep monthly-nth reminders (which can't natively repeat) armed for the next occurrence.
   useFocusEffect(useCallback(() => {
@@ -309,12 +319,91 @@ export default function HomeScreen({ navigation }: Props) {
   const total = tasks.length;
   const progress = total > 0 ? done / total : 0;
   const sortedTasks = [...tasks].sort((a, b) => {
-    const aDone = completedIds.has(a.id) ? 1 : 0;
-    const bDone = completedIds.has(b.id) ? 1 : 0;
-    if (aDone !== bDone) return bDone - aDone;
-    if (a.priority !== b.priority) return b.priority - a.priority;
     if (a.sort_order !== b.sort_order) return a.sort_order - b.sort_order;
     return a.id - b.id;
+  });
+
+  const persistTaskOrder = async () => {
+    const ordered = [...tasksRef.current].sort((a, b) => {
+      if (a.sort_order !== b.sort_order) return a.sort_order - b.sort_order;
+      return a.id - b.id;
+    });
+    await updateTaskSortOrders(db, ordered.map((task) => task.id));
+    load();
+  };
+
+  const moveTask = (taskId: number, toIndex: number) => {
+    setTasks((current) => {
+      const ordered = [...current].sort((a, b) => {
+        if (a.sort_order !== b.sort_order) return a.sort_order - b.sort_order;
+        return a.id - b.id;
+      });
+      const fromIndex = ordered.findIndex((task) => task.id === taskId);
+      if (fromIndex < 0) return current;
+      const nextIndex = Math.max(0, Math.min(toIndex, ordered.length - 1));
+      if (fromIndex === nextIndex) return current;
+      const [moved] = ordered.splice(fromIndex, 1);
+      ordered.splice(nextIndex, 0, moved);
+      dragState.current.currentIndex = nextIndex;
+      dragState.current.changed = true;
+      return ordered.map((task, index) => ({ ...task, sort_order: index }));
+    });
+  };
+
+  const startDrag = (taskId: number, index: number) => {
+    dragState.current = { taskId, startIndex: index, currentIndex: index, changed: false };
+  };
+
+  const updateDrag = (dy: number) => {
+    const { taskId, startIndex } = dragState.current;
+    if (taskId == null) return;
+    const nextIndex = Math.max(0, Math.min(startIndex + Math.round(dy / DRAG_ROW_HEIGHT), tasksRef.current.length - 1));
+    if (nextIndex !== dragState.current.currentIndex) moveTask(taskId, nextIndex);
+  };
+
+  const endDrag = () => {
+    if (dragState.current.changed) persistTaskOrder();
+    dragState.current = { taskId: null, startIndex: 0, currentIndex: 0, changed: false };
+  };
+
+  const resetSwipe = () => {
+    swipeState.current.taskId = null;
+    Animated.spring(swipeAnim, { toValue: 0, useNativeDriver: true, tension: 180, friction: 12 }).start();
+  };
+
+  const createTaskPanResponder = (task: Task, index: number) => PanResponder.create({
+    onStartShouldSetPanResponder: () => false,
+    onMoveShouldSetPanResponder: (_, gesture) => {
+      if (dragState.current.taskId === task.id) return true;
+      return Math.abs(gesture.dx) > 18 && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.4;
+    },
+    onPanResponderGrant: () => {
+      if (dragState.current.taskId !== task.id) {
+        swipeState.current.taskId = task.id;
+        swipeAnim.setValue(0);
+      }
+    },
+    onPanResponderMove: (_, gesture) => {
+      if (dragState.current.taskId === task.id) {
+        updateDrag(gesture.dy);
+        return;
+      }
+      swipeAnim.setValue(Math.max(-130, Math.min(130, gesture.dx)));
+    },
+    onPanResponderRelease: (_, gesture) => {
+      if (dragState.current.taskId === task.id) {
+        endDrag();
+        return;
+      }
+      if (Math.abs(gesture.dx) >= SWIPE_DELETE_THRESHOLD) {
+        handleDelete(task);
+      }
+      resetSwipe();
+    },
+    onPanResponderTerminate: () => {
+      if (dragState.current.taskId === task.id) endDrag();
+      resetSwipe();
+    },
   });
   const clampFab = (x: number, y: number) => ({
     x: Math.max(8, Math.min(x, screen.width - 60)),
@@ -538,10 +627,14 @@ export default function HomeScreen({ navigation }: Props) {
             <Text style={s.emptyBody}>右下の ＋ から追加できます</Text>
           </View>
         }
-        renderItem={({ item }) => {
+        renderItem={({ item, index }) => {
           const isDone = completedIds.has(item.id);
+          const panResponder = createTaskPanResponder(item, index);
+          const swipeStyle = swipeState.current.taskId === item.id
+            ? { transform: [{ translateX: swipeAnim }] }
+            : null;
           return (
-            <View style={[s.taskCard, isDone && s.taskCardDone]}>
+            <Animated.View style={[s.taskCard, isDone && s.taskCardDone, swipeStyle]} {...panResponder.panHandlers}>
               <TouchableOpacity
                 style={[s.checkBox, isDone && s.checkBoxDone]}
                 onPress={() => toggle(item.id)}
@@ -549,7 +642,13 @@ export default function HomeScreen({ navigation }: Props) {
               >
                 {isDone && <Text style={s.checkMark}>✓</Text>}
               </TouchableOpacity>
-              <TouchableOpacity style={s.taskBody} onPress={() => openDetail(item)} activeOpacity={0.7}>
+              <TouchableOpacity
+                style={s.taskBody}
+                onPress={() => openDetail(item)}
+                onLongPress={() => startDrag(item.id, index)}
+                delayLongPress={250}
+                activeOpacity={0.7}
+              >
                 {item.icon && <Text style={s.taskIcon}>{item.icon}</Text>}
                 <View style={s.taskTextWrap}>
                   <Text style={[s.taskTitle, isDone && s.taskTitleDone]} numberOfLines={2}>{item.title}</Text>
@@ -563,10 +662,10 @@ export default function HomeScreen({ navigation }: Props) {
                 </View>
                 {isDone && <View style={s.doneBadge}><Text style={s.doneBadgeText}>完了</Text></View>}
               </TouchableOpacity>
-              <TouchableOpacity style={s.deleteBtn} onPress={() => handleDelete(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Text style={s.deleteBtnText}>🗑️</Text>
+              <TouchableOpacity style={s.tagBtn} onPress={() => openDetail(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Text style={s.tagIcon}>🏷</Text>
               </TouchableOpacity>
-            </View>
+            </Animated.View>
           );
         }}
         ListFooterComponent={<View style={{ height: 80 }} />}
@@ -812,8 +911,8 @@ const s = StyleSheet.create({
   freqTag: { color: C.muted, fontSize: 10, fontWeight: '700' },
   doneBadge: { backgroundColor: C.header, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
   doneBadgeText: { color: C.onPrimary, fontSize: 9, fontWeight: '700', letterSpacing: 0.5 },
-  deleteBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#fee2e2', alignItems: 'center', justifyContent: 'center' },
-  deleteBtnText: { fontSize: 16 },
+  tagBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center' },
+  tagIcon: { fontSize: 17 },
 
   empty: { paddingVertical: 60, alignItems: 'center', gap: 8 },
   emptyTitle: { color: C.stone, fontSize: 16, fontWeight: '700' },

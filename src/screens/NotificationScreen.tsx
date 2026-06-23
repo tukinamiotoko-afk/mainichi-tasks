@@ -29,8 +29,8 @@ const C = {
   primary: '#60a5fa',
   onPrimary: '#ffffff',
   onDark: '#2d3748',
-  muted: '#93c5fd',
-  stone: '#3b82f6',
+  muted: '#111827',
+  stone: '#111827',
   error: '#e52020',
 };
 
@@ -276,7 +276,7 @@ const s = StyleSheet.create({
   logMain: { flex: 1, gap: 2 },
   logTitle: { color: C.onDark, fontSize: 13, fontWeight: '700' },
   logTime: { color: C.muted, fontSize: 11, fontWeight: '700' },
-  logDuration: { color: C.primary, fontSize: 15, fontWeight: '800' },
+  logDuration: { color: C.onDark, fontSize: 15, fontWeight: '800' },
   typeCard: { backgroundColor: C.card, borderRadius: 12, padding: 14, gap: 10, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4 },
   typeLabel: { color: C.stone, fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
   typeRow: { flexDirection: 'row', gap: 8 },

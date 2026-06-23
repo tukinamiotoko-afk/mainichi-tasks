@@ -105,7 +105,10 @@ const TASK_COLUMNS: (keyof TaskFields)[] = [
 ];
 
 export async function addTask(db: SQLite.SQLiteDatabase, title: string): Promise<number> {
-  const result = await db.runAsync('INSERT INTO tasks (title) VALUES (?)', [title]);
+  const row = await db.getFirstAsync<{ next_order: number | null }>(
+    'SELECT COALESCE(MAX(sort_order), -1) + 1 as next_order FROM tasks'
+  );
+  const result = await db.runAsync('INSERT INTO tasks (title, sort_order) VALUES (?, ?)', [title, row?.next_order ?? 0]);
   return result.lastInsertRowId;
 }
 
@@ -119,6 +122,14 @@ export async function updateTask(db: SQLite.SQLiteDatabase, id: number, fields: 
   if (sets.length === 0) return;
   values.push(id);
   await db.runAsync(`UPDATE tasks SET ${sets.join(', ')} WHERE id = ?`, values);
+}
+
+export async function updateTaskSortOrders(db: SQLite.SQLiteDatabase, orderedIds: number[]): Promise<void> {
+  await db.withTransactionAsync(async () => {
+    for (let index = 0; index < orderedIds.length; index += 1) {
+      await db.runAsync('UPDATE tasks SET sort_order = ? WHERE id = ?', [index, orderedIds[index]]);
+    }
+  });
 }
 
 export async function deleteTask(db: SQLite.SQLiteDatabase, id: number): Promise<string[]> {

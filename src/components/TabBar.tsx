@@ -17,7 +17,7 @@ interface Props {
   navigation: { navigate: (screen: string) => void };
 }
 
-const C = { card: '#ffffff', border: '#dbeafe', primary: '#60a5fa', muted: '#93c5fd' };
+const C = { card: '#ffffff', border: '#dbeafe', primary: '#111827', muted: '#111827' };
 
 export default function TabBar({ current, navigation }: Props) {
   const insets = useSafeAreaInsets();

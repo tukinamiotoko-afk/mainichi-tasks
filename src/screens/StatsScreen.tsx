@@ -19,8 +19,8 @@ const C = {
   primary:   '#60a5fa',
   onPrimary: '#ffffff',
   onDark:    '#2d3748',
-  muted:     '#93c5fd',
-  stone:     '#3b82f6',
+  muted:     '#111827',
+  stone:     '#111827',
   warning:   '#df6500',
 };
 
