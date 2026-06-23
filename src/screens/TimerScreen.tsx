@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, StatusBar, Alert, ScrollView, TextInput } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -67,6 +67,7 @@ function secondsToMinutesText(seconds: number): string {
 
 export default function TimerScreen({ navigation }: Props) {
   const db = useSQLiteContext();
+  const insets = useSafeAreaInsets();
   const today = getToday();
   const startedAtRef = useRef<string | null>(null);
   const finishingRef = useRef(false);
@@ -411,20 +412,20 @@ export default function TimerScreen({ navigation }: Props) {
   };
 
   return (
-    <SafeAreaView style={s.safeArea} edges={['top', 'bottom']}>
-      <StatusBar barStyle="light-content" backgroundColor={C.header} />
-      <LinearGradient colors={GRAD.header} start={GRAD_START} end={GRAD_END} style={s.headerCard}>
+    <View style={s.safeArea}>
+      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+      <LinearGradient colors={GRAD.header} start={GRAD_START} end={GRAD_END} style={[s.headerCard, { paddingTop: insets.top + 12 }]}>
         <Text style={s.headerTitle}>タイマー</Text>
         <Text style={s.headerSub}>今日の作業時間 {formatDuration(totalSeconds, true)}</Text>
       </LinearGradient>
       {selectedTask ? renderTimer() : renderTaskList()}
       <TabBar current="Timer" navigation={navigation} />
-    </SafeAreaView>
+    </View>
   );
 }
 
 const s = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: C.header },
+  safeArea: { flex: 1, backgroundColor: C.body },
   headerCard: { backgroundColor: C.header, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16, gap: 4 },
   headerTitle: { color: C.onPrimary, fontSize: 20, fontWeight: '700' },
   headerSub: { color: 'rgba(255,255,255,0.8)', fontSize: 12, fontWeight: '700' },

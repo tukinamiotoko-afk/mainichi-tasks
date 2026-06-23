@@ -4,7 +4,7 @@ import {
   TextInput, StyleSheet, Alert, KeyboardAvoidingView,
   Platform, StatusBar, Animated, ScrollView, PanResponder, Dimensions, Switch,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -106,6 +106,7 @@ async function rescheduleTask(task: Schedulable): Promise<string | null> {
 
 export default function HomeScreen({ navigation }: Props) {
   const db = useSQLiteContext();
+  const insets = useSafeAreaInsets();
   const screen = Dimensions.get('window');
   const [tasks, setTasks] = useState<Task[]>([]);
   const [completedIds, setCompletedIds] = useState<Set<number>>(new Set());
@@ -504,10 +505,10 @@ export default function HomeScreen({ navigation }: Props) {
   );
 
   return (
-    <SafeAreaView style={s.safeArea} edges={['top', 'bottom']}>
-      <StatusBar barStyle="light-content" backgroundColor={C.header} />
+    <View style={s.safeArea}>
+      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
-      <LinearGradient colors={GRAD.header} start={GRAD_START} end={GRAD_END} style={s.headerCard}>
+      <LinearGradient colors={GRAD.header} start={GRAD_START} end={GRAD_END} style={[s.headerCard, { paddingTop: insets.top + 12 }]}>
         <Text style={s.dateText}>{dateLabel}</Text>
         <Text style={s.headerLabel}>今日の進捗</Text>
         <View style={s.progressRow}>
@@ -770,12 +771,12 @@ export default function HomeScreen({ navigation }: Props) {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const s = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: C.header },
+  safeArea: { flex: 1, backgroundColor: C.body },
 
   headerCard: { backgroundColor: C.header, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 24 },
   dateText: { color: 'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: '600', marginBottom: 12 },

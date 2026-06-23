@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, Platform, StatusBar } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -35,6 +35,7 @@ function toDateString(d: Date): string {
 
 export default function StatsScreen({ navigation }: Props) {
   const db = useSQLiteContext();
+  const insets = useSafeAreaInsets();
   const today = getToday();
 
   const [period, setPeriod] = useState<Period>('7日');
@@ -83,10 +84,10 @@ export default function StatsScreen({ navigation }: Props) {
   const barColor = (rate: number) => rate >= 0.8 ? C.primary : rate >= 0.5 ? C.warning : C.muted;
 
   return (
-    <SafeAreaView style={s.safeArea} edges={['top', 'bottom']}>
-      <StatusBar barStyle="light-content" backgroundColor={C.header} />
+    <View style={s.safeArea}>
+      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
-      <LinearGradient colors={GRAD.header} start={GRAD_START} end={GRAD_END} style={s.headerCard}>
+      <LinearGradient colors={GRAD.header} start={GRAD_START} end={GRAD_END} style={[s.headerCard, { paddingTop: insets.top + 12 }]}>
         <Text style={s.headerTitle}>実行率</Text>
         <View style={s.periodBar}>
           {(['7日', '30日', '全期間', '任意'] as Period[]).map((p) => (
@@ -175,12 +176,12 @@ export default function StatsScreen({ navigation }: Props) {
         <DateTimePicker value={customEnd} mode="date" display={Platform.OS === 'ios' ? 'inline' : 'default'} minimumDate={customStart} maximumDate={new Date()}
           onChange={(_, date) => { setShowEndPicker(Platform.OS === 'ios'); if (date) setCustomEnd(date); }} />
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 
 const s = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: C.header },
+  safeArea: { flex: 1, backgroundColor: C.body },
   headerCard: { backgroundColor: C.header, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20, gap: 16 },
   headerTitle: { color: '#ffffff', fontSize: 20, fontWeight: '700' },
   periodBar: { flexDirection: 'row', gap: 8 },

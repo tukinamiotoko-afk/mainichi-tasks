@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const TABS = [
   { name: 'Home', label: 'タスク', icon: '✓' },
@@ -19,8 +20,9 @@ interface Props {
 const C = { card: '#ffffff', border: '#dbeafe', primary: '#60a5fa', muted: '#93c5fd' };
 
 export default function TabBar({ current, navigation }: Props) {
+  const insets = useSafeAreaInsets();
   return (
-    <View style={s.tabBar}>
+    <View style={[s.tabBar, { height: 56 + insets.bottom, paddingBottom: insets.bottom }]}>
       {TABS.map(({ name, label, icon }) => {
         const active = current === name;
         return (
@@ -44,9 +46,8 @@ const s = StyleSheet.create({
     backgroundColor: C.card,
     borderTopWidth: 1,
     borderTopColor: C.border,
-    height: 56,
   },
-  tabItem: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 2 },
+  tabItem: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 2, paddingTop: 4 },
   tabItemActive: { borderTopWidth: 2, borderTopColor: C.primary },
   tabIcon: { color: C.muted, fontSize: 16, fontWeight: '700' },
   tabLabel: { color: C.muted, fontSize: 9, fontWeight: '700' },

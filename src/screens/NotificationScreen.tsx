@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, Platform, Alert, StatusBar } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useFocusEffect } from '@react-navigation/native';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -80,6 +80,7 @@ async function scheduleNotification(time: string, type: NotifType): Promise<stri
 
 export default function NotificationScreen({ navigation }: Props) {
   const db = useSQLiteContext();
+  const insets = useSafeAreaInsets();
   const today = getToday();
   const [settings, setSettings] = useState<NotificationSetting[]>([]);
   const [timeLogs, setTimeLogs] = useState<TimeLog[]>([]);
@@ -146,10 +147,10 @@ export default function NotificationScreen({ navigation }: Props) {
   };
 
   return (
-    <SafeAreaView style={s.safeArea} edges={['top', 'bottom']}>
-      <StatusBar barStyle="light-content" backgroundColor={C.header} />
+    <View style={s.safeArea}>
+      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
-      <LinearGradient colors={GRAD.header} start={GRAD_START} end={GRAD_END} style={s.headerCard}>
+      <LinearGradient colors={GRAD.header} start={GRAD_START} end={GRAD_END} style={[s.headerCard, { paddingTop: insets.top + 12 }]}>
         <Text style={s.headerTitle}>通知</Text>
       </LinearGradient>
 
@@ -254,12 +255,12 @@ export default function NotificationScreen({ navigation }: Props) {
           </TouchableOpacity>
         </View>
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 
 const s = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: C.header },
+  safeArea: { flex: 1, backgroundColor: C.body },
   headerCard: { backgroundColor: C.header, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20 },
   headerTitle: { color: '#ffffff', fontSize: 20, fontWeight: '700' },
 
