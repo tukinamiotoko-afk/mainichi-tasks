@@ -311,30 +311,41 @@ export default function TimerScreen({ navigation }: Props) {
           </Text>
 
           <View style={s.controls}>
-            {running ? (
-              <>
-                {paused ? (
-                  <TouchableOpacity style={[s.controlBtn, s.startBtn]} onPress={start}>
-                    <Text style={s.controlBtnText}>再開</Text>
-                  </TouchableOpacity>
-                ) : (
-                  <TouchableOpacity style={[s.controlBtn, s.pauseBtn]} onPress={pause}>
-                    <Text style={s.controlBtnText}>一時停止</Text>
-                  </TouchableOpacity>
-                )}
-                <TouchableOpacity style={[s.controlBtn, s.stopBtn]} onPress={stop}>
-                  <Text style={s.controlBtnText}>停止して保存</Text>
+            {/* Play / Pause toggle */}
+            <View style={s.controlItem}>
+              <TouchableOpacity
+                style={[s.iconCircle, s.playCircle]}
+                onPress={() => { if (!running || paused) start(); else pause(); }}
+                activeOpacity={0.85}
+              >
+                <Text style={s.iconGlyph}>{running && !paused ? '⏸' : '▶'}</Text>
+              </TouchableOpacity>
+              <Text style={s.controlCaption}>
+                {!running ? '開始' : paused ? '再開' : '一時停止'}
+              </Text>
+            </View>
+
+            {/* Stop (square) — saves and finishes */}
+            <View style={s.controlItem}>
+              <TouchableOpacity
+                style={[s.iconCircle, s.stopCircle, !running && s.iconCircleDisabled]}
+                onPress={stop}
+                disabled={!running}
+                activeOpacity={0.85}
+              >
+                <View style={s.square} />
+              </TouchableOpacity>
+              <Text style={[s.controlCaption, !running && s.controlCaptionDisabled]}>保存</Text>
+            </View>
+
+            {/* Reset — only when idle */}
+            {!running && (
+              <View style={s.controlItem}>
+                <TouchableOpacity style={[s.iconCircle, s.resetCircle]} onPress={reset} activeOpacity={0.85}>
+                  <Text style={s.resetGlyph}>↺</Text>
                 </TouchableOpacity>
-              </>
-            ) : (
-              <>
-                <TouchableOpacity style={[s.controlBtn, s.startBtn]} onPress={start}>
-                  <Text style={s.controlBtnText}>開始</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={s.resetBtn} onPress={reset}>
-                  <Text style={s.resetBtnText}>リセット</Text>
-                </TouchableOpacity>
-              </>
+                <Text style={s.controlCaption}>リセット</Text>
+              </View>
             )}
           </View>
         </View>
@@ -437,14 +448,18 @@ const s = StyleSheet.create({
   modeChipTextActive: { color: C.onPrimary },
   timerText: { color: C.onDark, fontSize: 56, fontWeight: '800', textAlign: 'center' },
   timerHint: { color: C.muted, fontSize: 12, fontWeight: '700', textAlign: 'center' },
-  controls: { flexDirection: 'row', gap: 10 },
-  controlBtn: { flex: 1, borderRadius: 10, paddingVertical: 13, alignItems: 'center' },
-  startBtn: { backgroundColor: C.success },
-  pauseBtn: { backgroundColor: C.warning },
-  stopBtn: { backgroundColor: C.danger },
-  controlBtnText: { color: C.onPrimary, fontSize: 14, fontWeight: '800' },
-  resetBtn: { flex: 1, borderWidth: 1, borderColor: C.border, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 13, alignItems: 'center' },
-  resetBtnText: { color: C.stone, fontSize: 13, fontWeight: '800' },
+  controls: { flexDirection: 'row', justifyContent: 'center', alignItems: 'flex-start', gap: 28, paddingVertical: 4 },
+  controlItem: { alignItems: 'center', gap: 6 },
+  iconCircle: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center', elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.18, shadowRadius: 4 },
+  iconCircleDisabled: { opacity: 0.4, elevation: 0 },
+  playCircle: { backgroundColor: C.success },
+  stopCircle: { backgroundColor: C.danger },
+  resetCircle: { backgroundColor: C.card, borderWidth: 1, borderColor: C.border },
+  iconGlyph: { color: C.onPrimary, fontSize: 26, fontWeight: '900', marginLeft: 2 },
+  square: { width: 22, height: 22, borderRadius: 4, backgroundColor: C.onPrimary },
+  resetGlyph: { color: C.stone, fontSize: 26, fontWeight: '900' },
+  controlCaption: { color: C.stone, fontSize: 12, fontWeight: '800' },
+  controlCaptionDisabled: { color: C.muted },
   targetBox: { backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 12, padding: 14, gap: 8 },
   targetAdjustRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   targetAdjustBtn: { borderWidth: 1, borderColor: C.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
