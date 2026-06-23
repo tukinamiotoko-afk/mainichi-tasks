@@ -261,7 +261,7 @@ export default function TimerScreen({ navigation }: Props) {
         ) : tasks.map((task) => (
           <TouchableOpacity key={task.id} style={s.taskSelectCard} onPress={() => chooseTask(task.id)}>
             <View style={s.radio} />
-            <Text style={s.taskSelectTitle} numberOfLines={2}>{task.title}</Text>
+            <Text style={s.taskSelectTitle} numberOfLines={2}>{task.icon ? `${task.icon} ` : ''}{task.title}</Text>
             <Text style={s.openText}>計る</Text>
           </TouchableOpacity>
         ))}

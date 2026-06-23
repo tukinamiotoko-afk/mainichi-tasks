@@ -125,7 +125,7 @@ export default function CalendarScreen({ navigation }: Props) {
             {selectedCompletions.map((c, i) => (
               <View key={i} style={s.completionRow}>
                 <Text style={s.completionTime}>{formatTime(c.completed_at)}</Text>
-                <Text style={s.completionTitle}>{c.title}</Text>
+                <Text style={s.completionTitle}>{c.icon ? `${c.icon} ` : ''}{c.title}</Text>
               </View>
             ))}
           </View>

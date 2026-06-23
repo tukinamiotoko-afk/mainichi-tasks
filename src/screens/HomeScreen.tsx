@@ -12,11 +12,12 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Notifications from 'expo-notifications';
 import { RootStackParamList } from '../../App';
 import {
-  Task, getToday, getTasks, addTask, updateTask, deleteTask,
+  Task, TaskFields, getToday, getTasks, addTask, updateTask, deleteTask,
   getCompletedTaskIds, markComplete, markIncomplete,
   NotificationSetting, getNotificationSettingsForTask,
   addNotificationSetting, deleteNotificationSetting,
 } from '../db/database';
+import { TASK_ICONS, PRIORITIES, priorityMeta, FREQUENCIES } from '../constants/taskMeta';
 import TabBar from '../components/TabBar';
 
 const C = {
@@ -57,6 +58,9 @@ export default function HomeScreen({ navigation }: Props) {
   const [completedIds, setCompletedIds] = useState<Set<number>>(new Set());
   const [showAdd, setShowAdd] = useState(false);
   const [newTitle, setNewTitle] = useState('');
+  const [newIcon, setNewIcon] = useState<string | null>(null);
+  const [newPriority, setNewPriority] = useState(1);
+  const [newFrequency, setNewFrequency] = useState<string>('毎日');
   const [addNotifs, setAddNotifs] = useState<{ time: string; type: NotifType }[]>([]);
   const [showAddTimePicker, setShowAddTimePicker] = useState(false);
   const [addPickerTime, setAddPickerTime] = useState(new Date());
@@ -108,7 +112,7 @@ export default function HomeScreen({ navigation }: Props) {
   const handleAdd = async () => {
     const title = newTitle.trim();
     if (!title) return;
-    const taskId = await addTask(db, title);
+    const taskId = await addTask(db, title, { icon: newIcon, priority: newPriority, frequency: newFrequency });
     if (addNotifs.length > 0) {
       const { status } = await Notifications.requestPermissionsAsync();
       if (status === 'granted') {
@@ -119,6 +123,9 @@ export default function HomeScreen({ navigation }: Props) {
       }
     }
     setNewTitle('');
+    setNewIcon(null);
+    setNewPriority(1);
+    setNewFrequency('毎日');
     setAddNotifs([]);
     setShowAdd(false);
     load();
@@ -127,6 +134,9 @@ export default function HomeScreen({ navigation }: Props) {
   const closeAddSheet = () => {
     setShowAdd(false);
     setNewTitle('');
+    setNewIcon(null);
+    setNewPriority(1);
+    setNewFrequency('毎日');
     setAddNotifs([]);
     setShowAddTimePicker(false);
   };
@@ -146,8 +156,15 @@ export default function HomeScreen({ navigation }: Props) {
 
   const handleSaveTitle = async () => {
     if (!detailTask || !detailTitle.trim()) return;
-    await updateTask(db, detailTask.id, detailTitle.trim());
+    await updateTask(db, detailTask.id, { title: detailTitle.trim() });
     setDetailTask(t => t ? { ...t, title: detailTitle.trim() } : null);
+    load();
+  };
+
+  const updateDetailMeta = async (fields: TaskFields) => {
+    if (!detailTask) return;
+    await updateTask(db, detailTask.id, fields);
+    setDetailTask(t => t ? { ...t, ...fields } : null);
     load();
   };
 
@@ -199,6 +216,7 @@ export default function HomeScreen({ navigation }: Props) {
     const aDone = completedIds.has(a.id) ? 1 : 0;
     const bDone = completedIds.has(b.id) ? 1 : 0;
     if (aDone !== bDone) return bDone - aDone;
+    if (a.priority !== b.priority) return b.priority - a.priority;
     if (a.sort_order !== b.sort_order) return a.sort_order - b.sort_order;
     return a.id - b.id;
   });
@@ -287,9 +305,18 @@ export default function HomeScreen({ navigation }: Props) {
                 {isDone && <Text style={s.checkMark}>✓</Text>}
               </TouchableOpacity>
               <TouchableOpacity style={s.taskBody} onPress={() => openDetail(item)} activeOpacity={0.7}>
-                <Text style={[s.taskTitle, isDone && s.taskTitleDone]} numberOfLines={2}>
-                  {item.title}
-                </Text>
+                {item.icon && <Text style={s.taskIcon}>{item.icon}</Text>}
+                <View style={s.taskTextWrap}>
+                  <Text style={[s.taskTitle, isDone && s.taskTitleDone]} numberOfLines={2}>
+                    {item.title}
+                  </Text>
+                  <View style={s.taskMetaRow}>
+                    <View style={[s.priorityBadge, { backgroundColor: priorityMeta(item.priority).color }]}>
+                      <Text style={s.priorityBadgeText}>{priorityMeta(item.priority).label}</Text>
+                    </View>
+                    {item.frequency !== '毎日' && <Text style={s.freqTag}>{item.frequency}</Text>}
+                  </View>
+                </View>
                 {isDone && <View style={s.doneBadge}><Text style={s.doneBadgeText}>完了</Text></View>}
               </TouchableOpacity>
               <TouchableOpacity style={s.deleteBtn} onPress={() => handleDelete(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -329,6 +356,7 @@ export default function HomeScreen({ navigation }: Props) {
             <TouchableOpacity activeOpacity={1} onPress={() => {}}>
               <View style={s.sheet}>
                 <View style={s.sheetHandle} />
+                <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                 <Text style={s.sheetSection}>タスク名</Text>
                 <View style={s.sheetTitleRow}>
                   <TextInput
@@ -348,6 +376,51 @@ export default function HomeScreen({ navigation }: Props) {
                   >
                     <Text style={s.sheetSaveBtnText}>追加</Text>
                   </TouchableOpacity>
+                </View>
+
+                <Text style={[s.sheetSection, { marginTop: 16 }]}>アイコン</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.iconRow}>
+                  <TouchableOpacity
+                    style={[s.iconChip, newIcon === null && s.iconChipActive]}
+                    onPress={() => setNewIcon(null)}
+                  >
+                    <Text style={s.iconNone}>なし</Text>
+                  </TouchableOpacity>
+                  {TASK_ICONS.map((ic) => (
+                    <TouchableOpacity
+                      key={ic}
+                      style={[s.iconChip, newIcon === ic && s.iconChipActive]}
+                      onPress={() => setNewIcon(ic)}
+                    >
+                      <Text style={s.iconEmoji}>{ic}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+
+                <Text style={[s.sheetSection, { marginTop: 16 }]}>優先度</Text>
+                <View style={s.typeRow}>
+                  {PRIORITIES.map((p) => (
+                    <TouchableOpacity
+                      key={p.value}
+                      style={[s.typeChip, newPriority === p.value && { backgroundColor: p.color, borderColor: p.color }]}
+                      onPress={() => setNewPriority(p.value)}
+                    >
+                      <Text style={[s.typeChipText, newPriority === p.value && s.typeChipTextActive]}>{p.label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                <Text style={[s.sheetSection, { marginTop: 16 }]}>頻度</Text>
+                <View style={s.typeRow}>
+                  {FREQUENCIES.map((f) => (
+                    <TouchableOpacity
+                      key={f}
+                      style={[s.typeChip, newFrequency === f && s.typeChipActive]}
+                      onPress={() => setNewFrequency(f)}
+                    >
+                      <Text style={[s.typeChipText, newFrequency === f && s.typeChipTextActive]}>{f}</Text>
+                    </TouchableOpacity>
+                  ))}
                 </View>
 
                 <Text style={[s.sheetSection, { marginTop: 16 }]}>通知</Text>
@@ -373,6 +446,7 @@ export default function HomeScreen({ navigation }: Props) {
                 <TouchableOpacity style={s.addNotifBtn} onPress={() => setShowAddTimePicker(true)}>
                   <Text style={s.addNotifBtnText}>通知時間を追加</Text>
                 </TouchableOpacity>
+                </ScrollView>
               </View>
             </TouchableOpacity>
           </KeyboardAvoidingView>
@@ -386,6 +460,7 @@ export default function HomeScreen({ navigation }: Props) {
             <TouchableOpacity activeOpacity={1} onPress={() => {}}>
               <View style={s.sheet}>
                 <View style={s.sheetHandle} />
+                <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
                 {/* Title edit */}
                 <Text style={s.sheetSection}>タスク名</Text>
@@ -404,6 +479,54 @@ export default function HomeScreen({ navigation }: Props) {
                   >
                     <Text style={s.sheetSaveBtnText}>保存</Text>
                   </TouchableOpacity>
+                </View>
+
+                {/* Icon section */}
+                <Text style={[s.sheetSection, { marginTop: 16 }]}>アイコン</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.iconRow}>
+                  <TouchableOpacity
+                    style={[s.iconChip, !detailTask?.icon && s.iconChipActive]}
+                    onPress={() => updateDetailMeta({ icon: null })}
+                  >
+                    <Text style={s.iconNone}>なし</Text>
+                  </TouchableOpacity>
+                  {TASK_ICONS.map((ic) => (
+                    <TouchableOpacity
+                      key={ic}
+                      style={[s.iconChip, detailTask?.icon === ic && s.iconChipActive]}
+                      onPress={() => updateDetailMeta({ icon: ic })}
+                    >
+                      <Text style={s.iconEmoji}>{ic}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+
+                {/* Priority section */}
+                <Text style={[s.sheetSection, { marginTop: 16 }]}>優先度</Text>
+                <View style={s.typeRow}>
+                  {PRIORITIES.map((p) => (
+                    <TouchableOpacity
+                      key={p.value}
+                      style={[s.typeChip, detailTask?.priority === p.value && { backgroundColor: p.color, borderColor: p.color }]}
+                      onPress={() => updateDetailMeta({ priority: p.value })}
+                    >
+                      <Text style={[s.typeChipText, detailTask?.priority === p.value && s.typeChipTextActive]}>{p.label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {/* Frequency section */}
+                <Text style={[s.sheetSection, { marginTop: 16 }]}>頻度</Text>
+                <View style={s.typeRow}>
+                  {FREQUENCIES.map((f) => (
+                    <TouchableOpacity
+                      key={f}
+                      style={[s.typeChip, detailTask?.frequency === f && s.typeChipActive]}
+                      onPress={() => updateDetailMeta({ frequency: f })}
+                    >
+                      <Text style={[s.typeChipText, detailTask?.frequency === f && s.typeChipTextActive]}>{f}</Text>
+                    </TouchableOpacity>
+                  ))}
                 </View>
 
                 {/* Notification section */}
@@ -430,6 +553,7 @@ export default function HomeScreen({ navigation }: Props) {
                 <TouchableOpacity style={s.addNotifBtn} onPress={() => setShowTimePicker(true)}>
                   <Text style={s.addNotifBtnText}>＋ 通知時間を追加</Text>
                 </TouchableOpacity>
+                </ScrollView>
               </View>
             </TouchableOpacity>
           </KeyboardAvoidingView>
@@ -520,8 +644,14 @@ const s = StyleSheet.create({
   checkBoxDone: { backgroundColor: C.primary, borderColor: C.primary },
   checkMark: { color: C.onPrimary, fontSize: 11, fontWeight: '700' },
   taskBody: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  taskTitle: { flex: 1, color: C.onDark, fontSize: 14, fontWeight: '500', lineHeight: 20 },
+  taskIcon: { fontSize: 18 },
+  taskTextWrap: { flex: 1, gap: 4 },
+  taskTitle: { color: C.onDark, fontSize: 14, fontWeight: '500', lineHeight: 20 },
   taskTitleDone: { color: C.muted, textDecorationLine: 'line-through' },
+  taskMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  priorityBadge: { borderRadius: 4, paddingHorizontal: 6, paddingVertical: 1 },
+  priorityBadgeText: { color: C.onPrimary, fontSize: 9, fontWeight: '800' },
+  freqTag: { color: C.muted, fontSize: 10, fontWeight: '700' },
   doneBadge: { backgroundColor: C.header, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
   doneBadgeText: { color: C.onPrimary, fontSize: 9, fontWeight: '700', letterSpacing: 0.5 },
   deleteBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#fee2e2', alignItems: 'center', justifyContent: 'center' },
@@ -549,7 +679,7 @@ const s = StyleSheet.create({
   modalConfirmText: { color: C.onPrimary, fontSize: 13, fontWeight: '700' },
 
   sheetBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: C.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingTop: 12, gap: 8 },
+  sheet: { backgroundColor: C.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingTop: 12, gap: 8, maxHeight: '85%' },
   sheetHandle: { width: 40, height: 4, backgroundColor: C.border, borderRadius: 2, alignSelf: 'center', marginBottom: 12 },
   sheetSection: { color: C.muted, fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
   sheetTitleRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
@@ -557,6 +687,11 @@ const s = StyleSheet.create({
   sheetSaveBtn: { backgroundColor: C.primary, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 12 },
   sheetSaveBtnDisabled: { backgroundColor: C.border },
   sheetSaveBtnText: { color: C.onPrimary, fontSize: 13, fontWeight: '700' },
+  iconRow: { gap: 8, paddingVertical: 2 },
+  iconChip: { width: 44, height: 44, borderRadius: 12, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
+  iconChipActive: { backgroundColor: '#eff6ff', borderColor: C.primary },
+  iconEmoji: { fontSize: 22 },
+  iconNone: { color: C.muted, fontSize: 11, fontWeight: '700' },
   typeRow: { flexDirection: 'row', gap: 8 },
   typeChip: { flex: 1, borderWidth: 1, borderColor: C.border, borderRadius: 20, paddingVertical: 8, alignItems: 'center' },
   typeChipActive: { backgroundColor: C.primary, borderColor: C.primary },

@@ -23,6 +23,7 @@ const C = {
 };
 
 type Period = '7日' | '30日' | '全期間' | '任意';
+type FreqFilter = 'すべて' | '毎日' | 'その他';
 type Rate = { task: Task; completed: number; total: number; rate: number };
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'Stats'> };
 
@@ -35,6 +36,7 @@ export default function StatsScreen({ navigation }: Props) {
   const today = getToday();
 
   const [period, setPeriod] = useState<Period>('7日');
+  const [freqFilter, setFreqFilter] = useState<FreqFilter>('すべて');
   const [customStart, setCustomStart] = useState<Date>(() => { const d = new Date(); d.setDate(d.getDate() - 6); return d; });
   const [customEnd, setCustomEnd] = useState<Date>(new Date());
   const [showStartPicker, setShowStartPicker] = useState(false);
@@ -42,7 +44,8 @@ export default function StatsScreen({ navigation }: Props) {
   const [rates, setRates] = useState<Rate[]>([]);
 
   const load = useCallback(async () => {
-    const tasks = await getTasks(db);
+    const allTasks = await getTasks(db);
+    const tasks = freqFilter === 'すべて' ? allTasks : allTasks.filter((t) => t.frequency === freqFilter);
     if (tasks.length === 0) { setRates([]); return; }
     const computed = await Promise.all(tasks.map(async (task) => {
       let startDate: string;
@@ -62,7 +65,7 @@ export default function StatsScreen({ navigation }: Props) {
       return { task, completed, total: Math.max(totalDays, 1), rate: completed / Math.max(totalDays, 1) };
     }));
     setRates(computed);
-  }, [db, period, today, customStart, customEnd]);
+  }, [db, period, freqFilter, today, customStart, customEnd]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
@@ -89,6 +92,17 @@ export default function StatsScreen({ navigation }: Props) {
               onPress={() => setPeriod(p)}
             >
               <Text style={[s.periodChipText, period === p && s.periodChipTextActive]}>{p}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <View style={s.periodBar}>
+          {(['すべて', '毎日', 'その他'] as FreqFilter[]).map((f) => (
+            <TouchableOpacity
+              key={f}
+              style={[s.periodChip, freqFilter === f && s.periodChipActive]}
+              onPress={() => setFreqFilter(f)}
+            >
+              <Text style={[s.periodChipText, freqFilter === f && s.periodChipTextActive]}>{f}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -127,7 +141,9 @@ export default function StatsScreen({ navigation }: Props) {
             return (
               <View style={s.rateCard}>
                 <View style={s.rateHeader}>
-                  <Text style={s.rateTitle} numberOfLines={1}>{item.task.title}</Text>
+                  <Text style={s.rateTitle} numberOfLines={1}>
+                    {item.task.icon ? `${item.task.icon} ` : ''}{item.task.title}
+                  </Text>
                   <View style={s.rateRight}>
                     <Text style={s.rateDays}>{item.completed} / {item.total}日</Text>
                     <View style={[s.rateBadge, { backgroundColor: bc }]}>

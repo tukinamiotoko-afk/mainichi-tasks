@@ -1,8 +1,8 @@
 import * as SQLite from 'expo-sqlite';
 
-export type Task = { id: number; title: string; sort_order: number };
+export type Task = { id: number; title: string; sort_order: number; icon: string | null; priority: number; frequency: string };
 export type NotificationSetting = { id: number; time: string; notification_type: string; identifier: string | null; task_id: number | null };
-export type CompletionDetail = { task_id: number; title: string; date: string; completed_at: string | null };
+export type CompletionDetail = { task_id: number; title: string; icon: string | null; date: string; completed_at: string | null };
 export type TimeLog = { id: number; task_id: number; title: string; date: string; duration_seconds: number; started_at: string; ended_at: string };
 export type TimerSetting = { task_id: number; target_seconds: number };
 
@@ -11,7 +11,10 @@ export async function migrateDb(db: SQLite.SQLiteDatabase): Promise<void> {
     CREATE TABLE IF NOT EXISTS tasks (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       title TEXT NOT NULL,
-      sort_order INTEGER DEFAULT 0
+      sort_order INTEGER DEFAULT 0,
+      icon TEXT,
+      priority INTEGER DEFAULT 1,
+      frequency TEXT NOT NULL DEFAULT '毎日'
     );
     CREATE TABLE IF NOT EXISTS completions (
       task_id INTEGER NOT NULL,
@@ -41,6 +44,9 @@ export async function migrateDb(db: SQLite.SQLiteDatabase): Promise<void> {
   `);
   try { await db.execAsync('ALTER TABLE completions ADD COLUMN completed_at TEXT'); } catch {}
   try { await db.execAsync('ALTER TABLE notification_settings ADD COLUMN task_id INTEGER'); } catch {}
+  try { await db.execAsync('ALTER TABLE tasks ADD COLUMN icon TEXT'); } catch {}
+  try { await db.execAsync('ALTER TABLE tasks ADD COLUMN priority INTEGER DEFAULT 1'); } catch {}
+  try { await db.execAsync("ALTER TABLE tasks ADD COLUMN frequency TEXT NOT NULL DEFAULT '毎日'"); } catch {}
 }
 
 export function getToday(): string {
@@ -63,13 +69,28 @@ export async function getTasks(db: SQLite.SQLiteDatabase): Promise<Task[]> {
   return db.getAllAsync<Task>('SELECT * FROM tasks ORDER BY sort_order ASC, id ASC');
 }
 
-export async function addTask(db: SQLite.SQLiteDatabase, title: string): Promise<number> {
-  const result = await db.runAsync('INSERT INTO tasks (title) VALUES (?)', [title]);
+export type TaskFields = { title?: string; icon?: string | null; priority?: number; frequency?: string };
+
+export async function addTask(
+  db: SQLite.SQLiteDatabase, title: string, opts: Omit<TaskFields, 'title'> = {}
+): Promise<number> {
+  const result = await db.runAsync(
+    'INSERT INTO tasks (title, icon, priority, frequency) VALUES (?, ?, ?, ?)',
+    [title, opts.icon ?? null, opts.priority ?? 1, opts.frequency ?? '毎日']
+  );
   return result.lastInsertRowId;
 }
 
-export async function updateTask(db: SQLite.SQLiteDatabase, id: number, title: string): Promise<void> {
-  await db.runAsync('UPDATE tasks SET title = ? WHERE id = ?', [title, id]);
+export async function updateTask(db: SQLite.SQLiteDatabase, id: number, fields: TaskFields): Promise<void> {
+  const sets: string[] = [];
+  const values: (string | number | null)[] = [];
+  if (fields.title !== undefined) { sets.push('title = ?'); values.push(fields.title); }
+  if (fields.icon !== undefined) { sets.push('icon = ?'); values.push(fields.icon); }
+  if (fields.priority !== undefined) { sets.push('priority = ?'); values.push(fields.priority); }
+  if (fields.frequency !== undefined) { sets.push('frequency = ?'); values.push(fields.frequency); }
+  if (sets.length === 0) return;
+  values.push(id);
+  await db.runAsync(`UPDATE tasks SET ${sets.join(', ')} WHERE id = ?`, values);
 }
 
 export async function deleteTask(db: SQLite.SQLiteDatabase, id: number): Promise<string[]> {
@@ -124,7 +145,7 @@ export async function getCompletionsForMonth(
   const start = `${year}-${String(month).padStart(2, '0')}-01`;
   const end = `${year}-${String(month).padStart(2, '0')}-31`;
   return db.getAllAsync<CompletionDetail>(
-    `SELECT c.task_id, t.title, c.date, c.completed_at
+    `SELECT c.task_id, t.title, t.icon, c.date, c.completed_at
      FROM completions c JOIN tasks t ON c.task_id = t.id
      WHERE c.date >= ? AND c.date <= ?
      ORDER BY c.date, c.completed_at`,
