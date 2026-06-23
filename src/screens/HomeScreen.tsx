@@ -120,7 +120,10 @@ export default function HomeScreen({ navigation }: Props) {
   const fabPosition = useRef({ x: Math.max(screen.width - 72, 20), y: Math.max(screen.height - 150, 120) });
   const fabStartPosition = useRef(fabPosition.current);
   const fabAnim = useRef(new Animated.ValueXY(fabPosition.current)).current;
-  const dragState = useRef({ taskId: null as number | null, startIndex: 0, currentIndex: 0, changed: false });
+  const [activeDragId, setActiveDragId] = useState<number | null>(null);
+  const dragState = useRef({ taskId: null as number | null, currentIndex: 0, anchorDy: 0, changed: false });
+  const dragY = useRef(new Animated.Value(0)).current;
+  const dragScale = useRef(new Animated.Value(1)).current;
   const swipeState = useRef({ taskId: null as number | null });
   const swipeAnim = useRef(new Animated.Value(0)).current;
   const today = getToday();
@@ -352,26 +355,47 @@ export default function HomeScreen({ navigation }: Props) {
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
       const [moved] = ordered.splice(fromIndex, 1);
       ordered.splice(nextIndex, 0, moved);
-      dragState.current.currentIndex = nextIndex;
       dragState.current.changed = true;
       return ordered.map((task, index) => ({ ...task, sort_order: index }));
     });
   };
 
   const startDrag = (taskId: number, index: number) => {
-    dragState.current = { taskId, startIndex: index, currentIndex: index, changed: false };
+    swipeState.current.taskId = null;
+    swipeAnim.setValue(0);
+    setActiveDragId(taskId);
+    dragState.current = { taskId, currentIndex: index, anchorDy: 0, changed: false };
+    dragY.setValue(0);
+    Animated.spring(dragScale, {
+      toValue: 1.04,
+      useNativeDriver: true,
+      tension: 220,
+      friction: 14,
+    }).start();
   };
 
   const updateDrag = (dy: number) => {
-    const { taskId, startIndex } = dragState.current;
+    const { taskId, currentIndex, anchorDy } = dragState.current;
     if (taskId == null) return;
-    const nextIndex = Math.max(0, Math.min(startIndex + Math.round(dy / DRAG_ROW_HEIGHT), tasksRef.current.length - 1));
-    if (nextIndex !== dragState.current.currentIndex) moveTask(taskId, nextIndex);
+    const relativeDy = dy - anchorDy;
+    dragY.setValue(Math.max(-DRAG_ROW_HEIGHT * 0.75, Math.min(DRAG_ROW_HEIGHT * 0.75, relativeDy)));
+    const nextIndex = Math.max(0, Math.min(currentIndex + Math.round(relativeDy / DRAG_ROW_HEIGHT), tasksRef.current.length - 1));
+    if (nextIndex !== currentIndex) {
+      moveTask(taskId, nextIndex);
+      dragState.current.currentIndex = nextIndex;
+      dragState.current.anchorDy = dy;
+      dragY.setValue(0);
+    }
   };
 
   const endDrag = () => {
     if (dragState.current.changed) persistTaskOrder();
-    dragState.current = { taskId: null, startIndex: 0, currentIndex: 0, changed: false };
+    dragState.current = { taskId: null, currentIndex: 0, anchorDy: 0, changed: false };
+    setActiveDragId(null);
+    Animated.parallel([
+      Animated.spring(dragY, { toValue: 0, useNativeDriver: true, tension: 220, friction: 14 }),
+      Animated.spring(dragScale, { toValue: 1, useNativeDriver: true, tension: 220, friction: 14 }),
+    ]).start();
   };
 
   const resetSwipe = () => {
@@ -650,11 +674,21 @@ export default function HomeScreen({ navigation }: Props) {
         renderItem={({ item, index }) => {
           const isDone = completedIds.has(item.id);
           const panResponder = createTaskPanResponder(item, index);
+          const isDragging = activeDragId === item.id;
           const swipeStyle = swipeState.current.taskId === item.id
             ? { transform: [{ translateX: swipeAnim }] }
             : null;
+          const dragStyle = isDragging
+            ? {
+                transform: [{ translateY: dragY }, { scale: dragScale }],
+                zIndex: 30,
+                elevation: 8,
+                shadowOpacity: 0.18,
+                shadowRadius: 10,
+              }
+            : null;
           return (
-            <Animated.View style={[s.taskCard, isDone && s.taskCardDone, swipeStyle]} {...panResponder.panHandlers}>
+            <Animated.View style={[s.taskCard, isDone && s.taskCardDone, swipeStyle, dragStyle]} {...panResponder.panHandlers}>
               <TouchableOpacity
                 style={[s.checkBox, isDone && s.checkBoxDone]}
                 onPress={() => toggle(item.id)}
