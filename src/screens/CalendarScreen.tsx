@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, StatusBar } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, StatusBar, Dimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useFocusEffect } from '@react-navigation/native';
@@ -24,6 +24,8 @@ const C = {
 };
 
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
+const PAGE_PAD = 12;
+const GRID_GAP = 10;
 
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'Calendar'> };
 
@@ -33,6 +35,7 @@ export default function CalendarScreen({ navigation }: Props) {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
+  const [columns, setColumns] = useState<1 | 2 | 3>(2);
   const [tasks, setTasks] = useState<Task[]>([]);
   // task_id -> set of completed day-of-month numbers
   const [doneByTask, setDoneByTask] = useState<Record<number, Set<number>>>({});
@@ -55,6 +58,11 @@ export default function CalendarScreen({ navigation }: Props) {
 
   const prevMonth = () => { if (month === 1) { setMonth(12); setYear(y => y - 1); } else setMonth(m => m - 1); };
   const nextMonth = () => { if (month === 12) { setMonth(1); setYear(y => y + 1); } else setMonth(m => m + 1); };
+
+  const screenW = Dimensions.get('window').width;
+  const cardW = (screenW - PAGE_PAD * 2 - GRID_GAP * (columns - 1)) / columns;
+  const numSize = columns === 1 ? 13 : columns === 2 ? 11 : 9;
+  const labelSize = columns === 1 ? 11 : columns === 2 ? 10 : 8;
 
   const firstDow = new Date(year, month - 1, 1).getDay();
   const daysInMonth = new Date(year, month, 0).getDate();
@@ -81,6 +89,7 @@ export default function CalendarScreen({ navigation }: Props) {
               <View style={[s.dayBox, isDone && s.dayBoxDone, isToday && !isDone && s.dayBoxToday]}>
                 <Text style={[
                   s.dayNum,
+                  { fontSize: numSize },
                   dow === 0 && s.sun,
                   dow === 6 && s.sat,
                   isDone && s.dayNumDone,
@@ -109,11 +118,25 @@ export default function CalendarScreen({ navigation }: Props) {
             <Text style={s.navBtnText}>›</Text>
           </TouchableOpacity>
         </View>
+        <View style={s.colRow}>
+          {([1, 2, 3] as const).map((n) => (
+            <TouchableOpacity
+              key={n}
+              style={[s.colChip, columns === n && s.colChipActive]}
+              onPress={() => setColumns(n)}
+            >
+              <Text style={[s.colChipText, columns === n && s.colChipTextActive]}>{n}列</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
       </LinearGradient>
 
-      <ScrollView style={s.body} contentContainerStyle={{ padding: 12, gap: 12, paddingBottom: 24 }}>
+      <ScrollView
+        style={s.body}
+        contentContainerStyle={[s.gridPage, { paddingBottom: 24 }]}
+      >
         {tasks.length === 0 ? (
-          <View style={s.empty}>
+          <View style={[s.empty, { width: '100%' }]}>
             <Text style={s.emptyTitle}>タスクがありません</Text>
             <Text style={s.emptyBody}>タスク画面で追加すると、ここに月別の記録が出ます</Text>
           </View>
@@ -121,19 +144,19 @@ export default function CalendarScreen({ navigation }: Props) {
           tasks.map((task) => {
             const count = doneByTask[task.id]?.size ?? 0;
             return (
-              <View key={task.id} style={s.taskCard}>
+              <View key={task.id} style={[s.taskCard, { width: cardW }]}>
                 <View style={s.taskHeader}>
                   <Text style={s.taskTitle} numberOfLines={1}>
                     {task.icon ? `${task.icon} ` : ''}{task.title}
                   </Text>
                   <View style={s.countBadge}>
-                    <Text style={s.countText}>{count}日</Text>
+                    <Text style={s.countText}>{count}</Text>
                   </View>
                 </View>
                 <View style={s.weekRow}>
                   {WEEKDAYS.map((w, i) => (
                     <View key={w} style={s.cell}>
-                      <Text style={[s.weekLabel, i === 0 && s.sun, i === 6 && s.sat]}>{w}</Text>
+                      <Text style={[s.weekLabel, { fontSize: labelSize }, i === 0 && s.sun, i === 6 && s.sat]}>{w}</Text>
                     </View>
                   ))}
                 </View>
@@ -151,32 +174,38 @@ export default function CalendarScreen({ navigation }: Props) {
 
 const s = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: C.body },
-  headerCard: { backgroundColor: C.header, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20 },
+  headerCard: { backgroundColor: C.header, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16, gap: 12 },
   monthNav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   navBtn: { padding: 8 },
   navBtnText: { color: '#ffffff', fontSize: 28, fontWeight: '300' },
   monthLabel: { color: '#ffffff', fontSize: 18, fontWeight: '700' },
+  colRow: { flexDirection: 'row', justifyContent: 'center', gap: 8 },
+  colChip: { borderWidth: 1, borderColor: 'rgba(255,255,255,0.5)', borderRadius: 16, paddingHorizontal: 16, paddingVertical: 5 },
+  colChipActive: { backgroundColor: '#ffffff', borderColor: '#ffffff' },
+  colChipText: { color: 'rgba(255,255,255,0.9)', fontSize: 12, fontWeight: '700' },
+  colChipTextActive: { color: C.header },
 
   body: { flex: 1, backgroundColor: C.body },
+  gridPage: { padding: PAGE_PAD, flexDirection: 'row', flexWrap: 'wrap', gap: GRID_GAP },
 
   taskCard: {
-    backgroundColor: C.card, borderRadius: 16, padding: 12, gap: 6,
+    backgroundColor: C.card, borderRadius: 14, padding: 10, gap: 6,
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
   },
-  taskHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 2 },
-  taskTitle: { flex: 1, color: C.onDark, fontSize: 14, fontWeight: '700' },
-  countBadge: { backgroundColor: C.primary, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 3 },
-  countText: { color: C.onPrimary, fontSize: 12, fontWeight: '800' },
+  taskHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 },
+  taskTitle: { flex: 1, color: C.onDark, fontSize: 13, fontWeight: '700' },
+  countBadge: { backgroundColor: C.primary, borderRadius: 9, paddingHorizontal: 7, paddingVertical: 2, minWidth: 22, alignItems: 'center' },
+  countText: { color: C.onPrimary, fontSize: 11, fontWeight: '800' },
 
   weekRow: { flexDirection: 'row' },
-  weekLabel: { textAlign: 'center', color: C.muted, fontSize: 11, fontWeight: '700' },
+  weekLabel: { textAlign: 'center', color: C.muted, fontWeight: '700' },
 
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
-  cell: { width: '14.28%', alignItems: 'center', paddingVertical: 2 },
-  dayBox: { width: 30, height: 28, borderRadius: 7, backgroundColor: C.cellEmpty, alignItems: 'center', justifyContent: 'center' },
+  cell: { width: '14.28%', alignItems: 'center', paddingVertical: 1.5, paddingHorizontal: 1 },
+  dayBox: { width: '100%', aspectRatio: 1, borderRadius: 6, backgroundColor: C.cellEmpty, alignItems: 'center', justifyContent: 'center' },
   dayBoxDone: { backgroundColor: C.primary },
   dayBoxToday: { borderWidth: 1.5, borderColor: C.primary },
-  dayNum: { fontSize: 12, fontWeight: '600', color: C.onDark },
+  dayNum: { fontWeight: '600', color: C.onDark },
   dayNumDone: { color: C.onPrimary, fontWeight: '800' },
   sun: { color: '#e53e3e' },
   sat: { color: '#3182ce' },
