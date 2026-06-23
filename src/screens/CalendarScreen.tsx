@@ -1,18 +1,18 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Modal, ScrollView, StatusBar } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, StatusBar } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import { RootStackParamList } from '../../App';
-import { CompletionDetail, getCompletionsForMonth } from '../db/database';
+import { Task, getTasks, getCompletionsForMonth } from '../db/database';
 import { GRAD, GRAD_START, GRAD_END } from '../constants/theme';
 import TabBar from '../components/TabBar';
 
 const C = {
   header:    '#60a5fa',
-  body:      '#ffffff',
+  body:      '#f4f8ff',
   card:      '#ffffff',
   border:    '#dbeafe',
   primary:   '#60a5fa',
@@ -20,17 +20,12 @@ const C = {
   onDark:    '#2d3748',
   muted:     '#93c5fd',
   stone:     '#3b82f6',
+  cellEmpty: '#eef4ff',
 };
 
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
 
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'Calendar'> };
-
-function formatTime(iso: string | null): string {
-  if (!iso) return '--:--';
-  const d = new Date(iso);
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-}
 
 export default function CalendarScreen({ navigation }: Props) {
   const db = useSQLiteContext();
@@ -38,21 +33,28 @@ export default function CalendarScreen({ navigation }: Props) {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
-  const [completions, setCompletions] = useState<CompletionDetail[]>([]);
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  // task_id -> set of completed day-of-month numbers
+  const [doneByTask, setDoneByTask] = useState<Record<number, Set<number>>>({});
 
   const load = useCallback(async () => {
-    const data = await getCompletionsForMonth(db, year, month);
-    setCompletions(data);
+    const [allTasks, completions] = await Promise.all([
+      getTasks(db),
+      getCompletionsForMonth(db, year, month),
+    ]);
+    const map: Record<number, Set<number>> = {};
+    for (const c of completions) {
+      const day = Number(c.date.slice(8, 10));
+      (map[c.task_id] ??= new Set()).add(day);
+    }
+    setTasks(allTasks);
+    setDoneByTask(map);
   }, [db, year, month]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  const completionsByDate = completions.reduce<Record<string, CompletionDetail[]>>((acc, c) => {
-    if (!acc[c.date]) acc[c.date] = [];
-    acc[c.date].push(c);
-    return acc;
-  }, {});
+  const prevMonth = () => { if (month === 1) { setMonth(12); setYear(y => y - 1); } else setMonth(m => m - 1); };
+  const nextMonth = () => { if (month === 12) { setMonth(1); setYear(y => y + 1); } else setMonth(m => m + 1); };
 
   const firstDow = new Date(year, month - 1, 1).getDay();
   const daysInMonth = new Date(year, month, 0).getDate();
@@ -62,10 +64,36 @@ export default function CalendarScreen({ navigation }: Props) {
   ];
   while (cells.length % 7 !== 0) cells.push(null);
 
-  const prevMonth = () => { if (month === 1) { setMonth(12); setYear(y => y - 1); } else setMonth(m => m - 1); };
-  const nextMonth = () => { if (month === 12) { setMonth(1); setYear(y => y + 1); } else setMonth(m => m + 1); };
+  const isThisMonth = year === now.getFullYear() && month === now.getMonth() + 1;
+  const todayDay = now.getDate();
 
-  const selectedCompletions = selectedDate ? (completionsByDate[selectedDate] ?? []) : [];
+  const renderMini = (taskId: number) => {
+    const done = doneByTask[taskId];
+    return (
+      <View style={s.grid}>
+        {cells.map((day, i) => {
+          if (!day) return <View key={`e-${i}`} style={s.cell} />;
+          const isDone = !!done?.has(day);
+          const isToday = isThisMonth && day === todayDay;
+          const dow = i % 7;
+          return (
+            <View key={`d-${i}`} style={s.cell}>
+              <View style={[s.dayBox, isDone && s.dayBoxDone, isToday && !isDone && s.dayBoxToday]}>
+                <Text style={[
+                  s.dayNum,
+                  dow === 0 && s.sun,
+                  dow === 6 && s.sat,
+                  isDone && s.dayNumDone,
+                ]}>
+                  {day}
+                </Text>
+              </View>
+            </View>
+          );
+        })}
+      </View>
+    );
+  };
 
   return (
     <View style={s.safeArea}>
@@ -83,57 +111,40 @@ export default function CalendarScreen({ navigation }: Props) {
         </View>
       </LinearGradient>
 
-      <ScrollView style={s.body} contentContainerStyle={{ padding: 12 }}>
-        <View style={s.calendarCard}>
-          <View style={s.weekRow}>
-            {WEEKDAYS.map((d, i) => (
-              <Text key={d} style={[s.weekLabel, i === 0 && s.sun, i === 6 && s.sat]}>{d}</Text>
-            ))}
+      <ScrollView style={s.body} contentContainerStyle={{ padding: 12, gap: 12, paddingBottom: 24 }}>
+        {tasks.length === 0 ? (
+          <View style={s.empty}>
+            <Text style={s.emptyTitle}>タスクがありません</Text>
+            <Text style={s.emptyBody}>タスク画面で追加すると、ここに月別の記録が出ます</Text>
           </View>
-          <View style={s.grid}>
-            {cells.map((day, i) => {
-              if (!day) return <View key={`e-${i}`} style={s.cell} />;
-              const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-              const hasData = !!completionsByDate[dateStr];
-              const dow = i % 7;
-              const isToday = dateStr === `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-              return (
-                <TouchableOpacity
-                  key={`d-${i}`}
-                  style={s.cell}
-                  onPress={() => hasData && setSelectedDate(dateStr)}
-                  disabled={!hasData}
-                >
-                  <View style={[s.dayCircle, isToday && s.todayCircle]}>
-                    <Text style={[s.dayNum, dow === 0 && s.sun, dow === 6 && s.sat, isToday && s.todayNum, hasData && s.dayNumActive]}>
-                      {day}
-                    </Text>
+        ) : (
+          tasks.map((task) => {
+            const count = doneByTask[task.id]?.size ?? 0;
+            return (
+              <View key={task.id} style={s.taskCard}>
+                <View style={s.taskHeader}>
+                  <Text style={s.taskTitle} numberOfLines={1}>
+                    {task.icon ? `${task.icon} ` : ''}{task.title}
+                  </Text>
+                  <View style={s.countBadge}>
+                    <Text style={s.countText}>{count}日</Text>
                   </View>
-                  {hasData && <View style={s.dot} />}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
+                </View>
+                <View style={s.weekRow}>
+                  {WEEKDAYS.map((w, i) => (
+                    <View key={w} style={s.cell}>
+                      <Text style={[s.weekLabel, i === 0 && s.sun, i === 6 && s.sat]}>{w}</Text>
+                    </View>
+                  ))}
+                </View>
+                {renderMini(task.id)}
+              </View>
+            );
+          })
+        )}
       </ScrollView>
 
       <TabBar current="Calendar" navigation={navigation} />
-
-      <Modal visible={!!selectedDate} transparent animationType="slide" onRequestClose={() => setSelectedDate(null)}>
-        <TouchableOpacity style={s.modalBg} activeOpacity={1} onPress={() => setSelectedDate(null)}>
-          <View style={s.modalSheet}>
-            <View style={s.sheetHandle} />
-            <Text style={s.sheetTitle}>{selectedDate?.replace(/-/g, '/')} の記録</Text>
-            <View style={s.sheetDivider} />
-            {selectedCompletions.map((c, i) => (
-              <View key={i} style={s.completionRow}>
-                <Text style={s.completionTime}>{formatTime(c.completed_at)}</Text>
-                <Text style={s.completionTitle}>{c.icon ? `${c.icon} ` : ''}{c.title}</Text>
-              </View>
-            ))}
-          </View>
-        </TouchableOpacity>
-      </Modal>
     </View>
   );
 }
@@ -147,28 +158,30 @@ const s = StyleSheet.create({
   monthLabel: { color: '#ffffff', fontSize: 18, fontWeight: '700' },
 
   body: { flex: 1, backgroundColor: C.body },
-  calendarCard: { backgroundColor: C.card, borderRadius: 16, padding: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 6, elevation: 3 },
 
-  weekRow: { flexDirection: 'row', marginBottom: 4 },
-  weekLabel: { flex: 1, textAlign: 'center', color: C.muted, fontSize: 12, fontWeight: '700', paddingVertical: 6 },
+  taskCard: {
+    backgroundColor: C.card, borderRadius: 16, padding: 12, gap: 6,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
+  },
+  taskHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 2 },
+  taskTitle: { flex: 1, color: C.onDark, fontSize: 14, fontWeight: '700' },
+  countBadge: { backgroundColor: C.primary, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 3 },
+  countText: { color: C.onPrimary, fontSize: 12, fontWeight: '800' },
+
+  weekRow: { flexDirection: 'row' },
+  weekLabel: { textAlign: 'center', color: C.muted, fontSize: 11, fontWeight: '700' },
 
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
-  cell: { width: '14.28%', alignItems: 'center', paddingVertical: 4 },
-  dayCircle: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  todayCircle: { backgroundColor: C.primary },
-  dayNum: { fontSize: 13, fontWeight: '500', color: C.onDark },
-  dayNumActive: { fontWeight: '700' },
-  todayNum: { color: '#ffffff', fontWeight: '700' },
+  cell: { width: '14.28%', alignItems: 'center', paddingVertical: 2 },
+  dayBox: { width: 30, height: 28, borderRadius: 7, backgroundColor: C.cellEmpty, alignItems: 'center', justifyContent: 'center' },
+  dayBoxDone: { backgroundColor: C.primary },
+  dayBoxToday: { borderWidth: 1.5, borderColor: C.primary },
+  dayNum: { fontSize: 12, fontWeight: '600', color: C.onDark },
+  dayNumDone: { color: C.onPrimary, fontWeight: '800' },
   sun: { color: '#e53e3e' },
   sat: { color: '#3182ce' },
-  dot: { width: 4, height: 4, borderRadius: 2, backgroundColor: C.primary, marginTop: 2 },
 
-  modalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  modalSheet: { backgroundColor: C.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingTop: 12, gap: 12, maxHeight: '60%' },
-  sheetHandle: { width: 40, height: 4, backgroundColor: C.border, borderRadius: 2, alignSelf: 'center', marginBottom: 8 },
-  sheetTitle: { color: C.onDark, fontSize: 16, fontWeight: '700' },
-  sheetDivider: { height: 1, backgroundColor: C.border },
-  completionRow: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingVertical: 6 },
-  completionTime: { color: C.primary, fontSize: 16, fontWeight: '700', minWidth: 52 },
-  completionTitle: { flex: 1, color: C.onDark, fontSize: 14, fontWeight: '500' },
+  empty: { paddingVertical: 60, alignItems: 'center', gap: 8 },
+  emptyTitle: { color: C.stone, fontSize: 16, fontWeight: '700' },
+  emptyBody: { color: C.muted, fontSize: 13, textAlign: 'center', paddingHorizontal: 24 },
 });

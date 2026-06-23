@@ -598,7 +598,7 @@ export default function HomeScreen({ navigation }: Props) {
             <TouchableOpacity activeOpacity={1} onPress={() => {}}>
               <View style={s.sheet}>
                 <View style={s.sheetHandle} />
-                <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}>
 
                   {/* Time + notify (top) */}
                   {renderSchedule(
@@ -658,7 +658,7 @@ export default function HomeScreen({ navigation }: Props) {
             <TouchableOpacity activeOpacity={1} onPress={() => {}}>
               <View style={s.sheet}>
                 <View style={s.sheetHandle} />
-                <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}>
                   {detailTask && (
                     <>
                       {/* Time + notify (top) */}
