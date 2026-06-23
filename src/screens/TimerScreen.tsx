@@ -1,0 +1,475 @@
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, StatusBar, Alert, ScrollView, TextInput } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSQLiteContext } from 'expo-sqlite';
+import { useFocusEffect } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../../App';
+import {
+  Task,
+  TimeLog,
+  addTimeLog,
+  deleteTimeLog,
+  getTasks,
+  getTimeLogsForDate,
+  getTimerSettingForTask,
+  getToday,
+  getTotalTimeForDate,
+  markComplete,
+  saveTimerSettingForTask,
+} from '../db/database';
+import TabBar from '../components/TabBar';
+
+const C = {
+  header: '#60a5fa',
+  body: '#ffffff',
+  card: '#ffffff',
+  border: '#dbeafe',
+  primary: '#60a5fa',
+  onPrimary: '#ffffff',
+  onDark: '#2d3748',
+  muted: '#93c5fd',
+  stone: '#3b82f6',
+  success: '#16a34a',
+  danger: '#dc2626',
+  warning: '#f59e0b',
+};
+
+type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'Timer'> };
+type TimerMode = 'stopwatch' | 'countdown';
+
+function formatDuration(totalSeconds: number, alwaysHours = false): string {
+  const safeSeconds = Math.max(0, totalSeconds);
+  const h = Math.floor(safeSeconds / 3600);
+  const m = Math.floor((safeSeconds % 3600) / 60);
+  const s = safeSeconds % 60;
+  if (alwaysHours || h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+function formatClock(iso: string): string {
+  const d = new Date(iso);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+function formatDate(value: string): string {
+  const [year, month, day] = value.slice(0, 10).split('-');
+  return `${year}/${month}/${day}`;
+}
+
+function secondsToMinutesText(seconds: number): string {
+  return String(Math.max(1, Math.round(seconds / 60)));
+}
+
+export default function TimerScreen({ navigation }: Props) {
+  const db = useSQLiteContext();
+  const today = getToday();
+  const startedAtRef = useRef<string | null>(null);
+  const finishingRef = useRef(false);
+
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
+  const [mode, setMode] = useState<TimerMode>('stopwatch');
+  const [targetSeconds, setTargetSeconds] = useState(25 * 60);
+  const [customMinutes, setCustomMinutes] = useState('25');
+  const [running, setRunning] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
+  const [logs, setLogs] = useState<TimeLog[]>([]);
+  const [totalSeconds, setTotalSeconds] = useState(0);
+
+  const selectedTask = useMemo(
+    () => tasks.find((task) => task.id === selectedTaskId) ?? null,
+    [tasks, selectedTaskId]
+  );
+  const displaySeconds = mode === 'countdown' ? Math.max(targetSeconds - elapsed, 0) : elapsed;
+
+  const load = useCallback(async () => {
+    const loadedTasks = await getTasks(db);
+    const loadedLogs = await getTimeLogsForDate(db, today);
+    const loadedTotal = await getTotalTimeForDate(db, today);
+    setTasks(loadedTasks);
+    setLogs(loadedLogs);
+    setTotalSeconds(loadedTotal);
+    setSelectedTaskId((current) => loadedTasks.some((task) => task.id === current) ? current : null);
+  }, [db, today]);
+
+  useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  const applyTargetSeconds = (seconds: number) => {
+    const next = Math.max(60, Math.min(12 * 3600, Math.round(seconds)));
+    setTargetSeconds(next);
+    setCustomMinutes(secondsToMinutesText(next));
+    setElapsed(0);
+  };
+
+  const loadTaskTimerSetting = useCallback(async (taskId: number) => {
+    const setting = await getTimerSettingForTask(db, taskId);
+    applyTargetSeconds(setting?.target_seconds ?? 25 * 60);
+  }, [db]);
+
+  const saveAndStop = useCallback(async (durationSeconds: number, completedCountdown = false) => {
+    if (!selectedTask || !startedAtRef.current || finishingRef.current) return;
+    finishingRef.current = true;
+    const endedAt = new Date().toISOString();
+    await addTimeLog(db, selectedTask.id, Math.max(1, durationSeconds), startedAtRef.current, endedAt);
+    await markComplete(db, selectedTask.id, today);
+    startedAtRef.current = null;
+    setRunning(false);
+    setPaused(false);
+    setElapsed(0);
+    await load();
+    finishingRef.current = false;
+    if (completedCountdown) Alert.alert('時間になりました', '作業時間を保存して、タスクを完了にしました。');
+  }, [db, load, selectedTask, today]);
+
+  useEffect(() => {
+    if (!running || paused) return;
+    const id = setInterval(() => setElapsed((value) => value + 1), 1000);
+    return () => clearInterval(id);
+  }, [paused, running]);
+
+  useEffect(() => {
+    if (!running || paused || mode !== 'countdown' || elapsed < targetSeconds) return;
+    saveAndStop(targetSeconds, true);
+  }, [elapsed, mode, paused, running, saveAndStop, targetSeconds]);
+
+  const chooseTask = async (taskId: number) => {
+    if (running) return;
+    setSelectedTaskId(taskId);
+    setElapsed(0);
+    setPaused(false);
+    startedAtRef.current = null;
+    await loadTaskTimerSetting(taskId);
+  };
+
+  const backToTaskList = () => {
+    if (running) {
+      Alert.alert('計測中です', '停止して保存してからタスク一覧に戻ってください。');
+      return;
+    }
+    setSelectedTaskId(null);
+    setElapsed(0);
+    setPaused(false);
+    startedAtRef.current = null;
+  };
+
+  const start = () => {
+    if (!selectedTask) return;
+    if (running && paused) {
+      setPaused(false);
+      return;
+    }
+    startedAtRef.current = new Date().toISOString();
+    finishingRef.current = false;
+    setElapsed(0);
+    setPaused(false);
+    setRunning(true);
+  };
+
+  const pause = () => {
+    if (!running) return;
+    setPaused(true);
+  };
+
+  const stop = async () => {
+    const duration = mode === 'countdown' ? Math.min(elapsed, targetSeconds) : elapsed;
+    await saveAndStop(duration);
+  };
+
+  const reset = () => {
+    if (running) return;
+    setElapsed(0);
+    setPaused(false);
+    startedAtRef.current = null;
+  };
+
+  const setPresetMinutes = (minutes: number) => {
+    if (running) return;
+    applyTargetSeconds(minutes * 60);
+  };
+
+  const adjustTarget = (minutes: number) => {
+    if (running) return;
+    applyTargetSeconds(targetSeconds + minutes * 60);
+  };
+
+  const applyCustomMinutes = () => {
+    if (running) return;
+    const minutes = Number(customMinutes);
+    if (!Number.isFinite(minutes) || minutes <= 0) {
+      Alert.alert('時間を確認してください', '1分以上の数字を入力してください。');
+      setCustomMinutes(secondsToMinutesText(targetSeconds));
+      return;
+    }
+    applyTargetSeconds(minutes * 60);
+  };
+
+  const saveCurrentTargetForTask = async () => {
+    if (!selectedTask) return;
+    await saveTimerSettingForTask(db, selectedTask.id, targetSeconds);
+    Alert.alert('保存しました', `${selectedTask.title} のタイマーを ${secondsToMinutesText(targetSeconds)}分 にしました。`);
+  };
+
+  const handleDeleteLog = (log: TimeLog) => {
+    Alert.alert('履歴を削除', `${formatDate(log.date)} ${log.title} の ${formatDuration(log.duration_seconds, true)} を削除しますか？`, [
+      { text: 'キャンセル', style: 'cancel' },
+      {
+        text: '削除',
+        style: 'destructive',
+        onPress: async () => {
+          await deleteTimeLog(db, log.id);
+          await load();
+        },
+      },
+    ]);
+  };
+
+  const renderHistory = () => (
+    <>
+      <Text style={s.sectionTitle}>履歴</Text>
+      {logs.length === 0 ? (
+        <View style={s.empty}>
+          <Text style={s.emptyTitle}>まだ履歴がありません</Text>
+          <Text style={s.emptyBody}>計測が終わるとここに残ります</Text>
+        </View>
+      ) : logs.map((item) => (
+        <View key={item.id} style={s.logCard}>
+          <View style={s.logMain}>
+            <Text style={s.logDate}>{formatDate(item.date)}</Text>
+            <Text style={s.logTitle} numberOfLines={1}>{item.title}</Text>
+            <Text style={s.logTime}>{formatClock(item.started_at)} - {formatClock(item.ended_at)}</Text>
+          </View>
+          <Text style={s.logDuration}>{formatDuration(item.duration_seconds, true)}</Text>
+          <TouchableOpacity style={s.deleteLogBtn} onPress={() => handleDeleteLog(item)}>
+            <Text style={s.deleteLogText}>削除</Text>
+          </TouchableOpacity>
+        </View>
+      ))}
+    </>
+  );
+
+  const renderTaskList = () => (
+    <ScrollView style={s.body} contentContainerStyle={s.content}>
+      <Text style={s.sectionTitle}>タスクを選んでください</Text>
+      <View style={s.taskList}>
+        {tasks.length === 0 ? (
+          <View style={s.emptyTaskBox}>
+            <Text style={s.emptyTitle}>タスクがありません</Text>
+            <Text style={s.emptyBody}>タスク画面で先に追加してください</Text>
+          </View>
+        ) : tasks.map((task) => (
+          <TouchableOpacity key={task.id} style={s.taskSelectCard} onPress={() => chooseTask(task.id)}>
+            <View style={s.radio} />
+            <Text style={s.taskSelectTitle} numberOfLines={2}>{task.title}</Text>
+            <Text style={s.openText}>計る</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      {renderHistory()}
+    </ScrollView>
+  );
+
+  const renderTimer = () => {
+    if (!selectedTask) return null;
+    return (
+      <ScrollView style={s.body} contentContainerStyle={s.content}>
+        <TouchableOpacity style={s.backBtn} onPress={backToTaskList}>
+          <Text style={s.backBtnText}>← タスク一覧へ</Text>
+        </TouchableOpacity>
+
+        <View style={s.timerCard}>
+          <Text style={s.selectedLabel}>{selectedTask.title}</Text>
+          <View style={s.modeRow}>
+            <TouchableOpacity
+              style={[s.modeChip, mode === 'stopwatch' && s.modeChipActive, running && s.modeChipDisabled]}
+              onPress={() => { if (!running) { setMode('stopwatch'); reset(); } }}
+              disabled={running}
+            >
+              <Text style={[s.modeChipText, mode === 'stopwatch' && s.modeChipTextActive]}>ストップウォッチ</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[s.modeChip, mode === 'countdown' && s.modeChipActive, running && s.modeChipDisabled]}
+              onPress={() => { if (!running) { setMode('countdown'); reset(); } }}
+              disabled={running}
+            >
+              <Text style={[s.modeChipText, mode === 'countdown' && s.modeChipTextActive]}>タイマー</Text>
+            </TouchableOpacity>
+          </View>
+
+          <Text style={s.timerText}>{formatDuration(displaySeconds, true)}</Text>
+          <Text style={s.timerHint}>
+            {running
+              ? paused
+                ? '一時停止中'
+                : mode === 'countdown'
+                  ? 'カウントダウン中'
+                  : '計測中'
+              : mode === 'countdown'
+                ? '時間を決めて開始'
+                : '何秒でも計測できます'}
+          </Text>
+
+          <View style={s.controls}>
+            {running ? (
+              <>
+                {paused ? (
+                  <TouchableOpacity style={[s.controlBtn, s.startBtn]} onPress={start}>
+                    <Text style={s.controlBtnText}>再開</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity style={[s.controlBtn, s.pauseBtn]} onPress={pause}>
+                    <Text style={s.controlBtnText}>一時停止</Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity style={[s.controlBtn, s.stopBtn]} onPress={stop}>
+                  <Text style={s.controlBtnText}>停止して保存</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <TouchableOpacity style={[s.controlBtn, s.startBtn]} onPress={start}>
+                  <Text style={s.controlBtnText}>開始</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={s.resetBtn} onPress={reset}>
+                  <Text style={s.resetBtnText}>リセット</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </View>
+
+        {mode === 'countdown' && (
+          <>
+            <Text style={s.sectionTitle}>タイマー時間</Text>
+            <View style={s.targetBox}>
+              <View style={s.targetAdjustRow}>
+                <TouchableOpacity style={s.targetAdjustBtn} onPress={() => adjustTarget(-5)} disabled={running}>
+                  <Text style={s.targetAdjustText}>-5分</Text>
+                </TouchableOpacity>
+                <Text style={s.targetText}>{formatDuration(targetSeconds, true)}</Text>
+                <TouchableOpacity style={s.targetAdjustBtn} onPress={() => adjustTarget(5)} disabled={running}>
+                  <Text style={s.targetAdjustText}>+5分</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={s.customRow}>
+                <TextInput
+                  style={s.customInput}
+                  value={customMinutes}
+                  onChangeText={setCustomMinutes}
+                  keyboardType="numeric"
+                  editable={!running}
+                  onEndEditing={applyCustomMinutes}
+                />
+                <Text style={s.customUnit}>分</Text>
+                <TouchableOpacity style={[s.smallBtn, running && s.modeChipDisabled]} onPress={applyCustomMinutes} disabled={running}>
+                  <Text style={s.smallBtnText}>反映</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[s.smallBtn, running && s.modeChipDisabled]} onPress={saveCurrentTargetForTask} disabled={running}>
+                  <Text style={s.smallBtnText}>保存</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={s.presetRow}>
+                {[5, 10, 15, 25, 30, 60].map((minutes) => (
+                  <TouchableOpacity
+                    key={minutes}
+                    style={[s.presetChip, targetSeconds === minutes * 60 && s.presetChipActive, running && s.modeChipDisabled]}
+                    onPress={() => setPresetMinutes(minutes)}
+                    disabled={running}
+                  >
+                    <Text style={[s.presetText, targetSeconds === minutes * 60 && s.presetTextActive]}>{minutes}分</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          </>
+        )}
+
+        {renderHistory()}
+      </ScrollView>
+    );
+  };
+
+  return (
+    <SafeAreaView style={s.safeArea} edges={['top', 'bottom']}>
+      <StatusBar barStyle="light-content" backgroundColor={C.header} />
+      <View style={s.headerCard}>
+        <Text style={s.headerTitle}>タイマー</Text>
+        <Text style={s.headerSub}>今日の作業時間 {formatDuration(totalSeconds, true)}</Text>
+      </View>
+      {selectedTask ? renderTimer() : renderTaskList()}
+      <TabBar current="Timer" navigation={navigation} />
+    </SafeAreaView>
+  );
+}
+
+const s = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: C.header },
+  headerCard: { backgroundColor: C.header, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16, gap: 4 },
+  headerTitle: { color: C.onPrimary, fontSize: 20, fontWeight: '700' },
+  headerSub: { color: 'rgba(255,255,255,0.8)', fontSize: 12, fontWeight: '700' },
+  body: { flex: 1, backgroundColor: C.body },
+  content: { padding: 16, paddingBottom: 88, gap: 10 },
+  sectionTitle: { color: C.stone, fontSize: 12, fontWeight: '800', marginTop: 4 },
+  backBtn: { alignSelf: 'flex-start', borderWidth: 1, borderColor: C.border, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 7 },
+  backBtnText: { color: C.stone, fontSize: 12, fontWeight: '800' },
+  taskList: { gap: 8 },
+  taskSelectCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: C.card,
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: 12,
+    padding: 14,
+  },
+  radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: C.border },
+  taskSelectTitle: { flex: 1, color: C.onDark, fontSize: 14, fontWeight: '700' },
+  openText: { color: C.primary, fontSize: 12, fontWeight: '800' },
+  timerCard: { backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 12, padding: 14, gap: 10 },
+  selectedLabel: { color: C.onDark, fontSize: 15, fontWeight: '800' },
+  modeRow: { flexDirection: 'row', gap: 8 },
+  modeChip: { flex: 1, borderWidth: 1, borderColor: C.border, borderRadius: 10, paddingVertical: 9, alignItems: 'center' },
+  modeChipActive: { backgroundColor: C.primary, borderColor: C.primary },
+  modeChipDisabled: { opacity: 0.45 },
+  modeChipText: { color: C.stone, fontSize: 12, fontWeight: '800' },
+  modeChipTextActive: { color: C.onPrimary },
+  timerText: { color: C.onDark, fontSize: 56, fontWeight: '800', textAlign: 'center' },
+  timerHint: { color: C.muted, fontSize: 12, fontWeight: '700', textAlign: 'center' },
+  controls: { flexDirection: 'row', gap: 10 },
+  controlBtn: { flex: 1, borderRadius: 10, paddingVertical: 13, alignItems: 'center' },
+  startBtn: { backgroundColor: C.success },
+  pauseBtn: { backgroundColor: C.warning },
+  stopBtn: { backgroundColor: C.danger },
+  controlBtnText: { color: C.onPrimary, fontSize: 14, fontWeight: '800' },
+  resetBtn: { flex: 1, borderWidth: 1, borderColor: C.border, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 13, alignItems: 'center' },
+  resetBtnText: { color: C.stone, fontSize: 13, fontWeight: '800' },
+  targetBox: { backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 12, padding: 14, gap: 8 },
+  targetAdjustRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  targetAdjustBtn: { borderWidth: 1, borderColor: C.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
+  targetAdjustText: { color: C.primary, fontSize: 12, fontWeight: '800' },
+  targetText: { flex: 1, color: C.onDark, fontSize: 22, fontWeight: '800', textAlign: 'center' },
+  customRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  customInput: { width: 72, borderWidth: 1, borderColor: C.border, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, color: C.onDark, fontSize: 16, fontWeight: '800', textAlign: 'center' },
+  customUnit: { color: C.stone, fontSize: 13, fontWeight: '800' },
+  smallBtn: { backgroundColor: C.primary, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 9 },
+  smallBtnText: { color: C.onPrimary, fontSize: 12, fontWeight: '800' },
+  presetRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  presetChip: { borderWidth: 1, borderColor: C.border, borderRadius: 16, paddingHorizontal: 10, paddingVertical: 6 },
+  presetChipActive: { backgroundColor: C.primary, borderColor: C.primary },
+  presetText: { color: C.stone, fontSize: 11, fontWeight: '800' },
+  presetTextActive: { color: C.onPrimary },
+  logCard: { backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 10, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  logMain: { flex: 1, gap: 3 },
+  logDate: { color: C.stone, fontSize: 11, fontWeight: '800' },
+  logTitle: { color: C.onDark, fontSize: 14, fontWeight: '700' },
+  logTime: { color: C.muted, fontSize: 11, fontWeight: '700' },
+  logDuration: { color: C.primary, fontSize: 15, fontWeight: '800' },
+  deleteLogBtn: { backgroundColor: '#fee2e2', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7 },
+  deleteLogText: { color: C.danger, fontSize: 11, fontWeight: '800' },
+  emptyTaskBox: { backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 12, padding: 18, alignItems: 'center', gap: 6 },
+  empty: { paddingVertical: 28, alignItems: 'center', gap: 6 },
+  emptyTitle: { color: C.stone, fontSize: 15, fontWeight: '800' },
+  emptyBody: { color: C.muted, fontSize: 12, fontWeight: '600' },
+});

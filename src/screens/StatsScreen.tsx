@@ -1,39 +1,29 @@
 import React, { useState, useCallback } from 'react';
-import {
-  View, Text, FlatList, TouchableOpacity,
-  StyleSheet, Platform, StatusBar,
-} from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, Platform, StatusBar } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { RootStackParamList } from '../../App';
-import {
-  Task, getToday, subtractDays, daysBetween,
-  getTasks, getCompletionCountInRange, getFirstCompletionDate,
-} from '../db/database';
+import { Task, getToday, subtractDays, daysBetween, getTasks, getCompletionCountInRange, getFirstCompletionDate } from '../db/database';
+import TabBar from '../components/TabBar';
 
 const C = {
-  carbon:      '#21242e',
-  gold:        '#e48600',
-  amber:       '#ecab37',
-  signal:      '#f68d1f',
-  canvas:      '#7a8aba',
-  canvasSoft:  '#9fbee7',
-  chrome:      '#3d4f97',
-  mutedIndigo: '#60619c',
-  platinum:    '#dedede',
-  surface:     '#ffffff',
-  periwinkle:  '#8ba1d4',
-  onPrimary:   '#ffffff',
-  inkSoft:     '#3d4f97',
-  red:         '#e60012',
+  header:    '#60a5fa',
+  body:      '#ffffff',
+  card:      '#ffffff',
+  border:    '#dbeafe',
+  primary:   '#60a5fa',
+  onPrimary: '#ffffff',
+  onDark:    '#2d3748',
+  muted:     '#93c5fd',
+  stone:     '#3b82f6',
+  warning:   '#df6500',
 };
 
 type Period = '7日' | '30日' | '全期間' | '任意';
-
 type Rate = { task: Task; completed: number; total: number; rate: number };
-
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'Stats'> };
 
 function toDateString(d: Date): string {
@@ -54,33 +44,23 @@ export default function StatsScreen({ navigation }: Props) {
   const load = useCallback(async () => {
     const tasks = await getTasks(db);
     if (tasks.length === 0) { setRates([]); return; }
-
     const computed = await Promise.all(tasks.map(async (task) => {
       let startDate: string;
       let totalDays: number;
-
-      if (period === '7日') {
-        startDate = subtractDays(today, 6);
-        totalDays = 7;
-      } else if (period === '30日') {
-        startDate = subtractDays(today, 29);
-        totalDays = 30;
-      } else if (period === '全期間') {
+      if (period === '7日') { startDate = subtractDays(today, 6); totalDays = 7; }
+      else if (period === '30日') { startDate = subtractDays(today, 29); totalDays = 30; }
+      else if (period === '全期間') {
         const first = await getFirstCompletionDate(db, task.id);
         startDate = first ?? today;
         totalDays = daysBetween(startDate, today);
       } else {
-        // custom
         startDate = toDateString(customStart);
-        const endStr = toDateString(customEnd);
-        totalDays = daysBetween(startDate, endStr);
+        totalDays = daysBetween(startDate, toDateString(customEnd));
       }
-
       const endDate = period === '任意' ? toDateString(customEnd) : today;
       const completed = await getCompletionCountInRange(db, task.id, startDate, endDate);
       return { task, completed, total: Math.max(totalDays, 1), rate: completed / Math.max(totalDays, 1) };
     }));
-
     setRates(computed);
   }, [db, period, today, customStart, customEnd]);
 
@@ -90,43 +70,30 @@ export default function StatsScreen({ navigation }: Props) {
     if (period === '7日') return '直近7日間';
     if (period === '30日') return '直近30日間';
     if (period === '全期間') return '全期間';
-    const s = customStart;
-    const e = customEnd;
-    return `${s.getMonth() + 1}/${s.getDate()} 〜 ${e.getMonth() + 1}/${e.getDate()}`;
+    return `${customStart.getMonth() + 1}/${customStart.getDate()} 〜 ${customEnd.getMonth() + 1}/${customEnd.getDate()}`;
   };
 
-  const barColor = (rate: number) => {
-    if (rate >= 0.8) return C.signal;
-    if (rate >= 0.5) return C.amber;
-    return C.mutedIndigo;
-  };
+  const barColor = (rate: number) => rate >= 0.8 ? C.primary : rate >= 0.5 ? C.warning : C.muted;
 
   return (
-    <View style={s.root}>
-      <StatusBar barStyle="light-content" backgroundColor={C.carbon} />
+    <SafeAreaView style={s.safeArea} edges={['top', 'bottom']}>
+      <StatusBar barStyle="light-content" backgroundColor={C.header} />
 
-      {/* ── Nav bar ────────────────────────────────────────────────── */}
-      <View style={s.navBar}>
-        <TouchableOpacity style={s.backBtn} onPress={() => navigation.goBack()}>
-          <Text style={s.backText}>‹ 戻る</Text>
-        </TouchableOpacity>
-        <Text style={s.navTitle}>実行率</Text>
+      <View style={s.headerCard}>
+        <Text style={s.headerTitle}>実行率</Text>
+        <View style={s.periodBar}>
+          {(['7日', '30日', '全期間', '任意'] as Period[]).map((p) => (
+            <TouchableOpacity
+              key={p}
+              style={[s.periodChip, period === p && s.periodChipActive]}
+              onPress={() => setPeriod(p)}
+            >
+              <Text style={[s.periodChipText, period === p && s.periodChipTextActive]}>{p}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
       </View>
 
-      {/* ── Period selector ─────────────────────────────────────────── */}
-      <View style={s.periodBar}>
-        {(['7日', '30日', '全期間', '任意'] as Period[]).map((p) => (
-          <TouchableOpacity
-            key={p}
-            style={[s.periodChip, period === p && s.periodChipActive]}
-            onPress={() => { setPeriod(p); }}
-          >
-            <Text style={[s.periodChipText, period === p && s.periodChipTextActive]}>{p}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* ── Custom date range ───────────────────────────────────────── */}
       {period === '任意' && (
         <View style={s.customBar}>
           <Text style={s.customLabel}>期間：</Text>
@@ -143,12 +110,6 @@ export default function StatsScreen({ navigation }: Props) {
         </View>
       )}
 
-      {/* ── Section label ───────────────────────────────────────────── */}
-      <View style={s.sectionBar}>
-        <Text style={s.sectionLabel}>≡ EXECUTION RATE  {periodLabel()}</Text>
-      </View>
-
-      {/* ── Rate list ───────────────────────────────────────────────── */}
       {rates.length === 0 ? (
         <View style={s.empty}>
           <Text style={s.emptyText}>タスクがありません</Text>
@@ -158,7 +119,8 @@ export default function StatsScreen({ navigation }: Props) {
           data={rates}
           keyExtractor={(item) => String(item.task.id)}
           style={s.list}
-          contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 8, gap: 8 }}
+          contentContainerStyle={{ padding: 16, gap: 10 }}
+          ListHeaderComponent={<Text style={s.metaLabel}>{periodLabel()}</Text>}
           renderItem={({ item }) => {
             const pct = Math.round(item.rate * 100);
             const bc = barColor(item.rate);
@@ -174,82 +136,56 @@ export default function StatsScreen({ navigation }: Props) {
                   </View>
                 </View>
                 <View style={s.barBg}>
-                  <View style={[s.barFill, { width: `${Math.min(item.rate * 100, 100)}%`, backgroundColor: bc }]} />
+                  <View style={[s.barFill, { width: `${Math.min(item.rate * 100, 100)}%` as any, backgroundColor: bc }]} />
                 </View>
               </View>
             );
           }}
-          ListFooterComponent={<View style={{ height: 16 }} />}
+          ListFooterComponent={<View style={{ height: 8 }} />}
         />
       )}
 
-      {/* ── Date pickers ────────────────────────────────────────────── */}
+      <TabBar current="Stats" navigation={navigation} />
+
       {showStartPicker && (
-        <DateTimePicker
-          value={customStart}
-          mode="date"
-          display={Platform.OS === 'ios' ? 'inline' : 'default'}
-          maximumDate={customEnd}
-          onChange={(_, date) => {
-            setShowStartPicker(Platform.OS === 'ios');
-            if (date) setCustomStart(date);
-          }}
-        />
+        <DateTimePicker value={customStart} mode="date" display={Platform.OS === 'ios' ? 'inline' : 'default'} maximumDate={customEnd}
+          onChange={(_, date) => { setShowStartPicker(Platform.OS === 'ios'); if (date) setCustomStart(date); }} />
       )}
       {showEndPicker && (
-        <DateTimePicker
-          value={customEnd}
-          mode="date"
-          display={Platform.OS === 'ios' ? 'inline' : 'default'}
-          minimumDate={customStart}
-          maximumDate={new Date()}
-          onChange={(_, date) => {
-            setShowEndPicker(Platform.OS === 'ios');
-            if (date) setCustomEnd(date);
-          }}
-        />
+        <DateTimePicker value={customEnd} mode="date" display={Platform.OS === 'ios' ? 'inline' : 'default'} minimumDate={customStart} maximumDate={new Date()}
+          onChange={(_, date) => { setShowEndPicker(Platform.OS === 'ios'); if (date) setCustomEnd(date); }} />
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.canvas },
-
-  navBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.carbon, height: 52, paddingHorizontal: 12, borderBottomWidth: 2, borderBottomColor: C.chrome },
-  backBtn: { marginRight: 12 },
-  backText: { color: C.canvasSoft, fontSize: 14, fontWeight: '700' },
-  navTitle: { flex: 1, color: C.gold, fontSize: 13, fontWeight: '700', letterSpacing: 0.5 },
-
-  periodBar: { flexDirection: 'row', backgroundColor: C.canvasSoft, paddingHorizontal: 8, paddingVertical: 6, gap: 6 },
-  periodChip: { backgroundColor: C.periwinkle, borderRadius: 2, paddingHorizontal: 10, paddingVertical: 5 },
-  periodChipActive: { backgroundColor: C.carbon },
-  periodChipText: { color: C.carbon, fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
-  periodChipTextActive: { color: C.gold },
-
-  customBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.periwinkle, borderBottomWidth: 1, borderBottomColor: C.chrome, paddingHorizontal: 12, paddingVertical: 8, gap: 6 },
-  customLabel: { color: C.carbon, fontSize: 11, fontWeight: '700' },
-  dateBtn: { backgroundColor: C.surface, borderRadius: 2, borderWidth: 1, borderColor: C.chrome, paddingHorizontal: 8, paddingVertical: 4 },
-  dateBtnText: { color: C.carbon, fontSize: 11, fontWeight: '700' },
-  customTilde: { color: C.carbon, fontSize: 12, fontWeight: '700' },
-  applyBtn: { backgroundColor: C.signal, borderRadius: 2, paddingHorizontal: 10, paddingVertical: 4 },
+  safeArea: { flex: 1, backgroundColor: C.header },
+  headerCard: { backgroundColor: C.header, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20, gap: 16 },
+  headerTitle: { color: '#ffffff', fontSize: 20, fontWeight: '700' },
+  periodBar: { flexDirection: 'row', gap: 8 },
+  periodChip: { borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6 },
+  periodChipActive: { backgroundColor: '#ffffff', borderColor: '#ffffff' },
+  periodChipText: { color: 'rgba(255,255,255,0.8)', fontSize: 12, fontWeight: '700' },
+  periodChipTextActive: { color: C.header },
+  customBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.card, paddingHorizontal: 16, paddingVertical: 10, gap: 6, borderBottomWidth: 1, borderBottomColor: C.border },
+  customLabel: { color: C.stone, fontSize: 11, fontWeight: '700' },
+  dateBtn: { borderWidth: 1, borderColor: C.border, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 5 },
+  dateBtnText: { color: C.onDark, fontSize: 11, fontWeight: '700' },
+  customTilde: { color: C.muted, fontSize: 12 },
+  applyBtn: { backgroundColor: C.primary, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 5 },
   applyBtnText: { color: C.onPrimary, fontSize: 11, fontWeight: '700' },
-
-  sectionBar: { paddingHorizontal: 12, paddingVertical: 6 },
-  sectionLabel: { color: C.carbon, fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
-
-  list: { flex: 1 },
-
-  rateCard: { backgroundColor: C.platinum, borderRadius: 4, borderWidth: 1, borderColor: 'rgba(61,79,151,0.3)', padding: 12, gap: 8, elevation: 2 },
+  metaLabel: { color: C.muted, fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
+  list: { flex: 1, backgroundColor: C.body },
+  rateCard: { backgroundColor: C.card, borderRadius: 16, padding: 16, gap: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 6, elevation: 3 },
   rateHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  rateTitle: { flex: 1, color: C.carbon, fontSize: 12, fontWeight: '700' },
-  rateRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  rateDays: { color: C.inkSoft, fontSize: 11, fontWeight: '700' },
-  rateBadge: { borderRadius: 2, paddingHorizontal: 8, paddingVertical: 3 },
-  ratePct: { color: C.onPrimary, fontSize: 12, fontWeight: '700' },
-  barBg: { height: 6, backgroundColor: 'rgba(96,97,156,0.2)', borderRadius: 2, overflow: 'hidden' },
-  barFill: { height: '100%', borderRadius: 2 },
-
-  empty: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  emptyText: { color: C.mutedIndigo, fontSize: 12, fontWeight: '700' },
+  rateTitle: { flex: 1, color: C.onDark, fontSize: 14, fontWeight: '600' },
+  rateRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  rateDays: { color: C.muted, fontSize: 11, fontWeight: '700' },
+  rateBadge: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
+  ratePct: { color: C.onPrimary, fontSize: 11, fontWeight: '700' },
+  barBg: { height: 4, backgroundColor: C.border, borderRadius: 2, overflow: 'hidden' },
+  barFill: { height: '100%' },
+  empty: { flex: 1, backgroundColor: C.body, alignItems: 'center', justifyContent: 'center' },
+  emptyText: { color: C.muted, fontSize: 14, fontWeight: '600' },
 });

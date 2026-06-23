@@ -1,10 +1,9 @@
 import * as SQLite from 'expo-sqlite';
 
-export type Task = { id: number; title: string; sort_order: number };
+export type Task = { id: number; title: string; sort_order: number; priority: number; icon: string; target_time: string | null; frequency: string };
 export type NotificationSetting = { id: number; time: string; notification_type: string; identifier: string | null; task_id: number | null };
 export type CompletionDetail = { task_id: number; title: string; date: string; completed_at: string | null };
-export type TimeLog = { id: number; task_id: number; title: string; date: string; duration_seconds: number; started_at: string; ended_at: string };
-export type TimerSetting = { task_id: number; target_seconds: number };
+export type TimeLog = { id: number; task_id: number; date: string; duration: number; type: string; started_at: string };
 
 export async function migrateDb(db: SQLite.SQLiteDatabase): Promise<void> {
   await db.execAsync(`
@@ -30,17 +29,17 @@ export async function migrateDb(db: SQLite.SQLiteDatabase): Promise<void> {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       task_id INTEGER NOT NULL,
       date TEXT NOT NULL,
-      duration_seconds INTEGER NOT NULL,
-      started_at TEXT NOT NULL,
-      ended_at TEXT NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS timer_settings (
-      task_id INTEGER PRIMARY KEY,
-      target_seconds INTEGER NOT NULL
+      duration INTEGER NOT NULL,
+      type TEXT NOT NULL DEFAULT 'stopwatch',
+      started_at TEXT NOT NULL
     );
   `);
   try { await db.execAsync('ALTER TABLE completions ADD COLUMN completed_at TEXT'); } catch {}
   try { await db.execAsync('ALTER TABLE notification_settings ADD COLUMN task_id INTEGER'); } catch {}
+  try { await db.execAsync('ALTER TABLE tasks ADD COLUMN priority INTEGER DEFAULT 1'); } catch {}
+  try { await db.execAsync("ALTER TABLE tasks ADD COLUMN icon TEXT DEFAULT '✅'"); } catch {}
+  try { await db.execAsync('ALTER TABLE tasks ADD COLUMN target_time TEXT'); } catch {}
+  try { await db.execAsync("ALTER TABLE tasks ADD COLUMN frequency TEXT DEFAULT 'daily'"); } catch {}
 }
 
 export function getToday(): string {
@@ -60,7 +59,7 @@ export function daysBetween(start: string, end: string): number {
 }
 
 export async function getTasks(db: SQLite.SQLiteDatabase): Promise<Task[]> {
-  return db.getAllAsync<Task>('SELECT * FROM tasks ORDER BY sort_order ASC, id ASC');
+  return db.getAllAsync<Task>('SELECT * FROM tasks ORDER BY priority DESC, sort_order ASC, id ASC');
 }
 
 export async function addTask(db: SQLite.SQLiteDatabase, title: string): Promise<number> {
@@ -72,6 +71,22 @@ export async function updateTask(db: SQLite.SQLiteDatabase, id: number, title: s
   await db.runAsync('UPDATE tasks SET title = ? WHERE id = ?', [title, id]);
 }
 
+export async function updateTaskPriority(db: SQLite.SQLiteDatabase, id: number, priority: number): Promise<void> {
+  await db.runAsync('UPDATE tasks SET priority = ? WHERE id = ?', [priority, id]);
+}
+
+export async function updateTaskIcon(db: SQLite.SQLiteDatabase, id: number, icon: string): Promise<void> {
+  await db.runAsync('UPDATE tasks SET icon = ? WHERE id = ?', [icon, id]);
+}
+
+export async function updateTaskTargetTime(db: SQLite.SQLiteDatabase, id: number, target_time: string | null): Promise<void> {
+  await db.runAsync('UPDATE tasks SET target_time = ? WHERE id = ?', [target_time, id]);
+}
+
+export async function updateTaskFrequency(db: SQLite.SQLiteDatabase, id: number, frequency: string): Promise<void> {
+  await db.runAsync('UPDATE tasks SET frequency = ? WHERE id = ?', [frequency, id]);
+}
+
 export async function deleteTask(db: SQLite.SQLiteDatabase, id: number): Promise<string[]> {
   const rows = await db.getAllAsync<{ identifier: string | null }>(
     'SELECT identifier FROM notification_settings WHERE task_id = ?', [id]
@@ -79,14 +94,39 @@ export async function deleteTask(db: SQLite.SQLiteDatabase, id: number): Promise
   await db.runAsync('DELETE FROM tasks WHERE id = ?', [id]);
   await db.runAsync('DELETE FROM completions WHERE task_id = ?', [id]);
   await db.runAsync('DELETE FROM notification_settings WHERE task_id = ?', [id]);
-  await db.runAsync('DELETE FROM time_logs WHERE task_id = ?', [id]);
-  await db.runAsync('DELETE FROM timer_settings WHERE task_id = ?', [id]);
   return rows.map(r => r.identifier).filter(Boolean) as string[];
 }
 
 export async function getCompletedTaskIds(db: SQLite.SQLiteDatabase, date: string): Promise<number[]> {
   const rows = await db.getAllAsync<{ task_id: number }>('SELECT task_id FROM completions WHERE date = ?', [date]);
   return rows.map((r) => r.task_id);
+}
+
+export async function getCompletionsForDate(
+  db: SQLite.SQLiteDatabase, date: string
+): Promise<{ task_id: number; completed_at: string | null }[]> {
+  return db.getAllAsync<{ task_id: number; completed_at: string | null }>(
+    'SELECT task_id, completed_at FROM completions WHERE date = ?', [date]
+  );
+}
+
+export function expectedCompletions(frequency: string, startDate: string, endDate: string): number {
+  const start = new Date(startDate + 'T00:00:00');
+  const end = new Date(endDate + 'T00:00:00');
+  const totalDays = Math.round((end.getTime() - start.getTime()) / 86400000) + 1;
+  if (!frequency || frequency === 'daily') return totalDays;
+  if (frequency.startsWith('weekly:')) {
+    const n = parseInt(frequency.split(':')[1], 10);
+    return Math.ceil(totalDays / 7) * n;
+  }
+  if (frequency.startsWith('days:')) {
+    const days = frequency.split(':')[1].split(',').map(Number);
+    let count = 0;
+    const d = new Date(start);
+    while (d <= end) { if (days.includes(d.getDay())) count++; d.setDate(d.getDate() + 1); }
+    return Math.max(count, 1);
+  }
+  return totalDays;
 }
 
 export async function markComplete(db: SQLite.SQLiteDatabase, taskId: number, date: string): Promise<void> {
@@ -155,6 +195,22 @@ export async function addNotificationSetting(
   );
 }
 
+export async function addTimeLog(
+  db: SQLite.SQLiteDatabase, taskId: number, duration: number, type: string, startedAt: string
+): Promise<void> {
+  const date = startedAt.slice(0, 10);
+  await db.runAsync(
+    'INSERT INTO time_logs (task_id, date, duration, type, started_at) VALUES (?, ?, ?, ?, ?)',
+    [taskId, date, duration, type, startedAt]
+  );
+}
+
+export async function getTimeLogsForTask(db: SQLite.SQLiteDatabase, taskId: number): Promise<TimeLog[]> {
+  return db.getAllAsync<TimeLog>(
+    'SELECT * FROM time_logs WHERE task_id = ? ORDER BY started_at DESC', [taskId]
+  );
+}
+
 export async function deleteNotificationSetting(
   db: SQLite.SQLiteDatabase, id: number
 ): Promise<string | null> {
@@ -163,52 +219,4 @@ export async function deleteNotificationSetting(
   );
   await db.runAsync('DELETE FROM notification_settings WHERE id = ?', [id]);
   return row?.identifier ?? null;
-}
-
-export async function addTimeLog(
-  db: SQLite.SQLiteDatabase, taskId: number, durationSeconds: number, startedAt: string, endedAt: string
-): Promise<void> {
-  await db.runAsync(
-    'INSERT INTO time_logs (task_id, date, duration_seconds, started_at, ended_at) VALUES (?, ?, ?, ?, ?)',
-    [taskId, endedAt.slice(0, 10), Math.max(1, Math.round(durationSeconds)), startedAt, endedAt]
-  );
-}
-
-export async function getTimeLogsForDate(db: SQLite.SQLiteDatabase, date: string): Promise<TimeLog[]> {
-  return db.getAllAsync<TimeLog>(
-    `SELECT l.id, l.task_id, t.title, l.date, l.duration_seconds, l.started_at, l.ended_at
-     FROM time_logs l JOIN tasks t ON l.task_id = t.id
-     WHERE l.date = ?
-     ORDER BY l.ended_at DESC`,
-    [date]
-  );
-}
-
-export async function getTotalTimeForDate(db: SQLite.SQLiteDatabase, date: string): Promise<number> {
-  const row = await db.getFirstAsync<{ total: number | null }>(
-    'SELECT SUM(duration_seconds) as total FROM time_logs WHERE date = ?',
-    [date]
-  );
-  return row?.total ?? 0;
-}
-
-export async function deleteTimeLog(db: SQLite.SQLiteDatabase, id: number): Promise<void> {
-  await db.runAsync('DELETE FROM time_logs WHERE id = ?', [id]);
-}
-
-export async function getTimerSettingForTask(db: SQLite.SQLiteDatabase, taskId: number): Promise<TimerSetting | null> {
-  const row = await db.getFirstAsync<TimerSetting>(
-    'SELECT task_id, target_seconds FROM timer_settings WHERE task_id = ?',
-    [taskId]
-  );
-  return row ?? null;
-}
-
-export async function saveTimerSettingForTask(
-  db: SQLite.SQLiteDatabase, taskId: number, targetSeconds: number
-): Promise<void> {
-  await db.runAsync(
-    'INSERT OR REPLACE INTO timer_settings (task_id, target_seconds) VALUES (?, ?)',
-    [taskId, Math.max(60, Math.round(targetSeconds))]
-  );
 }

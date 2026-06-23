@@ -1,44 +1,80 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, Modal,
   TextInput, StyleSheet, Alert, KeyboardAvoidingView,
-  Platform, StatusBar,
+  Platform, StatusBar, Animated, ScrollView, PanResponder, Dimensions,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import * as Notifications from 'expo-notifications';
 import { RootStackParamList } from '../../App';
 import {
-  Task, getToday, getTasks, addTask, deleteTask,
+  Task, getToday, getTasks, addTask, updateTask, deleteTask,
   getCompletedTaskIds, markComplete, markIncomplete,
+  NotificationSetting, getNotificationSettingsForTask,
+  addNotificationSetting, deleteNotificationSetting,
 } from '../db/database';
+import TabBar from '../components/TabBar';
 
 const C = {
-  carbon:      '#21242e',
-  gold:        '#e48600',
-  amber:       '#ecab37',
-  signal:      '#f68d1f',
-  canvas:      '#7a8aba',
-  canvasSoft:  '#9fbee7',
-  chrome:      '#3d4f97',
-  mutedIndigo: '#60619c',
-  platinum:    '#dedede',
-  surface:     '#ffffff',
-  periwinkle:  '#8ba1d4',
-  onPrimary:   '#ffffff',
-  inkSoft:     '#3d4f97',
-  red:         '#e60012',
+  header:    '#60a5fa',
+  body:      '#ffffff',
+  card:      '#ffffff',
+  border:    '#dbeafe',
+  primary:   '#60a5fa',
+  onPrimary: '#ffffff',
+  onDark:    '#2d3748',
+  muted:     '#93c5fd',
+  stone:     '#3b82f6',
+  error:     '#e52020',
 };
 
+type NotifType = 'full' | 'silent';
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'Home'> };
+
+async function scheduleNotif(time: string, type: NotifType): Promise<string | null> {
+  const [h, m] = time.split(':').map(Number);
+  try {
+    return await Notifications.scheduleNotificationAsync({
+      content: ({
+        title: '毎日タスク',
+        body: '今日のタスクを確認しましょう！',
+        sound: type === 'full',
+        android: { channelId: type === 'full' ? 'full' : 'silent' } as any,
+      } as any),
+      trigger: { hour: h, minute: m, repeats: true } as any,
+    });
+  } catch { return null; }
+}
 
 export default function HomeScreen({ navigation }: Props) {
   const db = useSQLiteContext();
+  const screen = Dimensions.get('window');
   const [tasks, setTasks] = useState<Task[]>([]);
   const [completedIds, setCompletedIds] = useState<Set<number>>(new Set());
   const [showAdd, setShowAdd] = useState(false);
   const [newTitle, setNewTitle] = useState('');
+  const [addNotifs, setAddNotifs] = useState<{ time: string; type: NotifType }[]>([]);
+  const [showAddTimePicker, setShowAddTimePicker] = useState(false);
+  const [addPickerTime, setAddPickerTime] = useState(new Date());
+  const [showThumb, setShowThumb] = useState(false);
+  const thumbAnim = useRef(new Animated.Value(0)).current;
+  const progressAnim = useRef(new Animated.Value(0)).current;
+  const fabPosition = useRef({ x: Math.max(screen.width - 72, 20), y: Math.max(screen.height - 150, 120) });
+  const fabStartPosition = useRef(fabPosition.current);
+  const fabAnim = useRef(new Animated.ValueXY(fabPosition.current)).current;
   const today = getToday();
+
+  // Task detail sheet
+  const [detailTask, setDetailTask] = useState<Task | null>(null);
+  const [detailTitle, setDetailTitle] = useState('');
+  const [taskNotifs, setTaskNotifs] = useState<NotificationSetting[]>([]);
+  const [notifType, setNotifType] = useState<NotifType>('full');
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [pickerTime, setPickerTime] = useState(new Date());
 
   const load = useCallback(async () => {
     const ts = await getTasks(db);
@@ -49,11 +85,22 @@ export default function HomeScreen({ navigation }: Props) {
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
+  const triggerCelebration = () => {
+    setShowThumb(true);
+    thumbAnim.setValue(0);
+    Animated.sequence([
+      Animated.spring(thumbAnim, { toValue: 1, useNativeDriver: true, tension: 180, friction: 6 }),
+      Animated.delay(500),
+      Animated.timing(thumbAnim, { toValue: 0, duration: 250, useNativeDriver: true }),
+    ]).start(() => setShowThumb(false));
+  };
+
   const toggle = async (id: number) => {
     if (completedIds.has(id)) {
       await markIncomplete(db, id, today);
     } else {
       await markComplete(db, id, today);
+      triggerCelebration();
     }
     load();
   };
@@ -61,208 +108,472 @@ export default function HomeScreen({ navigation }: Props) {
   const handleAdd = async () => {
     const title = newTitle.trim();
     if (!title) return;
-    await addTask(db, title);
+    const taskId = await addTask(db, title);
+    if (addNotifs.length > 0) {
+      const { status } = await Notifications.requestPermissionsAsync();
+      if (status === 'granted') {
+        for (const item of addNotifs) {
+          const identifier = await scheduleNotif(item.time, item.type);
+          await addNotificationSetting(db, item.time, item.type, identifier, taskId);
+        }
+      }
+    }
     setNewTitle('');
+    setAddNotifs([]);
     setShowAdd(false);
     load();
+  };
+
+  const closeAddSheet = () => {
+    setShowAdd(false);
+    setNewTitle('');
+    setAddNotifs([]);
+    setShowAddTimePicker(false);
+  };
+
+  const handleAddNotifToNewTask = (date: Date) => {
+    setShowAddTimePicker(false);
+    const time = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+    setAddNotifs((items) => [...items, { time, type: notifType }]);
+  };
+
+  const openDetail = async (task: Task) => {
+    const notifs = await getNotificationSettingsForTask(db, task.id);
+    setDetailTask(task);
+    setDetailTitle(task.title);
+    setTaskNotifs(notifs);
+  };
+
+  const handleSaveTitle = async () => {
+    if (!detailTask || !detailTitle.trim()) return;
+    await updateTask(db, detailTask.id, detailTitle.trim());
+    setDetailTask(t => t ? { ...t, title: detailTitle.trim() } : null);
+    load();
+  };
+
+  const handleAddNotif = async (date: Date) => {
+    setShowTimePicker(false);
+    if (!detailTask) return;
+    const { status } = await Notifications.requestPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('通知の許可が必要です', '設定から通知を許可してください。');
+      return;
+    }
+    const h = date.getHours();
+    const m = date.getMinutes();
+    const time = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    const identifier = await scheduleNotif(time, notifType);
+    await addNotificationSetting(db, time, notifType, identifier, detailTask.id);
+    const notifs = await getNotificationSettingsForTask(db, detailTask.id);
+    setTaskNotifs(notifs);
+  };
+
+  const handleDeleteNotif = async (notif: NotificationSetting) => {
+    const id = await deleteNotificationSetting(db, notif.id);
+    if (id) await Notifications.cancelScheduledNotificationAsync(id);
+    if (detailTask) {
+      const notifs = await getNotificationSettingsForTask(db, detailTask.id);
+      setTaskNotifs(notifs);
+    }
   };
 
   const handleDelete = (task: Task) => {
     Alert.alert('削除', `「${task.title}」を削除しますか？`, [
       { text: 'キャンセル', style: 'cancel' },
-      { text: '削除', style: 'destructive', onPress: async () => { await deleteTask(db, task.id); load(); } },
+      {
+        text: '削除', style: 'destructive',
+        onPress: async () => {
+          const identifiers = await deleteTask(db, task.id);
+          for (const id of identifiers) await Notifications.cancelScheduledNotificationAsync(id);
+          if (detailTask?.id === task.id) setDetailTask(null);
+          load();
+        },
+      },
     ]);
   };
 
   const done = tasks.filter((t) => completedIds.has(t.id)).length;
   const total = tasks.length;
   const progress = total > 0 ? done / total : 0;
+  const sortedTasks = [...tasks].sort((a, b) => {
+    const aDone = completedIds.has(a.id) ? 1 : 0;
+    const bDone = completedIds.has(b.id) ? 1 : 0;
+    if (aDone !== bDone) return bDone - aDone;
+    if (a.sort_order !== b.sort_order) return a.sort_order - b.sort_order;
+    return a.id - b.id;
+  });
+  const clampFab = (x: number, y: number) => ({
+    x: Math.max(8, Math.min(x, screen.width - 60)),
+    y: Math.max(100, Math.min(y, screen.height - 130)),
+  });
+  const fabPanResponder = useRef(PanResponder.create({
+    onStartShouldSetPanResponder: () => false,
+    onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dx) > 4 || Math.abs(gesture.dy) > 4,
+    onPanResponderGrant: () => {
+      fabStartPosition.current = fabPosition.current;
+    },
+    onPanResponderMove: (_, gesture) => {
+      const next = clampFab(fabStartPosition.current.x + gesture.dx, fabStartPosition.current.y + gesture.dy);
+      fabAnim.setValue(next);
+    },
+    onPanResponderRelease: (_, gesture) => {
+      const next = clampFab(fabStartPosition.current.x + gesture.dx, fabStartPosition.current.y + gesture.dy);
+      fabPosition.current = next;
+      fabAnim.setValue(next);
+    },
+    onPanResponderTerminate: () => {
+      fabAnim.setValue(fabPosition.current);
+    },
+  })).current;
 
-  // Japanese date display
+  useEffect(() => {
+    Animated.timing(progressAnim, {
+      toValue: progress,
+      duration: 450,
+      useNativeDriver: false,
+    }).start();
+  }, [progress, progressAnim]);
+
   const now = new Date();
   const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
   const dateLabel = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')} (${weekdays[now.getDay()]})`;
 
   return (
-    <View style={s.root}>
-      <StatusBar barStyle="light-content" backgroundColor={C.carbon} />
+    <SafeAreaView style={s.safeArea} edges={['top', 'bottom']}>
+      <StatusBar barStyle="light-content" backgroundColor={C.header} />
 
-      {/* ── Nav bar ────────────────────────────────────────────────── */}
-      <View style={s.navBar}>
-        <Text style={s.navTitle}>毎日やること</Text>
-        <View style={s.navButtons}>
-          <TouchableOpacity style={s.chipMuted} onPress={() => navigation.navigate('Stats')}>
-            <Text style={s.chipMutedText}>実行率</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={s.chipAmber} onPress={() => setShowAdd(true)}>
-            <Text style={s.chipAmberText}>＋ ADD</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* ── Sub-nav strip ──────────────────────────────────────────── */}
-      <View style={s.subNav}>
-        <Text style={s.subNavText}>{dateLabel}</Text>
-      </View>
-
-      {/* ── Progress panel ─────────────────────────────────────────── */}
-      <View style={s.progressPanel}>
-        <Text style={s.sectionLabel}>≡ TODAY'S PROGRESS</Text>
+      <View style={s.headerCard}>
+        <Text style={s.dateText}>{dateLabel}</Text>
+        <Text style={s.headerLabel}>今日の進捗</Text>
         <View style={s.progressRow}>
           <View style={s.progressBg}>
-            <View style={[s.progressFill, { width: `${progress * 100}%` }]} />
-          </View>
-          <Text style={s.progressText}>{done} / {total} 完了</Text>
-        </View>
-      </View>
-
-      {/* ── Section label ──────────────────────────────────────────── */}
-      <View style={s.sectionBar}>
-        <Text style={s.sectionLabel}>≡ CHECKLIST</Text>
-        {total > 0 && <Text style={s.sectionCount}>{total}件</Text>}
-      </View>
-
-      {/* ── Task list ──────────────────────────────────────────────── */}
-      {tasks.length === 0 ? (
-        <View style={s.empty}>
-          <View style={s.emptyBox}>
-            <Text style={s.emptyTitle}>NO TASKS</Text>
-            <Text style={s.emptyBody}>毎日やることを追加しましょう</Text>
-            <TouchableOpacity style={s.emptyButton} onPress={() => setShowAdd(true)}>
-              <Text style={s.emptyButtonText}>＋</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      ) : (
-        <FlatList
-          data={tasks}
-          keyExtractor={(item) => String(item.id)}
-          style={s.list}
-          renderItem={({ item }) => {
-            const done = completedIds.has(item.id);
-            return (
-              <>
-                <TouchableOpacity style={s.taskRow} onPress={() => toggle(item.id)} onLongPress={() => handleDelete(item)}>
-                  <View style={[s.checkCircle, done && s.checkCircleDone]}>
-                    {done && <Text style={s.checkMark}>✓</Text>}
-                  </View>
-                  <Text style={[s.taskTitle, done && s.taskTitleDone]} numberOfLines={2}>{item.title}</Text>
-                  <View style={[s.arrowChip, done && s.arrowChipDone]}>
-                    <Text style={s.arrowText}>{done ? '✓' : '›'}</Text>
-                  </View>
-                </TouchableOpacity>
-                <View style={s.divider} />
-              </>
-            );
-          }}
-          ListFooterComponent={<View style={{ height: 16 }} />}
-        />
-      )}
-
-      {/* ── Add button (bottom) ─────────────────────────────────────── */}
-      <View style={s.bottomBar}>
-        <TouchableOpacity style={s.addButton} onPress={() => setShowAdd(true)}>
-          <Text style={s.addButtonText}>＋ タスクを追加する</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* ── Add task modal ──────────────────────────────────────────── */}
-      <Modal visible={showAdd} transparent animationType="fade" onRequestClose={() => setShowAdd(false)}>
-        <KeyboardAvoidingView style={s.modalBg} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <View style={s.modalCard}>
-            <Text style={s.modalTitle}>≡ ADD TASK</Text>
-            <View style={s.modalDivider} />
-            <Text style={s.modalLabel}>タスク名</Text>
-            <TextInput
-              style={s.modalInput}
-              value={newTitle}
-              onChangeText={setNewTitle}
-              placeholder="例：歯磨き、運動、水を飲む"
-              placeholderTextColor="#999"
-              autoFocus
-              returnKeyType="done"
-              onSubmitEditing={handleAdd}
+            <Animated.View
+              style={[
+                s.progressFill,
+                { width: progressAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) },
+              ]}
             />
-            <View style={s.modalButtons}>
-              <TouchableOpacity style={s.modalCancel} onPress={() => { setShowAdd(false); setNewTitle(''); }}>
-                <Text style={s.modalCancelText}>キャンセル</Text>
+          </View>
+          <Text style={s.progressText}>{done} / {total}</Text>
+        </View>
+      </View>
+
+      <FlatList
+        data={sortedTasks}
+        keyExtractor={(item) => String(item.id)}
+        style={s.list}
+        contentContainerStyle={{ padding: 16, gap: 10 }}
+        ListHeaderComponent={
+          <View style={s.sectionBar}>
+            <Text style={s.metaLabel}>チェックリスト</Text>
+            {total > 0 && <Text style={s.stone}>{total}件</Text>}
+          </View>
+        }
+        ListEmptyComponent={
+          <View style={s.empty}>
+            <Text style={s.emptyTitle}>タスクなし</Text>
+            <Text style={s.emptyBody}>右下の ＋ から追加できます</Text>
+          </View>
+        }
+        renderItem={({ item }) => {
+          const isDone = completedIds.has(item.id);
+          return (
+            <View style={[s.taskCard, isDone && s.taskCardDone]}>
+              <TouchableOpacity
+                style={[s.checkBox, isDone && s.checkBoxDone]}
+                onPress={() => toggle(item.id)}
+                hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+              >
+                {isDone && <Text style={s.checkMark}>✓</Text>}
               </TouchableOpacity>
-              <TouchableOpacity style={[s.modalConfirm, !newTitle.trim() && s.modalConfirmDisabled]} onPress={handleAdd} disabled={!newTitle.trim()}>
-                <Text style={s.modalConfirmText}>追加</Text>
+              <TouchableOpacity style={s.taskBody} onPress={() => openDetail(item)} activeOpacity={0.7}>
+                <Text style={[s.taskTitle, isDone && s.taskTitleDone]} numberOfLines={2}>
+                  {item.title}
+                </Text>
+                {isDone && <View style={s.doneBadge}><Text style={s.doneBadgeText}>完了</Text></View>}
+              </TouchableOpacity>
+              <TouchableOpacity style={s.deleteBtn} onPress={() => handleDelete(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Text style={s.deleteBtnText}>🗑️</Text>
               </TouchableOpacity>
             </View>
-          </View>
-        </KeyboardAvoidingView>
+          );
+        }}
+        ListFooterComponent={<View style={{ height: 80 }} />}
+      />
+
+      <TabBar current="Home" navigation={navigation} />
+
+      <Animated.View style={[s.fabWrap, fabAnim.getLayout()]} {...fabPanResponder.panHandlers}>
+        <TouchableOpacity
+          style={s.fab}
+          onPress={() => setShowAdd(true)}
+          activeOpacity={0.85}
+        >
+          <Text style={s.fabText}>＋</Text>
+        </TouchableOpacity>
+      </Animated.View>
+
+      {showThumb && (
+        <Animated.View style={[s.thumbOverlay, {
+          opacity: thumbAnim,
+          transform: [{ scale: thumbAnim.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1] }) }],
+        }]} pointerEvents="none">
+          <Text style={s.thumbEmoji}>👍</Text>
+        </Animated.View>
+      )}
+
+      {/* Add task bottom sheet */}
+      <Modal visible={showAdd} transparent animationType="slide" onRequestClose={closeAddSheet}>
+        <TouchableOpacity style={s.sheetBg} activeOpacity={1} onPress={closeAddSheet}>
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+            <TouchableOpacity activeOpacity={1} onPress={() => {}}>
+              <View style={s.sheet}>
+                <View style={s.sheetHandle} />
+                <Text style={s.sheetSection}>タスク名</Text>
+                <View style={s.sheetTitleRow}>
+                  <TextInput
+                    style={s.sheetTitleInput}
+                    value={newTitle}
+                    onChangeText={setNewTitle}
+                    placeholder="例：歯磨き、運動、水を飲む"
+                    placeholderTextColor={C.muted}
+                    autoFocus
+                    returnKeyType="done"
+                    onSubmitEditing={handleAdd}
+                  />
+                  <TouchableOpacity
+                    style={[s.sheetSaveBtn, !newTitle.trim() && s.sheetSaveBtnDisabled]}
+                    onPress={handleAdd}
+                    disabled={!newTitle.trim()}
+                  >
+                    <Text style={s.sheetSaveBtnText}>追加</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <Text style={[s.sheetSection, { marginTop: 16 }]}>通知</Text>
+                <View style={s.typeRow}>
+                  <TouchableOpacity style={[s.typeChip, notifType === 'full' && s.typeChipActive]} onPress={() => setNotifType('full')}>
+                    <Text style={[s.typeChipText, notifType === 'full' && s.typeChipTextActive]}>通常</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[s.typeChip, notifType === 'silent' && s.typeChipActive]} onPress={() => setNotifType('silent')}>
+                    <Text style={[s.typeChipText, notifType === 'silent' && s.typeChipTextActive]}>サイレント</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {addNotifs.map((item, index) => (
+                  <View key={`${item.time}-${index}`} style={s.notifRow}>
+                    <Text style={s.notifTime}>{item.time}</Text>
+                    <Text style={s.notifType}>{item.type === 'full' ? '通常' : 'サイレント'}</Text>
+                    <TouchableOpacity onPress={() => setAddNotifs((items) => items.filter((_, i) => i !== index))}>
+                      <Text style={s.deleteBtnText}>削除</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+
+                <TouchableOpacity style={s.addNotifBtn} onPress={() => setShowAddTimePicker(true)}>
+                  <Text style={s.addNotifBtnText}>通知時間を追加</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
+          </KeyboardAvoidingView>
+        </TouchableOpacity>
       </Modal>
-    </View>
+
+      {/* Task detail bottom sheet */}
+      <Modal visible={!!detailTask} transparent animationType="slide" onRequestClose={() => setDetailTask(null)}>
+        <TouchableOpacity style={s.sheetBg} activeOpacity={1} onPress={() => setDetailTask(null)}>
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+            <TouchableOpacity activeOpacity={1} onPress={() => {}}>
+              <View style={s.sheet}>
+                <View style={s.sheetHandle} />
+
+                {/* Title edit */}
+                <Text style={s.sheetSection}>タスク名</Text>
+                <View style={s.sheetTitleRow}>
+                  <TextInput
+                    style={s.sheetTitleInput}
+                    value={detailTitle}
+                    onChangeText={setDetailTitle}
+                    returnKeyType="done"
+                    onSubmitEditing={handleSaveTitle}
+                  />
+                  <TouchableOpacity
+                    style={[s.sheetSaveBtn, detailTitle === detailTask?.title && s.sheetSaveBtnDisabled]}
+                    onPress={handleSaveTitle}
+                    disabled={detailTitle === detailTask?.title}
+                  >
+                    <Text style={s.sheetSaveBtnText}>保存</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Notification section */}
+                <Text style={[s.sheetSection, { marginTop: 16 }]}>通知</Text>
+                <View style={s.typeRow}>
+                  <TouchableOpacity style={[s.typeChip, notifType === 'full' && s.typeChipActive]} onPress={() => setNotifType('full')}>
+                    <Text style={[s.typeChipText, notifType === 'full' && s.typeChipTextActive]}>🔔 通常</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[s.typeChip, notifType === 'silent' && s.typeChipActive]} onPress={() => setNotifType('silent')}>
+                    <Text style={[s.typeChipText, notifType === 'silent' && s.typeChipTextActive]}>🔕 サイレント</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {taskNotifs.map((n) => (
+                  <View key={n.id} style={s.notifRow}>
+                    <Text style={s.notifTime}>{n.time}</Text>
+                    <Text style={s.notifType}>{n.notification_type === 'full' ? '🔔' : '🔕'}</Text>
+                    <TouchableOpacity onPress={() => handleDeleteNotif(n)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                      <Text style={s.deleteBtnText}>🗑️</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+
+                <TouchableOpacity style={s.addNotifBtn} onPress={() => setShowTimePicker(true)}>
+                  <Text style={s.addNotifBtnText}>＋ 通知時間を追加</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
+          </KeyboardAvoidingView>
+        </TouchableOpacity>
+      </Modal>
+
+      {showAddTimePicker && (
+        <DateTimePicker
+          value={addPickerTime}
+          mode="time"
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          onChange={(_, date) => {
+            if (Platform.OS === 'android') {
+              if (date) handleAddNotifToNewTask(date);
+              else setShowAddTimePicker(false);
+            } else {
+              if (date) setAddPickerTime(date);
+            }
+          }}
+        />
+      )}
+      {Platform.OS === 'ios' && showAddTimePicker && (
+        <View style={s.iosRow}>
+          <TouchableOpacity style={s.iosCancelBtn} onPress={() => setShowAddTimePicker(false)}>
+            <Text style={s.iosCancelText}>キャンセル</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={s.iosConfirmBtn} onPress={() => handleAddNotifToNewTask(addPickerTime)}>
+            <Text style={s.iosConfirmText}>追加</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {showTimePicker && (
+        <DateTimePicker
+          value={pickerTime}
+          mode="time"
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          onChange={(_, date) => {
+            if (Platform.OS === 'android') {
+              if (date) handleAddNotif(date);
+              else setShowTimePicker(false);
+            } else {
+              if (date) setPickerTime(date);
+            }
+          }}
+        />
+      )}
+      {Platform.OS === 'ios' && showTimePicker && (
+        <View style={s.iosRow}>
+          <TouchableOpacity style={s.iosCancelBtn} onPress={() => setShowTimePicker(false)}>
+            <Text style={s.iosCancelText}>キャンセル</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={s.iosConfirmBtn} onPress={() => handleAddNotif(pickerTime)}>
+            <Text style={s.iosConfirmText}>追加</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </SafeAreaView>
   );
 }
 
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.canvas },
+  safeArea: { flex: 1, backgroundColor: C.header },
 
-  // Nav bar
-  navBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.carbon, height: 52, paddingHorizontal: 12, borderBottomWidth: 2, borderBottomColor: C.chrome },
-  navTitle: { flex: 1, color: C.gold, fontSize: 13, fontWeight: '700', letterSpacing: 0.5 },
-  navButtons: { flexDirection: 'row', gap: 6 },
-  chipMuted: { backgroundColor: C.mutedIndigo, borderRadius: 2, paddingHorizontal: 10, paddingVertical: 5, justifyContent: 'center' },
-  chipMutedText: { color: C.onPrimary, fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
-  chipAmber: { backgroundColor: C.amber, borderRadius: 2, paddingHorizontal: 10, paddingVertical: 5, justifyContent: 'center' },
-  chipAmberText: { color: C.carbon, fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
+  headerCard: { backgroundColor: C.header, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 24 },
+  dateText: { color: 'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: '600', marginBottom: 12 },
+  headerLabel: { color: 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
+  progressRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 6 },
+  progressBg: { flex: 1, height: 4, backgroundColor: 'rgba(255,255,255,0.25)', borderRadius: 2, overflow: 'hidden' },
+  progressFill: { height: '100%', backgroundColor: '#ffffff' },
+  progressText: { color: '#ffffff', fontSize: 11, fontWeight: '700' },
 
-  // Sub-nav
-  subNav: { backgroundColor: C.canvasSoft, paddingHorizontal: 12, paddingVertical: 5 },
-  subNavText: { color: C.carbon, fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
+  list: { flex: 1, backgroundColor: C.body },
+  sectionBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  metaLabel: { color: C.muted, fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
+  stone: { color: C.stone, fontSize: 11, fontWeight: '700' },
 
-  // Progress
-  progressPanel: { margin: 12, backgroundColor: C.periwinkle, borderRadius: 4, borderWidth: 1, borderColor: C.chrome, padding: 10, elevation: 2 },
-  progressRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 },
-  progressBg: { flex: 1, height: 8, backgroundColor: C.mutedIndigo, borderRadius: 2, overflow: 'hidden' },
-  progressFill: { height: '100%', backgroundColor: C.signal, borderRadius: 2 },
-  progressText: { color: C.onPrimary, fontSize: 11, fontWeight: '700' },
+  taskCard: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: C.card,
+    borderRadius: 12,
+    paddingHorizontal: 14, paddingVertical: 14, gap: 12,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4,
+    elevation: 2,
+  },
+  taskCardDone: { opacity: 0.6 },
+  checkBox: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
+  checkBoxDone: { backgroundColor: C.primary, borderColor: C.primary },
+  checkMark: { color: C.onPrimary, fontSize: 11, fontWeight: '700' },
+  taskBody: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  taskTitle: { flex: 1, color: C.onDark, fontSize: 14, fontWeight: '500', lineHeight: 20 },
+  taskTitleDone: { color: C.muted, textDecorationLine: 'line-through' },
+  doneBadge: { backgroundColor: C.header, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
+  doneBadgeText: { color: C.onPrimary, fontSize: 9, fontWeight: '700', letterSpacing: 0.5 },
+  deleteBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#fee2e2', alignItems: 'center', justifyContent: 'center' },
+  deleteBtnText: { fontSize: 16 },
 
-  // Section bar
-  sectionBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 5 },
-  sectionLabel: { color: C.carbon, fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
-  sectionCount: { color: C.inkSoft, fontSize: 10, fontWeight: '700' },
+  empty: { paddingVertical: 60, alignItems: 'center', gap: 8 },
+  emptyTitle: { color: C.stone, fontSize: 16, fontWeight: '700' },
+  emptyBody: { color: C.muted, fontSize: 13 },
 
-  // Task list
-  list: { flex: 1, paddingHorizontal: 12 },
-  taskRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.platinum, paddingHorizontal: 12, paddingVertical: 12, gap: 10 },
-  checkCircle: { width: 22, height: 22, borderRadius: 11, borderWidth: 1, borderColor: C.mutedIndigo, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
-  checkCircleDone: { backgroundColor: C.signal, borderColor: C.signal },
-  checkMark: { color: C.onPrimary, fontSize: 12, fontWeight: '700' },
-  taskTitle: { flex: 1, color: C.carbon, fontSize: 12, fontWeight: '700' },
-  taskTitleDone: { color: C.inkSoft, textDecorationLine: 'line-through' },
-  arrowChip: { width: 18, height: 18, borderRadius: 2, backgroundColor: C.amber, alignItems: 'center', justifyContent: 'center' },
-  arrowChipDone: { backgroundColor: C.signal },
-  arrowText: { color: C.carbon, fontSize: 11, fontWeight: '700' },
-  divider: { height: 1, backgroundColor: C.mutedIndigo, opacity: 0.3 },
+  fabWrap: { position: 'absolute', zIndex: 20 },
+  fab: { width: 52, height: 52, borderRadius: 26, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.25, shadowRadius: 6 },
+  fabText: { color: C.onPrimary, fontSize: 26, fontWeight: '400', lineHeight: 30 },
 
-  // Empty
-  empty: { flex: 1, padding: 24, justifyContent: 'center' },
-  emptyBox: { backgroundColor: C.canvasSoft, borderRadius: 4, borderWidth: 1, borderColor: C.chrome, padding: 24, alignItems: 'center', gap: 10 },
-  emptyTitle: { color: C.chrome, fontSize: 13, fontWeight: '700', letterSpacing: 0.5 },
-  emptyBody: { color: C.inkSoft, fontSize: 12 },
-  emptyButton: { width: 44, height: 44, borderRadius: 22, backgroundColor: C.signal, alignItems: 'center', justifyContent: 'center', marginTop: 6 },
-  emptyButtonText: { color: C.onPrimary, fontSize: 22, fontWeight: '700' },
-
-  // Bottom bar
-  bottomBar: { backgroundColor: C.carbon, padding: 12 },
-  addButton: { backgroundColor: C.signal, borderRadius: 2, height: 42, alignItems: 'center', justifyContent: 'center' },
-  addButtonText: { color: C.onPrimary, fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
-
-  // Modal
-  modalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 24 },
-  modalCard: { backgroundColor: C.surface, borderRadius: 4, padding: 20, gap: 10 },
-  modalTitle: { color: C.carbon, fontSize: 13, fontWeight: '700', letterSpacing: 0.5 },
-  modalDivider: { height: 1, backgroundColor: C.platinum },
-  modalLabel: { color: C.carbon, fontSize: 12, fontWeight: '700' },
-  modalInput: { borderWidth: 1, borderColor: C.chrome, borderRadius: 2, padding: 8, fontSize: 12, color: C.carbon },
+  modalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 },
+  modalCard: { backgroundColor: C.card, borderRadius: 16, padding: 20, gap: 12, elevation: 8 },
+  modalTitle: { color: C.onDark, fontSize: 16, fontWeight: '700' },
+  modalDivider: { height: 1, backgroundColor: C.border },
+  modalLabel: { color: C.muted, fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
+  modalInput: { borderWidth: 1, borderColor: C.border, borderRadius: 10, padding: 12, fontSize: 14, color: C.onDark, backgroundColor: C.body },
   modalButtons: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 4 },
-  modalCancel: { backgroundColor: C.carbon, borderRadius: 2, paddingHorizontal: 14, paddingVertical: 8 },
-  modalCancelText: { color: C.canvasSoft, fontSize: 11, fontWeight: '700' },
-  modalConfirm: { backgroundColor: C.signal, borderRadius: 2, paddingHorizontal: 16, paddingVertical: 8 },
-  modalConfirmDisabled: { backgroundColor: C.platinum },
-  modalConfirmText: { color: C.onPrimary, fontSize: 11, fontWeight: '700' },
+  modalCancel: { borderRadius: 8, borderWidth: 1, borderColor: C.border, paddingHorizontal: 16, paddingVertical: 9 },
+  modalCancelText: { color: C.stone, fontSize: 13, fontWeight: '700' },
+  modalConfirm: { backgroundColor: C.primary, borderRadius: 8, paddingHorizontal: 20, paddingVertical: 9 },
+  modalConfirmDisabled: { backgroundColor: C.border },
+  modalConfirmText: { color: C.onPrimary, fontSize: 13, fontWeight: '700' },
+
+  sheetBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  sheet: { backgroundColor: C.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingTop: 12, gap: 8 },
+  sheetHandle: { width: 40, height: 4, backgroundColor: C.border, borderRadius: 2, alignSelf: 'center', marginBottom: 12 },
+  sheetSection: { color: C.muted, fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
+  sheetTitleRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  sheetTitleInput: { flex: 1, borderWidth: 1, borderColor: C.border, borderRadius: 10, padding: 12, fontSize: 15, color: C.onDark, backgroundColor: C.body },
+  sheetSaveBtn: { backgroundColor: C.primary, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 12 },
+  sheetSaveBtnDisabled: { backgroundColor: C.border },
+  sheetSaveBtnText: { color: C.onPrimary, fontSize: 13, fontWeight: '700' },
+  typeRow: { flexDirection: 'row', gap: 8 },
+  typeChip: { flex: 1, borderWidth: 1, borderColor: C.border, borderRadius: 20, paddingVertical: 8, alignItems: 'center' },
+  typeChipActive: { backgroundColor: C.primary, borderColor: C.primary },
+  typeChipText: { color: C.muted, fontSize: 12, fontWeight: '700' },
+  typeChipTextActive: { color: C.onPrimary },
+  notifRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: C.border, gap: 12 },
+  notifTime: { flex: 1, fontSize: 18, fontWeight: '700', color: C.onDark },
+  notifType: { fontSize: 16 },
+  addNotifBtn: { backgroundColor: C.body, borderRadius: 10, paddingVertical: 12, alignItems: 'center', marginTop: 4 },
+  addNotifBtnText: { color: C.primary, fontSize: 14, fontWeight: '700' },
+
+  iosRow: { flexDirection: 'row', backgroundColor: C.card, borderTopWidth: 1, borderTopColor: C.border, padding: 12, gap: 12 },
+  iosCancelBtn: { flex: 1, borderWidth: 1, borderColor: C.border, borderRadius: 8, paddingVertical: 12, alignItems: 'center' },
+  iosCancelText: { color: C.stone, fontSize: 14, fontWeight: '700' },
+  iosConfirmBtn: { flex: 1, backgroundColor: C.primary, borderRadius: 8, paddingVertical: 12, alignItems: 'center' },
+  iosConfirmText: { color: C.onPrimary, fontSize: 14, fontWeight: '700' },
+
+  thumbOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
+  thumbEmoji: { fontSize: 80 },
 });
