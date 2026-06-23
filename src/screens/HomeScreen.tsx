@@ -24,11 +24,11 @@ import { GRAD, GRAD_START, GRAD_END } from '../constants/theme';
 import TabBar from '../components/TabBar';
 
 const C = {
-  header:    '#60a5fa',
+  header:    '#2563eb',
   body:      '#ffffff',
   card:      '#ffffff',
   border:    '#dbeafe',
-  primary:   '#60a5fa',
+  primary:   '#2563eb',
   onPrimary: '#ffffff',
   onDark:    '#2d3748',
   muted:     '#111827',
