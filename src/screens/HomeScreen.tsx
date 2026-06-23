@@ -3,6 +3,7 @@ import {
   View, Text, FlatList, TouchableOpacity, Modal,
   TextInput, StyleSheet, Alert, KeyboardAvoidingView,
   Platform, StatusBar, Animated, ScrollView, PanResponder, Dimensions, Switch,
+  LayoutAnimation, UIManager,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSQLiteContext } from 'expo-sqlite';
@@ -159,6 +160,12 @@ export default function HomeScreen({ navigation }: Props) {
     tasksRef.current = tasks;
   }, [tasks]);
 
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      UIManager.setLayoutAnimationEnabledExperimental?.(true);
+    }
+  }, []);
+
   // Keep monthly-nth reminders (which can't natively repeat) armed for the next occurrence.
   useFocusEffect(useCallback(() => {
     (async () => {
@@ -268,9 +275,9 @@ export default function HomeScreen({ navigation }: Props) {
     load();
   };
 
-  const handleDelete = (task: Task) => {
+  const handleDelete = (task: Task, onCancel?: () => void) => {
     Alert.alert('削除', `「${task.title}」を削除しますか？`, [
-      { text: 'キャンセル', style: 'cancel' },
+      { text: 'キャンセル', style: 'cancel', onPress: onCancel },
       {
         text: '削除', style: 'destructive',
         onPress: async () => {
@@ -342,6 +349,7 @@ export default function HomeScreen({ navigation }: Props) {
       if (fromIndex < 0) return current;
       const nextIndex = Math.max(0, Math.min(toIndex, ordered.length - 1));
       if (fromIndex === nextIndex) return current;
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
       const [moved] = ordered.splice(fromIndex, 1);
       ordered.splice(nextIndex, 0, moved);
       dragState.current.currentIndex = nextIndex;
@@ -371,6 +379,17 @@ export default function HomeScreen({ navigation }: Props) {
     Animated.spring(swipeAnim, { toValue: 0, useNativeDriver: true, tension: 180, friction: 12 }).start();
   };
 
+  const confirmSwipeDelete = (task: Task, dx: number) => {
+    const direction = dx < 0 ? -1 : 1;
+    Animated.timing(swipeAnim, {
+      toValue: direction * screen.width,
+      duration: 180,
+      useNativeDriver: true,
+    }).start(() => {
+      handleDelete(task, resetSwipe);
+    });
+  };
+
   const createTaskPanResponder = (task: Task, index: number) => PanResponder.create({
     onStartShouldSetPanResponder: () => false,
     onMoveShouldSetPanResponder: (_, gesture) => {
@@ -396,9 +415,10 @@ export default function HomeScreen({ navigation }: Props) {
         return;
       }
       if (Math.abs(gesture.dx) >= SWIPE_DELETE_THRESHOLD) {
-        handleDelete(task);
+        confirmSwipeDelete(task, gesture.dx);
+      } else {
+        resetSwipe();
       }
-      resetSwipe();
     },
     onPanResponderTerminate: () => {
       if (dragState.current.taskId === task.id) endDrag();
@@ -649,7 +669,6 @@ export default function HomeScreen({ navigation }: Props) {
                 delayLongPress={250}
                 activeOpacity={0.7}
               >
-                {item.icon && <Text style={s.taskIcon}>{item.icon}</Text>}
                 <View style={s.taskTextWrap}>
                   <Text style={[s.taskTitle, isDone && s.taskTitleDone]} numberOfLines={2}>{item.title}</Text>
                   <View style={s.taskMetaRow}>
@@ -663,7 +682,7 @@ export default function HomeScreen({ navigation }: Props) {
                 {isDone && <View style={s.doneBadge}><Text style={s.doneBadgeText}>完了</Text></View>}
               </TouchableOpacity>
               <TouchableOpacity style={s.tagBtn} onPress={() => openDetail(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Text style={s.tagIcon}>🏷</Text>
+                <Text style={[s.tagIcon, !item.icon && s.tagIconEmpty]}>{item.icon ?? '🏷'}</Text>
               </TouchableOpacity>
             </Animated.View>
           );
@@ -900,7 +919,6 @@ const s = StyleSheet.create({
   checkBoxDone: { backgroundColor: C.primary, borderColor: C.primary },
   checkMark: { color: C.onPrimary, fontSize: 11, fontWeight: '700' },
   taskBody: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  taskIcon: { fontSize: 18 },
   taskTextWrap: { flex: 1, gap: 4 },
   taskTitle: { color: C.onDark, fontSize: 14, fontWeight: '500', lineHeight: 20 },
   taskTitleDone: { color: C.muted, textDecorationLine: 'line-through' },
@@ -913,6 +931,7 @@ const s = StyleSheet.create({
   doneBadgeText: { color: C.onPrimary, fontSize: 9, fontWeight: '700', letterSpacing: 0.5 },
   tagBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center' },
   tagIcon: { fontSize: 17 },
+  tagIconEmpty: { opacity: 0.35 },
 
   empty: { paddingVertical: 60, alignItems: 'center', gap: 8 },
   emptyTitle: { color: C.stone, fontSize: 16, fontWeight: '700' },
