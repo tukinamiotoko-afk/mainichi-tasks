@@ -8,7 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Notifications from 'expo-notifications';
 import { RootStackParamList } from '../../App';
 import {
@@ -19,6 +19,7 @@ import {
   TASK_ICONS, PRIORITIES, priorityMeta, WEEKDAYS,
   FreqType, FREQ_TYPES, NTH_WEEKS, frequencyLabel, parseDays, nextNthWeekdayDate,
 } from '../constants/taskMeta';
+import { GRAD, GRAD_START, GRAD_END } from '../constants/theme';
 import TabBar from '../components/TabBar';
 
 const C = {
@@ -133,9 +134,10 @@ export default function HomeScreen({ navigation }: Props) {
   const [detailTask, setDetailTask] = useState<Task | null>(null);
   const [detailTitle, setDetailTitle] = useState('');
 
-  // Shared time picker
+  // Shared time editor (numeric input)
   const [timePickerFor, setTimePickerFor] = useState<'add' | 'edit' | null>(null);
-  const [pickerDate, setPickerDate] = useState(new Date());
+  const [hourInput, setHourInput] = useState('8');
+  const [minuteInput, setMinuteInput] = useState('00');
 
   const load = useCallback(async () => {
     const ts = await getTasks(db);
@@ -270,8 +272,22 @@ export default function HomeScreen({ navigation }: Props) {
     ]);
   };
 
-  const onTimePicked = async (date: Date) => {
-    const time = `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  const openTimeEditor = (target: 'add' | 'edit', current: string | null) => {
+    if (current) {
+      const [h, m] = current.split(':');
+      setHourInput(String(Number(h)));
+      setMinuteInput(m);
+    } else {
+      setHourInput('8');
+      setMinuteInput('00');
+    }
+    setTimePickerFor(target);
+  };
+
+  const confirmTime = async () => {
+    const h = Math.max(0, Math.min(23, parseInt(hourInput, 10) || 0));
+    const m = Math.max(0, Math.min(59, parseInt(minuteInput, 10) || 0));
+    const time = `${pad(h)}:${pad(m)}`;
     const target = timePickerFor;
     setTimePickerFor(null);
     if (target === 'add') setNewTime(time);
@@ -491,7 +507,7 @@ export default function HomeScreen({ navigation }: Props) {
     <SafeAreaView style={s.safeArea} edges={['top', 'bottom']}>
       <StatusBar barStyle="light-content" backgroundColor={C.header} />
 
-      <View style={s.headerCard}>
+      <LinearGradient colors={GRAD.header} start={GRAD_START} end={GRAD_END} style={s.headerCard}>
         <Text style={s.dateText}>{dateLabel}</Text>
         <Text style={s.headerLabel}>今日の進捗</Text>
         <View style={s.progressRow}>
@@ -502,7 +518,7 @@ export default function HomeScreen({ navigation }: Props) {
           </View>
           <Text style={s.progressText}>{done} / {total}</Text>
         </View>
-      </View>
+      </LinearGradient>
 
       <FlatList
         data={sortedTasks}
@@ -558,8 +574,10 @@ export default function HomeScreen({ navigation }: Props) {
       <TabBar current="Home" navigation={navigation} />
 
       <Animated.View style={[s.fabWrap, fabAnim.getLayout()]} {...fabPanResponder.panHandlers}>
-        <TouchableOpacity style={s.fab} onPress={() => setShowAdd(true)} activeOpacity={0.85}>
-          <Text style={s.fabText}>＋</Text>
+        <TouchableOpacity onPress={() => setShowAdd(true)} activeOpacity={0.85}>
+          <LinearGradient colors={GRAD.brand} start={GRAD_START} end={GRAD_END} style={s.fab}>
+            <Text style={s.fabText}>＋</Text>
+          </LinearGradient>
         </TouchableOpacity>
       </Animated.View>
 
@@ -585,7 +603,7 @@ export default function HomeScreen({ navigation }: Props) {
                   {renderSchedule(
                     newTime,
                     newNotify,
-                    () => { setPickerDate(new Date()); setTimePickerFor('add'); },
+                    () => openTimeEditor('add', newTime),
                     () => setNewTime(null),
                     toggleNewNotify,
                   )}
@@ -601,12 +619,13 @@ export default function HomeScreen({ navigation }: Props) {
                       returnKeyType="done"
                       onSubmitEditing={handleAdd}
                     />
-                    <TouchableOpacity
-                      style={[s.sheetSaveBtn, !newTitle.trim() && s.sheetSaveBtnDisabled]}
-                      onPress={handleAdd}
-                      disabled={!newTitle.trim()}
-                    >
-                      <Text style={s.sheetSaveBtnText}>追加</Text>
+                    <TouchableOpacity onPress={handleAdd} disabled={!newTitle.trim()} activeOpacity={0.85}>
+                      <LinearGradient
+                        colors={!newTitle.trim() ? [C.border, C.border] : GRAD.brand}
+                        start={GRAD_START} end={GRAD_END} style={s.sheetSaveBtn}
+                      >
+                        <Text style={s.sheetSaveBtnText}>追加</Text>
+                      </LinearGradient>
                     </TouchableOpacity>
                   </View>
 
@@ -645,7 +664,7 @@ export default function HomeScreen({ navigation }: Props) {
                       {renderSchedule(
                         detailTask.scheduled_time,
                         !!detailTask.notify,
-                        () => { setPickerDate(new Date()); setTimePickerFor('edit'); },
+                        () => openTimeEditor('edit', detailTask.scheduled_time),
                         () => patchDetail({ scheduled_time: null }),
                         toggleDetailNotify,
                       )}
@@ -659,12 +678,13 @@ export default function HomeScreen({ navigation }: Props) {
                           returnKeyType="done"
                           onSubmitEditing={handleSaveTitle}
                         />
-                        <TouchableOpacity
-                          style={[s.sheetSaveBtn, detailTitle === detailTask.title && s.sheetSaveBtnDisabled]}
-                          onPress={handleSaveTitle}
-                          disabled={detailTitle === detailTask.title}
-                        >
-                          <Text style={s.sheetSaveBtnText}>保存</Text>
+                        <TouchableOpacity onPress={handleSaveTitle} disabled={detailTitle === detailTask.title} activeOpacity={0.85}>
+                          <LinearGradient
+                            colors={detailTitle === detailTask.title ? [C.border, C.border] : GRAD.brand}
+                            start={GRAD_START} end={GRAD_END} style={s.sheetSaveBtn}
+                          >
+                            <Text style={s.sheetSaveBtnText}>保存</Text>
+                          </LinearGradient>
                         </TouchableOpacity>
                       </View>
 
@@ -710,32 +730,46 @@ export default function HomeScreen({ navigation }: Props) {
         </TouchableOpacity>
       </Modal>
 
-      {/* Shared time picker */}
-      {timePickerFor && (
-        <DateTimePicker
-          value={pickerDate}
-          mode="time"
-          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-          onChange={(_, date) => {
-            if (Platform.OS === 'android') {
-              if (date) onTimePicked(date);
-              else setTimePickerFor(null);
-            } else if (date) {
-              setPickerDate(date);
-            }
-          }}
-        />
-      )}
-      {Platform.OS === 'ios' && timePickerFor && (
-        <View style={s.iosRow}>
-          <TouchableOpacity style={s.iosCancelBtn} onPress={() => setTimePickerFor(null)}>
-            <Text style={s.iosCancelText}>キャンセル</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={s.iosConfirmBtn} onPress={() => onTimePicked(pickerDate)}>
-            <Text style={s.iosConfirmText}>決定</Text>
-          </TouchableOpacity>
+      {/* Shared time editor (numeric) */}
+      <Modal visible={!!timePickerFor} transparent animationType="fade" onRequestClose={() => setTimePickerFor(null)}>
+        <View style={s.timeModalBg}>
+          <View style={s.timeModalCard}>
+            <Text style={s.timeModalTitle}>時間を入力</Text>
+            <View style={s.timeInputRow}>
+              <TextInput
+                style={s.timeInput}
+                value={hourInput}
+                onChangeText={setHourInput}
+                keyboardType="number-pad"
+                maxLength={2}
+                selectTextOnFocus
+                placeholder="8"
+                placeholderTextColor={C.muted}
+              />
+              <Text style={s.timeColon}>:</Text>
+              <TextInput
+                style={s.timeInput}
+                value={minuteInput}
+                onChangeText={setMinuteInput}
+                keyboardType="number-pad"
+                maxLength={2}
+                selectTextOnFocus
+                placeholder="00"
+                placeholderTextColor={C.muted}
+              />
+            </View>
+            <Text style={s.timeHint}>24時間制（時 0〜23 ／ 分 0〜59）</Text>
+            <View style={s.timeBtnRow}>
+              <TouchableOpacity style={s.timeCancelBtn} onPress={() => setTimePickerFor(null)}>
+                <Text style={s.timeCancelText}>キャンセル</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.timeConfirmBtn} onPress={confirmTime}>
+                <Text style={s.timeConfirmText}>決定</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
-      )}
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -794,7 +828,7 @@ const s = StyleSheet.create({
   sheetSection: { color: C.muted, fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
   sheetTitleRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   sheetTitleInput: { flex: 1, borderWidth: 1, borderColor: C.border, borderRadius: 10, padding: 12, fontSize: 15, color: C.onDark, backgroundColor: C.body },
-  sheetSaveBtn: { backgroundColor: C.primary, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 12 },
+  sheetSaveBtn: { backgroundColor: C.primary, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 12, alignItems: 'center', justifyContent: 'center' },
   sheetSaveBtnDisabled: { backgroundColor: C.border },
   sheetSaveBtnText: { color: C.onPrimary, fontSize: 13, fontWeight: '700' },
 
@@ -847,11 +881,18 @@ const s = StyleSheet.create({
   monthDayText: { color: C.onDark, fontSize: 13, fontWeight: '700' },
   monthDayTextActive: { color: C.onPrimary },
 
-  iosRow: { flexDirection: 'row', backgroundColor: C.card, borderTopWidth: 1, borderTopColor: C.border, padding: 12, gap: 12 },
-  iosCancelBtn: { flex: 1, borderWidth: 1, borderColor: C.border, borderRadius: 8, paddingVertical: 12, alignItems: 'center' },
-  iosCancelText: { color: C.stone, fontSize: 14, fontWeight: '700' },
-  iosConfirmBtn: { flex: 1, backgroundColor: C.primary, borderRadius: 8, paddingVertical: 12, alignItems: 'center' },
-  iosConfirmText: { color: C.onPrimary, fontSize: 14, fontWeight: '700' },
+  timeModalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center', padding: 32 },
+  timeModalCard: { width: '100%', backgroundColor: C.card, borderRadius: 18, padding: 20, gap: 12, alignItems: 'center' },
+  timeModalTitle: { color: C.onDark, fontSize: 15, fontWeight: '800' },
+  timeInputRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  timeInput: { width: 76, borderWidth: 1, borderColor: C.border, borderRadius: 12, paddingVertical: 10, fontSize: 30, fontWeight: '800', color: C.onDark, textAlign: 'center', backgroundColor: C.body },
+  timeColon: { fontSize: 30, fontWeight: '800', color: C.onDark },
+  timeHint: { color: C.muted, fontSize: 11, fontWeight: '600' },
+  timeBtnRow: { flexDirection: 'row', gap: 10, alignSelf: 'stretch', marginTop: 4 },
+  timeCancelBtn: { flex: 1, borderWidth: 1, borderColor: C.border, borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
+  timeCancelText: { color: C.stone, fontSize: 14, fontWeight: '700' },
+  timeConfirmBtn: { flex: 1, backgroundColor: C.primary, borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
+  timeConfirmText: { color: C.onPrimary, fontSize: 14, fontWeight: '700' },
 
   thumbOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
   thumbEmoji: { fontSize: 80 },

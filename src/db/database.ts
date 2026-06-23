@@ -250,6 +250,16 @@ export async function deleteTimeLog(db: SQLite.SQLiteDatabase, id: number): Prom
   await db.runAsync('DELETE FROM time_logs WHERE id = ?', [id]);
 }
 
+export async function countTimeLogsForTaskDate(
+  db: SQLite.SQLiteDatabase, taskId: number, date: string
+): Promise<number> {
+  const row = await db.getFirstAsync<{ count: number }>(
+    'SELECT COUNT(*) as count FROM time_logs WHERE task_id = ? AND date = ?',
+    [taskId, date]
+  );
+  return row?.count ?? 0;
+}
+
 export async function getTimerSettingForTask(db: SQLite.SQLiteDatabase, taskId: number): Promise<TimerSetting | null> {
   const row = await db.getFirstAsync<TimerSetting>(
     'SELECT task_id, target_seconds FROM timer_settings WHERE task_id = ?',

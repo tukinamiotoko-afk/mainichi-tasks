@@ -4,8 +4,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { LinearGradient } from 'expo-linear-gradient';
 import { RootStackParamList } from '../../App';
 import { CompletionDetail, getCompletionsForMonth } from '../db/database';
+import { GRAD, GRAD_START, GRAD_END } from '../constants/theme';
 import TabBar from '../components/TabBar';
 
 const C = {
@@ -68,7 +70,7 @@ export default function CalendarScreen({ navigation }: Props) {
     <SafeAreaView style={s.safeArea} edges={['top', 'bottom']}>
       <StatusBar barStyle="light-content" backgroundColor={C.header} />
 
-      <View style={s.headerCard}>
+      <LinearGradient colors={GRAD.header} start={GRAD_START} end={GRAD_END} style={s.headerCard}>
         <View style={s.monthNav}>
           <TouchableOpacity onPress={prevMonth} style={s.navBtn}>
             <Text style={s.navBtnText}>‹</Text>
@@ -78,7 +80,7 @@ export default function CalendarScreen({ navigation }: Props) {
             <Text style={s.navBtnText}>›</Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </LinearGradient>
 
       <ScrollView style={s.body} contentContainerStyle={{ padding: 12 }}>
         <View style={s.calendarCard}>

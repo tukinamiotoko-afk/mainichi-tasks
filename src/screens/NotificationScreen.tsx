@@ -6,6 +6,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import * as Notifications from 'expo-notifications';
+import { LinearGradient } from 'expo-linear-gradient';
 import { RootStackParamList } from '../../App';
 import {
   NotificationSetting,
@@ -17,6 +18,7 @@ import {
   getToday,
   getTotalTimeForDate,
 } from '../db/database';
+import { GRAD, GRAD_START, GRAD_END } from '../constants/theme';
 import TabBar from '../components/TabBar';
 
 const C = {
@@ -147,9 +149,9 @@ export default function NotificationScreen({ navigation }: Props) {
     <SafeAreaView style={s.safeArea} edges={['top', 'bottom']}>
       <StatusBar barStyle="light-content" backgroundColor={C.header} />
 
-      <View style={s.headerCard}>
+      <LinearGradient colors={GRAD.header} start={GRAD_START} end={GRAD_END} style={s.headerCard}>
         <Text style={s.headerTitle}>通知</Text>
-      </View>
+      </LinearGradient>
 
       <FlatList
         data={settings}
@@ -200,8 +202,10 @@ export default function NotificationScreen({ navigation }: Props) {
                 </TouchableOpacity>
               </View>
             </View>
-            <TouchableOpacity style={s.addBtn} onPress={() => setShowPicker(true)}>
-              <Text style={s.addBtnText}>通知時間を追加</Text>
+            <TouchableOpacity onPress={() => setShowPicker(true)} activeOpacity={0.85}>
+              <LinearGradient colors={GRAD.brand} start={GRAD_START} end={GRAD_END} style={s.addBtn}>
+                <Text style={s.addBtnText}>通知時間を追加</Text>
+              </LinearGradient>
             </TouchableOpacity>
             {settings.length > 0 && <Text style={s.sectionLabel}>設定済みの通知</Text>}
           </View>

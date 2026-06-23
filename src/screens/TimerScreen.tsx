@@ -4,20 +4,24 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { LinearGradient } from 'expo-linear-gradient';
 import { RootStackParamList } from '../../App';
 import {
   Task,
   TimeLog,
   addTimeLog,
   deleteTimeLog,
+  countTimeLogsForTaskDate,
   getTasks,
   getTimeLogsForDate,
   getTimerSettingForTask,
   getToday,
   getTotalTimeForDate,
   markComplete,
+  markIncomplete,
   saveTimerSettingForTask,
 } from '../db/database';
+import { GRAD, GRAD_START, GRAD_END } from '../constants/theme';
 import TabBar from '../components/TabBar';
 
 const C = {
@@ -219,6 +223,9 @@ export default function TimerScreen({ navigation }: Props) {
         style: 'destructive',
         onPress: async () => {
           await deleteTimeLog(db, log.id);
+          // If no time logs remain for this task on that day, revert its completion.
+          const remaining = await countTimeLogsForTaskDate(db, log.task_id, log.date);
+          if (remaining === 0) await markIncomplete(db, log.task_id, log.date);
           await load();
         },
       },
@@ -314,11 +321,12 @@ export default function TimerScreen({ navigation }: Props) {
             {/* Play / Pause toggle */}
             <View style={s.controlItem}>
               <TouchableOpacity
-                style={[s.iconCircle, s.playCircle]}
                 onPress={() => { if (!running || paused) start(); else pause(); }}
                 activeOpacity={0.85}
               >
-                <Text style={s.iconGlyph}>{running && !paused ? '⏸' : '▶'}</Text>
+                <LinearGradient colors={GRAD.success} start={GRAD_START} end={GRAD_END} style={[s.iconCircle, s.playCircle]}>
+                  <Text style={s.iconGlyph}>{running && !paused ? '⏸' : '▶'}</Text>
+                </LinearGradient>
               </TouchableOpacity>
               <Text style={s.controlCaption}>
                 {!running ? '開始' : paused ? '再開' : '一時停止'}
@@ -327,13 +335,14 @@ export default function TimerScreen({ navigation }: Props) {
 
             {/* Stop (square) — saves and finishes */}
             <View style={s.controlItem}>
-              <TouchableOpacity
-                style={[s.iconCircle, s.stopCircle, !running && s.iconCircleDisabled]}
-                onPress={stop}
-                disabled={!running}
-                activeOpacity={0.85}
-              >
-                <View style={s.square} />
+              <TouchableOpacity onPress={stop} disabled={!running} activeOpacity={0.85}>
+                <LinearGradient
+                  colors={GRAD.danger}
+                  start={GRAD_START} end={GRAD_END}
+                  style={[s.iconCircle, s.stopCircle, !running && s.iconCircleDisabled]}
+                >
+                  <View style={s.square} />
+                </LinearGradient>
               </TouchableOpacity>
               <Text style={[s.controlCaption, !running && s.controlCaptionDisabled]}>保存</Text>
             </View>
@@ -404,10 +413,10 @@ export default function TimerScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={s.safeArea} edges={['top', 'bottom']}>
       <StatusBar barStyle="light-content" backgroundColor={C.header} />
-      <View style={s.headerCard}>
+      <LinearGradient colors={GRAD.header} start={GRAD_START} end={GRAD_END} style={s.headerCard}>
         <Text style={s.headerTitle}>タイマー</Text>
         <Text style={s.headerSub}>今日の作業時間 {formatDuration(totalSeconds, true)}</Text>
-      </View>
+      </LinearGradient>
       {selectedTask ? renderTimer() : renderTaskList()}
       <TabBar current="Timer" navigation={navigation} />
     </SafeAreaView>

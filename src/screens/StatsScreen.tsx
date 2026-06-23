@@ -5,8 +5,10 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { LinearGradient } from 'expo-linear-gradient';
 import { RootStackParamList } from '../../App';
 import { Task, getToday, subtractDays, daysBetween, getTasks, getCompletionCountInRange, getFirstCompletionDate } from '../db/database';
+import { GRAD, GRAD_START, GRAD_END } from '../constants/theme';
 import TabBar from '../components/TabBar';
 
 const C = {
@@ -84,7 +86,7 @@ export default function StatsScreen({ navigation }: Props) {
     <SafeAreaView style={s.safeArea} edges={['top', 'bottom']}>
       <StatusBar barStyle="light-content" backgroundColor={C.header} />
 
-      <View style={s.headerCard}>
+      <LinearGradient colors={GRAD.header} start={GRAD_START} end={GRAD_END} style={s.headerCard}>
         <Text style={s.headerTitle}>実行率</Text>
         <View style={s.periodBar}>
           {(['7日', '30日', '全期間', '任意'] as Period[]).map((p) => (
@@ -108,7 +110,7 @@ export default function StatsScreen({ navigation }: Props) {
             </TouchableOpacity>
           ))}
         </View>
-      </View>
+      </LinearGradient>
 
       {period === '任意' && (
         <View style={s.customBar}>
