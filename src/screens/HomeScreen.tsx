@@ -405,9 +405,10 @@ export default function HomeScreen({ navigation }: Props) {
 
   const confirmSwipeDelete = (task: Task, dx: number) => {
     const direction = dx < 0 ? -1 : 1;
-    Animated.timing(swipeAnim, {
-      toValue: direction * screen.width,
-      duration: 180,
+    Animated.spring(swipeAnim, {
+      toValue: direction * (screen.width + 80),
+      speed: 22,
+      bounciness: 0,
       useNativeDriver: true,
     }).start(() => {
       handleDelete(task, resetSwipe);
@@ -431,7 +432,7 @@ export default function HomeScreen({ navigation }: Props) {
         updateDrag(gesture.dy);
         return;
       }
-      swipeAnim.setValue(Math.max(-130, Math.min(130, gesture.dx)));
+      swipeAnim.setValue(Math.max(-220, Math.min(220, gesture.dx)));
     },
     onPanResponderRelease: (_, gesture) => {
       if (dragState.current.taskId === task.id) {
@@ -676,7 +677,34 @@ export default function HomeScreen({ navigation }: Props) {
           const panResponder = createTaskPanResponder(item, index);
           const isDragging = activeDragId === item.id;
           const swipeStyle = swipeState.current.taskId === item.id
-            ? { transform: [{ translateX: swipeAnim }] }
+            ? {
+                transform: [
+                  { translateX: swipeAnim },
+                  {
+                    rotate: swipeAnim.interpolate({
+                      inputRange: [-220, 0, 220],
+                      outputRange: ['-5deg', '0deg', '5deg'],
+                      extrapolate: 'clamp',
+                    }),
+                  },
+                  {
+                    scale: swipeAnim.interpolate({
+                      inputRange: [-220, 0, 220],
+                      outputRange: [0.96, 1, 0.96],
+                      extrapolate: 'clamp',
+                    }),
+                  },
+                ],
+              }
+            : null;
+          const swipeBgStyle = swipeState.current.taskId === item.id
+            ? {
+                opacity: swipeAnim.interpolate({
+                  inputRange: [-SWIPE_DELETE_THRESHOLD, 0, SWIPE_DELETE_THRESHOLD],
+                  outputRange: [1, 0, 1],
+                  extrapolate: 'clamp',
+                }),
+              }
             : null;
           const dragStyle = isDragging
             ? {
@@ -688,7 +716,11 @@ export default function HomeScreen({ navigation }: Props) {
               }
             : null;
           return (
-            <Animated.View style={[s.taskCard, isDone && s.taskCardDone, swipeStyle, dragStyle]} {...panResponder.panHandlers}>
+            <View style={s.swipeWrap}>
+              <Animated.View style={[s.swipeDeleteBg, swipeBgStyle]}>
+                <Text style={s.swipeDeleteText}>削除</Text>
+              </Animated.View>
+              <Animated.View style={[s.taskCard, isDone && s.taskCardDone, swipeStyle, dragStyle]} {...panResponder.panHandlers}>
               <TouchableOpacity
                 style={[s.checkBox, isDone && s.checkBoxDone]}
                 onPress={() => toggle(item.id)}
@@ -718,7 +750,8 @@ export default function HomeScreen({ navigation }: Props) {
               <TouchableOpacity style={s.tagBtn} onPress={() => openDetail(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                 <Text style={[s.tagIcon, !item.icon && s.tagIconEmpty]}>{item.icon ?? '🏷'}</Text>
               </TouchableOpacity>
-            </Animated.View>
+              </Animated.View>
+            </View>
           );
         }}
         ListFooterComponent={<View style={{ height: 80 }} />}
@@ -943,6 +976,19 @@ const s = StyleSheet.create({
   metaLabel: { color: C.muted, fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
   stone: { color: C.stone, fontSize: 11, fontWeight: '700' },
 
+  swipeWrap: { borderRadius: 12 },
+  swipeDeleteBg: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    borderRadius: 12,
+    backgroundColor: '#dc2626',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  swipeDeleteText: { color: '#ffffff', fontSize: 14, fontWeight: '800', letterSpacing: 1 },
   taskCard: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: C.card, borderRadius: 12,
     paddingHorizontal: 14, paddingVertical: 14, gap: 12,
