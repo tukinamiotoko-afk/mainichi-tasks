@@ -126,6 +126,9 @@ export default function HomeScreen({ navigation }: Props) {
   const dragScale = useRef(new Animated.Value(1)).current;
   const swipeState = useRef({ taskId: null as number | null });
   const swipeAnim = useRef(new Animated.Value(0)).current;
+  // Mirror of the actively-swiping card id, in state so the swipe transform
+  // actually binds (a ref alone won't re-render to apply the animated styles).
+  const [swipingId, setSwipingId] = useState<number | null>(null);
   const today = getToday();
 
   // Add task sheet draft
@@ -287,6 +290,7 @@ export default function HomeScreen({ navigation }: Props) {
           const identifiers = await deleteTask(db, task.id);
           await cancelIds(identifiers.join(','));
           if (detailTask?.id === task.id) setDetailTask(null);
+          setSwipingId(null);
           load();
         },
       },
@@ -362,6 +366,7 @@ export default function HomeScreen({ navigation }: Props) {
 
   const startDrag = (taskId: number, index: number) => {
     swipeState.current.taskId = null;
+    setSwipingId(null);
     swipeAnim.setValue(0);
     setActiveDragId(taskId);
     dragState.current = { taskId, currentIndex: index, anchorDy: 0, changed: false };
@@ -400,6 +405,7 @@ export default function HomeScreen({ navigation }: Props) {
 
   const resetSwipe = () => {
     swipeState.current.taskId = null;
+    setSwipingId(null);
     Animated.spring(swipeAnim, { toValue: 0, useNativeDriver: true, tension: 180, friction: 12 }).start();
   };
 
@@ -424,6 +430,7 @@ export default function HomeScreen({ navigation }: Props) {
     onPanResponderGrant: () => {
       if (dragState.current.taskId !== task.id) {
         swipeState.current.taskId = task.id;
+        setSwipingId(task.id);
         swipeAnim.setValue(0);
       }
     },
@@ -676,7 +683,7 @@ export default function HomeScreen({ navigation }: Props) {
           const isDone = completedIds.has(item.id);
           const panResponder = createTaskPanResponder(item, index);
           const isDragging = activeDragId === item.id;
-          const swipeStyle = swipeState.current.taskId === item.id
+          const swipeStyle = swipingId === item.id
             ? {
                 transform: [
                   { translateX: swipeAnim },
@@ -697,7 +704,7 @@ export default function HomeScreen({ navigation }: Props) {
                 ],
               }
             : null;
-          const swipeBgStyle = swipeState.current.taskId === item.id
+          const swipeBgStyle = swipingId === item.id
             ? {
                 opacity: swipeAnim.interpolate({
                   inputRange: [-SWIPE_DELETE_THRESHOLD, 0, SWIPE_DELETE_THRESHOLD],
