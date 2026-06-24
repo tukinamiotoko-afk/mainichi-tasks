@@ -12,27 +12,46 @@ import { GRAD, GRAD_START, GRAD_END } from '../constants/theme';
 import TabBar from '../components/TabBar';
 
 const C = {
-  header:    '#1d4ed8',
-  body:      '#ffffff',
-  card:      '#ffffff',
-  grid:      '#d1d5db',
-  headerCell:'#f1f5f9',
-  primary:   '#2563eb',
+  header:     '#1d4ed8',
+  body:       '#ffffff',
+  grid:       '#d1d5db',
+  headerCell: '#f1f5f9',
+  primary:    '#2563eb',
   primarySoft:'#dbeafe',
-  onPrimary: '#ffffff',
-  onDark:    '#1f2937',
-  muted:     '#6b7280',
-  ink:       '#111827',
-  success:   '#16a34a',
-  successBg: '#dcfce7',
+  onDark:     '#1f2937',
+  muted:      '#6b7280',
+  ink:        '#111827',
+  success:    '#16a34a',
+  successBg:  '#dcfce7',
+  line:       '#64748b',
+  termBg:     '#dbeafe',
+  termBorder: '#2563eb',
+  termText:   '#1e3a8a',
+  procText:   '#1e3a8a',
+  diaBg:      '#bbf7d0',
+  diaBorder:  '#16a34a',
+  diaText:    '#14532d',
+  doneBg:     '#16a34a',
+  doneBorder: '#15803d',
 };
 
-// Day runs 5:00 → 0:00 (midnight) like the reference timetable.
+// Day runs 5:00 → 0:00 (midnight) like a printed timetable.
 const HOURS: number[] = [...Array.from({ length: 19 }, (_, i) => i + 5), 0];
 const hourLabel = (h: number) => `${h}:00`;
 const bucketHour = (h: number) => (h >= 5 && h <= 23 ? h : 0); // 0–4時 は 0:00 行へ
 
+type Mode = 'schedule' | 'flow';
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'Schedule'> };
+
+// vertical line + downward arrowhead (flow connectors)
+function Down({ color = C.line, h = 22 }: { color?: string; h?: number }) {
+  return (
+    <View style={s.down} pointerEvents="none">
+      <View style={[s.downLine, { height: h, backgroundColor: color }]} />
+      <View style={[s.arrowHead, { borderTopColor: color }]} />
+    </View>
+  );
+}
 
 export default function ScheduleScreen({ navigation }: Props) {
   const db = useSQLiteContext();
@@ -42,6 +61,7 @@ export default function ScheduleScreen({ navigation }: Props) {
   const dateLabel = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')} (${WEEKDAYS[now.getDay()]})`;
   const nowHour = now.getHours();
 
+  const [mode, setMode] = useState<Mode>('schedule');
   const [tasks, setTasks] = useState<Task[]>([]);
   const [completedIds, setCompletedIds] = useState<Set<number>>(new Set());
 
@@ -61,8 +81,17 @@ export default function ScheduleScreen({ navigation }: Props) {
   };
 
   const due = tasks.filter((t) => isDueToday(t, now));
+  const ordered = [...due].sort((a, b) => {
+    const at = a.scheduled_time ?? '99:99';
+    const bt = b.scheduled_time ?? '99:99';
+    if (at !== bt) return at < bt ? -1 : 1;
+    return a.sort_order - b.sort_order;
+  });
   const timed = due.filter((t) => t.scheduled_time);
   const untimed = due.filter((t) => !t.scheduled_time);
+  const doneCount = due.filter((t) => completedIds.has(t.id)).length;
+  const remaining = due.length - doneCount;
+  const allDone = due.length > 0 && remaining === 0;
 
   const byHour: Record<number, Task[]> = {};
   for (const t of timed) {
@@ -73,11 +102,11 @@ export default function ScheduleScreen({ navigation }: Props) {
     byHour[Number(h)].sort((a, b) => (a.scheduled_time! < b.scheduled_time! ? -1 : 1));
   }
 
-  const renderTask = (task: Task) => {
+  const renderPill = (task: Task) => {
     const done = completedIds.has(task.id);
     return (
       <TouchableOpacity key={task.id} style={[s.taskPill, done && s.taskPillDone]} onPress={() => toggle(task.id)} activeOpacity={0.7}>
-        <Text style={[s.pillTime, done && s.pillTimeDone]}>{task.scheduled_time}</Text>
+        {task.scheduled_time && <Text style={[s.pillTime, done && s.pillTimeDone]}>{task.scheduled_time}</Text>}
         <Text style={[s.pillTitle, done && s.pillTitleDone]} numberOfLines={1}>
           {task.icon ? `${task.icon} ` : ''}{task.title}
         </Text>
@@ -91,41 +120,106 @@ export default function ScheduleScreen({ navigation }: Props) {
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
       <LinearGradient colors={GRAD.header} start={GRAD_START} end={GRAD_END} style={[s.headerCard, { paddingTop: insets.top + 12 }]}>
-        <Text style={s.headerTitle}>タイムスケジュール表</Text>
-        <Text style={s.headerSub}>日付：{dateLabel}</Text>
+        <View style={s.segRow}>
+          {([['schedule', 'タイムスケジュール'], ['flow', 'フローチャート']] as [Mode, string][]).map(([m, label]) => (
+            <TouchableOpacity key={m} style={[s.segChip, mode === m && s.segChipActive]} onPress={() => setMode(m)}>
+              <Text style={[s.segText, mode === m && s.segTextActive]}>{label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <Text style={s.headerSub}>
+          {mode === 'schedule' ? `日付：${dateLabel}` : `今日のワークフロー ・ ${doneCount}/${due.length} 完了`}
+        </Text>
       </LinearGradient>
 
-      <ScrollView style={s.bodyView} contentContainerStyle={{ padding: 12, paddingBottom: 28 }}>
-        <View style={s.table}>
-          {/* header row */}
-          <View style={[s.row, s.headRow]}>
-            <View style={[s.timeCell, s.headCell]}><Text style={s.headText}>時間</Text></View>
-            <View style={[s.contentCell, s.headCell]}><Text style={s.headText}>内容</Text></View>
+      {mode === 'schedule' ? (
+        <ScrollView style={s.bodyView} contentContainerStyle={{ padding: 12, paddingBottom: 28 }}>
+          <View style={s.table}>
+            <View style={[s.row, s.headRow]}>
+              <View style={[s.timeCell, s.headCell]}><Text style={s.headText}>時間</Text></View>
+              <View style={[s.contentCell, s.headCell]}><Text style={s.headText}>内容</Text></View>
+            </View>
+            {HOURS.map((h, idx) => {
+              const items = byHour[h] ?? [];
+              const isNow = h === bucketHour(nowHour);
+              return (
+                <View key={h} style={[s.row, idx === HOURS.length - 1 && s.rowLast]}>
+                  <View style={[s.timeCell, isNow && s.timeCellNow]}>
+                    <Text style={[s.timeText, isNow && s.timeTextNow]}>{hourLabel(h)}</Text>
+                  </View>
+                  <View style={s.contentCell}>{items.map(renderPill)}</View>
+                </View>
+              );
+            })}
           </View>
 
-          {HOURS.map((h, idx) => {
-            const items = byHour[h] ?? [];
-            const isNow = h === bucketHour(nowHour);
-            return (
-              <View key={h} style={[s.row, idx === HOURS.length - 1 && s.rowLast]}>
-                <View style={[s.timeCell, isNow && s.timeCellNow]}>
-                  <Text style={[s.timeText, isNow && s.timeTextNow]}>{hourLabel(h)}</Text>
-                </View>
-                <View style={s.contentCell}>
-                  {items.map(renderTask)}
+          {untimed.length > 0 && (
+            <View style={s.untimedBox}>
+              <Text style={s.untimedLabel}>時間未設定</Text>
+              {untimed.map(renderPill)}
+            </View>
+          )}
+        </ScrollView>
+      ) : (
+        <ScrollView style={s.bodyView} contentContainerStyle={s.flowContent}>
+          {due.length === 0 ? (
+            <View style={s.empty}>
+              <Text style={s.emptyTitle}>今日のフローはありません</Text>
+              <Text style={s.emptyBody}>頻度が「今日」に当たるタスクがワークフローになります</Text>
+            </View>
+          ) : (
+            <>
+              <View style={s.terminator}><Text style={s.terminatorText}>開始</Text></View>
+
+              {ordered.map((task, i) => {
+                const isDone = completedIds.has(task.id);
+                return (
+                  <View key={task.id} style={s.stepWrap}>
+                    <Down color={isDone ? C.doneBg : C.line} />
+                    <TouchableOpacity style={[s.process, isDone && s.processDone]} onPress={() => toggle(task.id)} activeOpacity={0.8}>
+                      <View style={[s.stepNo, isDone && s.stepNoDone]}><Text style={s.stepNoText}>{i + 1}</Text></View>
+                      <Text style={[s.processText, isDone && s.processTextDone]} numberOfLines={2}>
+                        {task.icon ? `${task.icon} ` : ''}{task.title}{task.scheduled_time ? `  (${task.scheduled_time})` : ''}
+                      </Text>
+                      {isDone && <Text style={s.processCheck}>✓</Text>}
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
+
+              <Down color={allDone ? C.doneBg : C.line} />
+              <View style={[s.diamond, allDone && s.diamondDone]}>
+                <View style={s.diamondInner}>
+                  <Text style={[s.diamondText, allDone && s.diamondTextDone]}>全部{'\n'}完了?</Text>
                 </View>
               </View>
-            );
-          })}
-        </View>
 
-        {untimed.length > 0 && (
-          <View style={s.untimedBox}>
-            <Text style={s.untimedLabel}>時間未設定</Text>
-            {untimed.map(renderTask)}
-          </View>
-        )}
-      </ScrollView>
+              <View style={s.branchRow}>
+                <View style={s.branchCol}>
+                  <Text style={[s.branchLabel, { color: C.diaBorder }]}>はい</Text>
+                  <Down color={allDone ? C.doneBg : C.line} h={16} />
+                  <View style={[s.outBox, allDone && s.outBoxDone]}>
+                    <Text style={[s.outText, allDone && s.outTextDone]}>完了 🎉</Text>
+                  </View>
+                </View>
+                <View style={s.branchCol}>
+                  <Text style={[s.branchLabel, { color: C.muted }]}>いいえ</Text>
+                  <Down color={C.line} h={16} />
+                  <View style={[s.outBox, s.outBoxNo]}>
+                    <Text style={s.outNoText}>残り {remaining} 件</Text>
+                  </View>
+                </View>
+              </View>
+
+              <View style={s.mergeRailWrap}><View style={s.mergeRail} /></View>
+              <Down color={allDone ? C.doneBg : C.line} h={16} />
+              <View style={[s.terminator, allDone && s.terminatorDone]}>
+                <Text style={[s.terminatorText, allDone && s.terminatorEndText]}>終了</Text>
+              </View>
+            </>
+          )}
+        </ScrollView>
+      )}
 
       <TabBar current="Schedule" navigation={navigation} />
     </View>
@@ -134,13 +228,18 @@ export default function ScheduleScreen({ navigation }: Props) {
 
 const s = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: C.body },
-  headerCard: { backgroundColor: C.header, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 18, gap: 4 },
-  headerTitle: { color: '#ffffff', fontSize: 20, fontWeight: '800' },
-  headerSub: { color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '700' },
+  headerCard: { backgroundColor: C.header, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16, gap: 10 },
+  segRow: { flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 10, padding: 3 },
+  segChip: { flex: 1, paddingVertical: 7, borderRadius: 8, alignItems: 'center' },
+  segChipActive: { backgroundColor: '#ffffff' },
+  segText: { color: '#ffffff', fontSize: 13, fontWeight: '800' },
+  segTextActive: { color: C.header },
+  headerSub: { color: 'rgba(255,255,255,0.9)', fontSize: 12, fontWeight: '700' },
 
   bodyView: { flex: 1, backgroundColor: C.body },
 
-  table: { borderWidth: 1, borderColor: C.grid, borderRadius: 8, overflow: 'hidden', backgroundColor: C.card },
+  // ── schedule table ──
+  table: { borderWidth: 1, borderColor: C.grid, borderRadius: 8, overflow: 'hidden', backgroundColor: '#ffffff' },
   row: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: C.grid, minHeight: 44 },
   rowLast: { borderBottomWidth: 0 },
   headRow: { backgroundColor: C.headerCell },
@@ -151,7 +250,6 @@ const s = StyleSheet.create({
   headText: { color: C.onDark, fontSize: 13, fontWeight: '800' },
   timeText: { color: C.onDark, fontSize: 13, fontWeight: '700' },
   timeTextNow: { color: C.primary, fontWeight: '800' },
-
   taskPill: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: C.primarySoft, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 6 },
   taskPillDone: { backgroundColor: C.successBg },
   pillTime: { color: C.primary, fontSize: 11, fontWeight: '800' },
@@ -159,7 +257,45 @@ const s = StyleSheet.create({
   pillTitle: { flex: 1, color: C.onDark, fontSize: 13, fontWeight: '700' },
   pillTitleDone: { color: C.muted, textDecorationLine: 'line-through' },
   pillCheck: { color: C.success, fontSize: 13, fontWeight: '900' },
-
   untimedBox: { marginTop: 14, gap: 6 },
   untimedLabel: { color: C.muted, fontSize: 12, fontWeight: '800', marginBottom: 2 },
+
+  // ── flow chart ──
+  flowContent: { padding: 16, paddingBottom: 40, alignItems: 'center' },
+  down: { alignItems: 'center', justifyContent: 'center' },
+  downLine: { width: 2 },
+  arrowHead: { width: 0, height: 0, borderLeftWidth: 6, borderRightWidth: 6, borderTopWidth: 9, borderLeftColor: 'transparent', borderRightColor: 'transparent', marginTop: -1 },
+  terminator: { backgroundColor: C.termBg, borderWidth: 1.5, borderColor: C.termBorder, borderRadius: 22, paddingHorizontal: 30, paddingVertical: 10 },
+  terminatorText: { color: C.termText, fontSize: 14, fontWeight: '800', letterSpacing: 1 },
+  terminatorEndText: { color: '#ffffff' },
+  terminatorDone: { backgroundColor: C.doneBg, borderColor: C.doneBorder },
+  stepWrap: { alignItems: 'center', width: '100%' },
+  process: { flexDirection: 'row', alignItems: 'center', gap: 10, width: '82%', backgroundColor: C.termBg, borderWidth: 1.5, borderColor: C.termBorder, borderRadius: 4, paddingHorizontal: 12, paddingVertical: 12 },
+  processDone: { backgroundColor: '#dcfce7', borderColor: C.doneBorder },
+  stepNo: { width: 22, height: 22, borderRadius: 4, backgroundColor: C.termBorder, alignItems: 'center', justifyContent: 'center' },
+  stepNoDone: { backgroundColor: C.doneBg },
+  stepNoText: { color: '#ffffff', fontSize: 12, fontWeight: '800' },
+  processText: { flex: 1, color: C.procText, fontSize: 13, fontWeight: '700' },
+  processTextDone: { color: '#166534', textDecorationLine: 'line-through' },
+  processCheck: { color: C.doneBg, fontSize: 14, fontWeight: '900' },
+  diamond: { width: 96, height: 96, borderRadius: 8, borderWidth: 1.5, borderColor: C.diaBorder, backgroundColor: C.diaBg, alignItems: 'center', justifyContent: 'center', transform: [{ rotate: '45deg' }] },
+  diamondDone: { backgroundColor: '#86efac' },
+  diamondInner: { width: 140, alignItems: 'center', transform: [{ rotate: '-45deg' }] },
+  diamondText: { color: C.diaText, fontSize: 13, fontWeight: '800', textAlign: 'center' },
+  diamondTextDone: { color: '#14532d' },
+  branchRow: { flexDirection: 'row', width: '100%', marginTop: 2 },
+  branchCol: { flex: 1, alignItems: 'center' },
+  branchLabel: { fontSize: 12, fontWeight: '800', marginBottom: -2 },
+  outBox: { backgroundColor: C.termBg, borderWidth: 1.5, borderColor: C.termBorder, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 8, minWidth: 92, alignItems: 'center' },
+  outBoxDone: { backgroundColor: C.doneBg, borderColor: C.doneBorder },
+  outBoxNo: { backgroundColor: '#fef3c7', borderColor: '#d97706' },
+  outText: { color: C.termText, fontSize: 13, fontWeight: '800' },
+  outTextDone: { color: '#ffffff' },
+  outNoText: { color: '#92400e', fontSize: 13, fontWeight: '800' },
+  mergeRailWrap: { width: '50%', alignItems: 'center', marginTop: 14 },
+  mergeRail: { width: '100%', height: 2, backgroundColor: C.line },
+
+  empty: { paddingVertical: 60, alignItems: 'center', gap: 8 },
+  emptyTitle: { color: C.ink, fontSize: 16, fontWeight: '700' },
+  emptyBody: { color: C.muted, fontSize: 13, textAlign: 'center', paddingHorizontal: 24 },
 });
