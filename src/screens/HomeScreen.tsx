@@ -717,8 +717,8 @@ export default function HomeScreen({ navigation }: Props) {
             : null;
           return (
             <View style={s.swipeWrap}>
-              <Animated.View style={[s.swipeDeleteBg, isDone && s.swipeDoneBg, swipeBgStyle]}>
-                <Text style={[s.swipeDeleteText, isDone && s.swipeDoneText]}>{isDone ? '完了' : '削除'}</Text>
+              <Animated.View style={[s.swipeDeleteBg, swipeBgStyle]}>
+                <Text style={s.swipeDeleteText}>削除</Text>
               </Animated.View>
               <Animated.View style={[s.taskCard, isDone && s.taskCardDone, swipeStyle, dragStyle]} {...panResponder.panHandlers}>
               <TouchableOpacity
@@ -989,8 +989,6 @@ const s = StyleSheet.create({
     justifyContent: 'center',
   },
   swipeDeleteText: { color: '#ffffff', fontSize: 14, fontWeight: '800', letterSpacing: 1 },
-  swipeDoneBg: { backgroundColor: '#fef3c7' },
-  swipeDoneText: { color: '#b45309' },
   taskCard: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: C.card, borderRadius: 12,
     paddingHorizontal: 14, paddingVertical: 14, gap: 12,
