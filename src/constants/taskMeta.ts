@@ -110,3 +110,20 @@ export function nextNthWeekdayDate(week: number, weekday: number, hour: number, 
   fallback.setHours(hour, minute, 0, 0);
   return fallback;
 }
+
+// Whether a task's recurrence rule makes it due on the given date.
+export function isDueToday(t: TaskFreq, ref: Date = new Date()): boolean {
+  switch (t.freq_type) {
+    case 'weekly':
+      return parseDays(t.freq_days).includes(ref.getDay());
+    case 'monthly_day':
+      return (t.freq_day ?? 1) === ref.getDate();
+    case 'monthly_nth': {
+      const occ = nthWeekdayOfMonth(ref.getFullYear(), ref.getMonth(), t.freq_week ?? 1, t.freq_weekday ?? 0);
+      return !!occ && occ.getDate() === ref.getDate();
+    }
+    case 'daily':
+    default:
+      return true;
+  }
+}
