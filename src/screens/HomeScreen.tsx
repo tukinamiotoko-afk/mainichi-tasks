@@ -18,7 +18,7 @@ import {
 } from '../db/database';
 import {
   TASK_ICONS, PRIORITIES, priorityMeta, WEEKDAYS,
-  FreqType, FREQ_TYPES, NTH_WEEKS, frequencyLabel, parseDays, nextNthWeekdayDate,
+  FreqType, FREQ_TYPES, NTH_WEEKS, frequencyLabel, parseDays, nextNthWeekdayDate, isDueToday,
 } from '../constants/taskMeta';
 import { GRAD, GRAD_START, GRAD_END } from '../constants/theme';
 import TabBar from '../components/TabBar';
@@ -44,6 +44,7 @@ const DRAG_ROW_HEIGHT = 88;
 
 type FilterStatus = 'all' | 'incomplete' | 'done';
 type FilterFreq = 'all' | 'daily' | 'other';
+type FilterDue = 'all' | 'today';
 type SortKey = 'manual' | 'priority' | 'time' | 'name';
 
 const STATUS_OPTS: { k: FilterStatus; l: string }[] = [
@@ -51,6 +52,9 @@ const STATUS_OPTS: { k: FilterStatus; l: string }[] = [
 ];
 const FREQ_OPTS: { k: FilterFreq; l: string }[] = [
   { k: 'all', l: 'すべて' }, { k: 'daily', l: '毎日' }, { k: 'other', l: 'その他' },
+];
+const DUE_OPTS: { k: FilterDue; l: string }[] = [
+  { k: 'all', l: 'すべて' }, { k: 'today', l: '今日やる' },
 ];
 const SORT_OPTS: { k: SortKey; l: string }[] = [
   { k: 'manual', l: '手動' }, { k: 'priority', l: '優先度' }, { k: 'time', l: '時刻' }, { k: 'name', l: '名前' },
@@ -145,6 +149,7 @@ export default function HomeScreen({ navigation }: Props) {
   const [swipingId, setSwipingId] = useState<number | null>(null);
   const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
   const [filterFreq, setFilterFreq] = useState<FilterFreq>('all');
+  const [filterDue, setFilterDue] = useState<FilterDue>('all');
   const [sortKey, setSortKey] = useState<SortKey>('manual');
   const [showFilters, setShowFilters] = useState(false);
   const today = getToday();
@@ -356,13 +361,14 @@ export default function HomeScreen({ navigation }: Props) {
   });
 
   // Drag reorder only makes sense in unfiltered manual order.
-  const reorderEnabled = sortKey === 'manual' && filterStatus === 'all' && filterFreq === 'all';
+  const reorderEnabled = sortKey === 'manual' && filterStatus === 'all' && filterFreq === 'all' && filterDue === 'all';
   const displayedTasks = (() => {
     let list = sortedTasks;
     if (filterStatus === 'incomplete') list = list.filter((t) => !completedIds.has(t.id));
     else if (filterStatus === 'done') list = list.filter((t) => completedIds.has(t.id));
     if (filterFreq === 'daily') list = list.filter((t) => t.freq_type === 'daily');
     else if (filterFreq === 'other') list = list.filter((t) => t.freq_type !== 'daily');
+    if (filterDue === 'today') list = list.filter((t) => isDueToday(t));
     if (sortKey === 'priority') {
       list = [...list].sort((a, b) => (b.priority - a.priority) || (a.sort_order - b.sort_order));
     } else if (sortKey === 'time') {
@@ -733,6 +739,14 @@ export default function HomeScreen({ navigation }: Props) {
                   {FREQ_OPTS.map((o) => (
                     <TouchableOpacity key={o.k} style={[s.fChip, filterFreq === o.k && s.fChipActive]} onPress={() => setFilterFreq(o.k)}>
                       <Text style={[s.fChipText, filterFreq === o.k && s.fChipTextActive]}>{o.l}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <Text style={s.filterLabel}>対象</Text>
+                <View style={s.filterRow}>
+                  {DUE_OPTS.map((o) => (
+                    <TouchableOpacity key={o.k} style={[s.fChip, filterDue === o.k && s.fChipActive]} onPress={() => setFilterDue(o.k)}>
+                      <Text style={[s.fChipText, filterDue === o.k && s.fChipTextActive]}>{o.l}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
