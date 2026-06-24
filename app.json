@@ -4,9 +4,25 @@
     "slug": "mainichi-tasks",
     "version": "1.0.0",
     "orientation": "portrait",
-    "backgroundColor": "#60a5fa",
-    "ios": { "supportsTablet": false },
-    "android": { "adaptiveIcon": { "backgroundColor": "#60a5fa" } },
-    "plugins": ["expo-sqlite", "expo-notifications"]
+    "backgroundColor": "#2563eb",
+    "ios": {
+      "supportsTablet": false
+    },
+    "android": {
+      "package": "com.tukinamiotokoafk.mainichitasks",
+      "adaptiveIcon": {
+        "backgroundColor": "#2563eb"
+      }
+    },
+    "plugins": [
+      "expo-sqlite",
+      "expo-notifications"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "c6182de1-528f-4e75-9d1b-76f3a5698414"
+      }
+    },
+    "owner": "hanatare"
   }
 }
