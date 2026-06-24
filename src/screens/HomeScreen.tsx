@@ -356,6 +356,13 @@ export default function HomeScreen({ navigation }: Props) {
   const done = tasks.filter((t) => completedIds.has(t.id)).length;
   const total = tasks.length;
   const progress = total > 0 ? done / total : 0;
+  // Gauge gradient color by completion ratio.
+  const gaugeColors = (
+    progress >= 1 ? ['#34d399', '#059669'] :
+    progress >= 0.67 ? ['#4ade80', '#16a34a'] :
+    progress >= 0.34 ? ['#facc15', '#f59e0b'] :
+    ['#fb7185', '#e11d48']
+  ) as readonly [string, string];
   const sortedTasks = [...tasks].sort((a, b) => {
     if (a.sort_order !== b.sort_order) return a.sort_order - b.sort_order;
     return a.id - b.id;
@@ -703,7 +710,9 @@ export default function HomeScreen({ navigation }: Props) {
           <View style={s.progressBg}>
             <Animated.View
               style={[s.progressFill, { width: progressAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }]}
-            />
+            >
+              <LinearGradient colors={gaugeColors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.progressGrad} />
+            </Animated.View>
           </View>
           <Text style={s.progressText}>{done} / {total}</Text>
         </View>
@@ -1075,7 +1084,8 @@ const s = StyleSheet.create({
   headerLabel: { color: 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
   progressRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 6 },
   progressBg: { flex: 1, height: 4, backgroundColor: 'rgba(255,255,255,0.25)', borderRadius: 2, overflow: 'hidden' },
-  progressFill: { height: '100%', backgroundColor: '#ffffff' },
+  progressFill: { height: '100%', borderRadius: 2, overflow: 'hidden' },
+  progressGrad: { flex: 1 },
   progressText: { color: '#ffffff', fontSize: 11, fontWeight: '700' },
 
   list: { flex: 1, backgroundColor: C.body },
