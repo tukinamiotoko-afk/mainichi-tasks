@@ -718,15 +718,15 @@ export default function HomeScreen({ navigation }: Props) {
           <View style={s.listHeader}>
             <View style={s.sectionBar}>
               <Text style={s.metaLabel}>チェックリスト</Text>
+              <View style={s.toggleRow}>
+                <TouchableOpacity style={[s.filterToggle, showFilters && s.filterToggleActive]} onPress={() => setShowFilters((v) => !v)}>
+                  <Text style={[s.filterToggleText, showFilters && s.filterToggleTextActive]}>絞り込み {showFilters ? '▲' : '▼'}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[s.filterToggle, showSort && s.filterToggleActive]} onPress={() => setShowSort((v) => !v)}>
+                  <Text style={[s.filterToggleText, showSort && s.filterToggleTextActive]}>並び替え {showSort ? '▲' : '▼'}</Text>
+                </TouchableOpacity>
+              </View>
               {total > 0 && <Text style={s.stone}>{displayedTasks.length}/{total}件</Text>}
-            </View>
-            <View style={s.toggleRow}>
-              <TouchableOpacity style={[s.filterToggle, showFilters && s.filterToggleActive]} onPress={() => setShowFilters((v) => !v)}>
-                <Text style={[s.filterToggleText, showFilters && s.filterToggleTextActive]}>絞り込み {showFilters ? '▲' : '▼'}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[s.filterToggle, showSort && s.filterToggleActive]} onPress={() => setShowSort((v) => !v)}>
-                <Text style={[s.filterToggleText, showSort && s.filterToggleTextActive]}>並び替え {showSort ? '▲' : '▼'}</Text>
-              </TouchableOpacity>
             </View>
 
             {showFilters && (
@@ -1084,10 +1084,10 @@ const s = StyleSheet.create({
   sectionRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   metaLabel: { color: C.muted, fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
   stone: { color: C.stone, fontSize: 11, fontWeight: '700' },
-  toggleRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
-  filterToggle: { flex: 1, backgroundColor: '#eff6ff', borderRadius: 14, paddingVertical: 8, alignItems: 'center' },
+  toggleRow: { flexDirection: 'row', gap: 6, flexShrink: 1 },
+  filterToggle: { backgroundColor: '#eff6ff', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 5 },
   filterToggleActive: { backgroundColor: C.primary },
-  filterToggleText: { color: C.primary, fontSize: 12, fontWeight: '800' },
+  filterToggleText: { color: C.primary, fontSize: 11, fontWeight: '800' },
   filterToggleTextActive: { color: C.onPrimary },
   filterPanel: { backgroundColor: C.card, borderRadius: 12, borderWidth: 1, borderColor: C.border, padding: 12, marginTop: 8, gap: 6 },
   filterLabel: { color: C.muted, fontSize: 10, fontWeight: '800', letterSpacing: 0.5, marginTop: 2 },
