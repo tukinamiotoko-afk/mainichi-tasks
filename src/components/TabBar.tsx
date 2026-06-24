@@ -17,7 +17,7 @@ interface Props {
   navigation: { navigate: (screen: string) => void };
 }
 
-const C = { card: '#ffffff', border: '#dbeafe', active: '#1e3a8a', activeBg: '#dbeafe', inactive: '#94a3b8' };
+const C = { card: '#ffffff', border: '#dbeafe', active: '#ffffff', activeBg: '#1d4ed8', activeBar: '#1e3a8a', inactive: '#94a3b8' };
 
 export default function TabBar({ current, navigation }: Props) {
   const insets = useSafeAreaInsets();
@@ -48,7 +48,7 @@ const s = StyleSheet.create({
     borderTopColor: C.border,
   },
   tabItem: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 2, paddingTop: 4 },
-  tabItemActive: { borderTopWidth: 3, borderTopColor: C.active, backgroundColor: C.activeBg },
+  tabItemActive: { borderTopWidth: 3, borderTopColor: C.activeBar, backgroundColor: C.activeBg },
   tabIcon: { color: C.inactive, fontSize: 16, fontWeight: '700' },
   tabIconActive: { color: C.active },
   tabLabel: { color: C.inactive, fontSize: 9, fontWeight: '700' },
