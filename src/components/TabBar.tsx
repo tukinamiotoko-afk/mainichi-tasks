@@ -5,8 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 const TABS = [
   { name: 'Home', label: 'タスク', icon: '✓' },
   { name: 'Timer', label: 'タイマー', icon: '⏱' },
-  { name: 'Calendar', label: 'カレンダー', icon: '📅' },
-  { name: 'Stats', label: '実行率', icon: '%' },
+  { name: 'Stats', label: '統計', icon: '📊' },
   { name: 'Notifications', label: '通知', icon: '!' },
 ] as const;
 
