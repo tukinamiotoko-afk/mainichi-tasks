@@ -1071,7 +1071,7 @@ const s = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: C.body },
 
   headerCard: { backgroundColor: C.header, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 24 },
-  dateText: { color: 'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: '600', marginBottom: 12 },
+  dateText: { color: '#ffffff', fontSize: 22, fontWeight: '800', marginBottom: 12 },
   headerLabel: { color: 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
   progressRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 6 },
   progressBg: { flex: 1, height: 4, backgroundColor: 'rgba(255,255,255,0.25)', borderRadius: 2, overflow: 'hidden' },
