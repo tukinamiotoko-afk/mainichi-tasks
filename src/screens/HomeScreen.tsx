@@ -54,7 +54,7 @@ const FREQ_OPTS: { k: FilterFreq; l: string }[] = [
   { k: 'all', l: 'すべて' }, { k: 'daily', l: '毎日' }, { k: 'other', l: 'その他' },
 ];
 const DUE_OPTS: { k: FilterDue; l: string }[] = [
-  { k: 'all', l: 'すべて' }, { k: 'today', l: '今日やる' },
+  { k: 'all', l: 'すべて' }, { k: 'today', l: '今日' },
 ];
 const SORT_OPTS: { k: SortKey; l: string }[] = [
   { k: 'manual', l: '手動' }, { k: 'priority', l: '優先度' }, { k: 'time', l: '時刻' }, { k: 'name', l: '名前' },
