@@ -17,7 +17,7 @@ interface Props {
   navigation: { navigate: (screen: string) => void };
 }
 
-const C = { card: '#ffffff', border: '#dbeafe', primary: '#111827', muted: '#111827' };
+const C = { card: '#ffffff', border: '#dbeafe', active: '#1e3a8a', activeBg: '#dbeafe', inactive: '#94a3b8' };
 
 export default function TabBar({ current, navigation }: Props) {
   const insets = useSafeAreaInsets();
@@ -31,7 +31,7 @@ export default function TabBar({ current, navigation }: Props) {
             style={[s.tabItem, active && s.tabItemActive]}
             onPress={() => { if (!active) navigation.navigate(name); }}
           >
-            <Text style={[s.tabIcon, active && s.tabLabelActive]}>{icon}</Text>
+            <Text style={[s.tabIcon, active && s.tabIconActive]}>{icon}</Text>
             <Text style={[s.tabLabel, active && s.tabLabelActive]} numberOfLines={1}>{label}</Text>
           </TouchableOpacity>
         );
@@ -48,8 +48,9 @@ const s = StyleSheet.create({
     borderTopColor: C.border,
   },
   tabItem: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 2, paddingTop: 4 },
-  tabItemActive: { borderTopWidth: 2, borderTopColor: C.primary },
-  tabIcon: { color: C.muted, fontSize: 16, fontWeight: '700' },
-  tabLabel: { color: C.muted, fontSize: 9, fontWeight: '700' },
-  tabLabelActive: { color: C.primary },
+  tabItemActive: { borderTopWidth: 3, borderTopColor: C.active, backgroundColor: C.activeBg },
+  tabIcon: { color: C.inactive, fontSize: 16, fontWeight: '700' },
+  tabIconActive: { color: C.active },
+  tabLabel: { color: C.inactive, fontSize: 9, fontWeight: '700' },
+  tabLabelActive: { color: C.active, fontWeight: '900' },
 });
