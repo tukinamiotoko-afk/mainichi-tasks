@@ -717,8 +717,8 @@ export default function HomeScreen({ navigation }: Props) {
             : null;
           return (
             <View style={s.swipeWrap}>
-              <Animated.View style={[s.swipeDeleteBg, swipeBgStyle]}>
-                <Text style={s.swipeDeleteText}>削除</Text>
+              <Animated.View style={[s.swipeDeleteBg, isDone && s.swipeDoneBg, swipeBgStyle]}>
+                <Text style={[s.swipeDeleteText, isDone && s.swipeDoneText]}>{isDone ? '完了' : '削除'}</Text>
               </Animated.View>
               <Animated.View style={[s.taskCard, isDone && s.taskCardDone, swipeStyle, dragStyle]} {...panResponder.panHandlers}>
               <TouchableOpacity
@@ -989,6 +989,8 @@ const s = StyleSheet.create({
     justifyContent: 'center',
   },
   swipeDeleteText: { color: '#ffffff', fontSize: 14, fontWeight: '800', letterSpacing: 1 },
+  swipeDoneBg: { backgroundColor: '#fef3c7' },
+  swipeDoneText: { color: '#b45309' },
   taskCard: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: C.card, borderRadius: 12,
     paddingHorizontal: 14, paddingVertical: 14, gap: 12,
@@ -1007,8 +1009,8 @@ const s = StyleSheet.create({
   priorityBadgeText: { color: C.onPrimary, fontSize: 9, fontWeight: '800' },
   scheduleTag: { color: C.stone, fontSize: 10, fontWeight: '700' },
   freqTag: { color: C.muted, fontSize: 10, fontWeight: '700' },
-  doneBadge: { backgroundColor: C.header, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
-  doneBadgeText: { color: C.onPrimary, fontSize: 9, fontWeight: '700', letterSpacing: 0.5 },
+  doneBadge: { backgroundColor: '#fef3c7', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
+  doneBadgeText: { color: '#b45309', fontSize: 9, fontWeight: '700', letterSpacing: 0.5 },
   tagBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center' },
   tagIcon: { fontSize: 17 },
   tagIconEmpty: { opacity: 0.35 },
