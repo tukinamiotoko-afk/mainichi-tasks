@@ -41,6 +41,20 @@ type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'Home'>
 const pad = (n: number) => String(n).padStart(2, '0');
 const daysToCsv = (days: number[]) => days.slice().sort((a, b) => a - b).join(',');
 const DRAG_ROW_HEIGHT = 88;
+
+type FilterStatus = 'all' | 'incomplete' | 'done';
+type FilterFreq = 'all' | 'daily' | 'other';
+type SortKey = 'manual' | 'priority' | 'time' | 'name';
+
+const STATUS_OPTS: { k: FilterStatus; l: string }[] = [
+  { k: 'all', l: 'すべて' }, { k: 'incomplete', l: '未完了' }, { k: 'done', l: '完了' },
+];
+const FREQ_OPTS: { k: FilterFreq; l: string }[] = [
+  { k: 'all', l: 'すべて' }, { k: 'daily', l: '毎日' }, { k: 'other', l: 'その他' },
+];
+const SORT_OPTS: { k: SortKey; l: string }[] = [
+  { k: 'manual', l: '手動' }, { k: 'priority', l: '優先度' }, { k: 'time', l: '時刻' }, { k: 'name', l: '名前' },
+];
 const SWIPE_DELETE_THRESHOLD = 92;
 
 // Minimal shape required to schedule a task's reminder.
@@ -129,6 +143,10 @@ export default function HomeScreen({ navigation }: Props) {
   // Mirror of the actively-swiping card id, in state so the swipe transform
   // actually binds (a ref alone won't re-render to apply the animated styles).
   const [swipingId, setSwipingId] = useState<number | null>(null);
+  const [filterStatus, setFilterStatus] = useState<FilterStatus>('all');
+  const [filterFreq, setFilterFreq] = useState<FilterFreq>('all');
+  const [sortKey, setSortKey] = useState<SortKey>('manual');
+  const [showFilters, setShowFilters] = useState(false);
   const today = getToday();
 
   // Add task sheet draft
@@ -336,6 +354,28 @@ export default function HomeScreen({ navigation }: Props) {
     if (a.sort_order !== b.sort_order) return a.sort_order - b.sort_order;
     return a.id - b.id;
   });
+
+  // Drag reorder only makes sense in unfiltered manual order.
+  const reorderEnabled = sortKey === 'manual' && filterStatus === 'all' && filterFreq === 'all';
+  const displayedTasks = (() => {
+    let list = sortedTasks;
+    if (filterStatus === 'incomplete') list = list.filter((t) => !completedIds.has(t.id));
+    else if (filterStatus === 'done') list = list.filter((t) => completedIds.has(t.id));
+    if (filterFreq === 'daily') list = list.filter((t) => t.freq_type === 'daily');
+    else if (filterFreq === 'other') list = list.filter((t) => t.freq_type !== 'daily');
+    if (sortKey === 'priority') {
+      list = [...list].sort((a, b) => (b.priority - a.priority) || (a.sort_order - b.sort_order));
+    } else if (sortKey === 'time') {
+      list = [...list].sort((a, b) => {
+        const at = a.scheduled_time ?? '99:99';
+        const bt = b.scheduled_time ?? '99:99';
+        return at < bt ? -1 : at > bt ? 1 : a.sort_order - b.sort_order;
+      });
+    } else if (sortKey === 'name') {
+      list = [...list].sort((a, b) => a.title.localeCompare(b.title, 'ja'));
+    }
+    return list;
+  })();
 
   const persistTaskOrder = async () => {
     const ordered = [...tasksRef.current].sort((a, b) => {
@@ -663,20 +703,56 @@ export default function HomeScreen({ navigation }: Props) {
       </LinearGradient>
 
       <FlatList
-        data={sortedTasks}
+        data={displayedTasks}
         keyExtractor={(item) => String(item.id)}
         style={s.list}
         contentContainerStyle={{ padding: 16, gap: 10 }}
         ListHeaderComponent={
-          <View style={s.sectionBar}>
-            <Text style={s.metaLabel}>チェックリスト</Text>
-            {total > 0 && <Text style={s.stone}>{total}件</Text>}
+          <View style={s.listHeader}>
+            <View style={s.sectionBar}>
+              <Text style={s.metaLabel}>チェックリスト</Text>
+              <View style={s.sectionRight}>
+                {total > 0 && <Text style={s.stone}>{displayedTasks.length}/{total}件</Text>}
+                <TouchableOpacity style={s.filterToggle} onPress={() => setShowFilters((v) => !v)}>
+                  <Text style={s.filterToggleText}>絞り込み・並べ替え {showFilters ? '▲' : '▼'}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+            {showFilters && (
+              <View style={s.filterPanel}>
+                <Text style={s.filterLabel}>状態</Text>
+                <View style={s.filterRow}>
+                  {STATUS_OPTS.map((o) => (
+                    <TouchableOpacity key={o.k} style={[s.fChip, filterStatus === o.k && s.fChipActive]} onPress={() => setFilterStatus(o.k)}>
+                      <Text style={[s.fChipText, filterStatus === o.k && s.fChipTextActive]}>{o.l}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <Text style={s.filterLabel}>頻度</Text>
+                <View style={s.filterRow}>
+                  {FREQ_OPTS.map((o) => (
+                    <TouchableOpacity key={o.k} style={[s.fChip, filterFreq === o.k && s.fChipActive]} onPress={() => setFilterFreq(o.k)}>
+                      <Text style={[s.fChipText, filterFreq === o.k && s.fChipTextActive]}>{o.l}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <Text style={s.filterLabel}>並べ替え</Text>
+                <View style={s.filterRow}>
+                  {SORT_OPTS.map((o) => (
+                    <TouchableOpacity key={o.k} style={[s.fChip, sortKey === o.k && s.fChipActive]} onPress={() => setSortKey(o.k)}>
+                      <Text style={[s.fChipText, sortKey === o.k && s.fChipTextActive]}>{o.l}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                {!reorderEnabled && <Text style={s.filterHint}>※ この表示中はドラッグでの並び替えはできません（「手動」かつ絞り込み「すべて」で可能）</Text>}
+              </View>
+            )}
           </View>
         }
         ListEmptyComponent={
           <View style={s.empty}>
-            <Text style={s.emptyTitle}>タスクなし</Text>
-            <Text style={s.emptyBody}>右下の ＋ から追加できます</Text>
+            <Text style={s.emptyTitle}>{total > 0 ? '該当なし' : 'タスクなし'}</Text>
+            <Text style={s.emptyBody}>{total > 0 ? '絞り込み条件を変えてみてください' : '右下の ＋ から追加できます'}</Text>
           </View>
         }
         renderItem={({ item, index }) => {
@@ -738,7 +814,7 @@ export default function HomeScreen({ navigation }: Props) {
               <TouchableOpacity
                 style={s.taskBody}
                 onPress={() => openDetail(item)}
-                onLongPress={() => startDrag(item.id, index)}
+                onLongPress={reorderEnabled ? () => startDrag(item.id, index) : undefined}
                 delayLongPress={250}
                 activeOpacity={0.7}
               >
@@ -979,9 +1055,21 @@ const s = StyleSheet.create({
   progressText: { color: '#ffffff', fontSize: 11, fontWeight: '700' },
 
   list: { flex: 1, backgroundColor: C.body },
-  sectionBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  listHeader: { marginBottom: 4 },
+  sectionBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  sectionRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   metaLabel: { color: C.muted, fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
   stone: { color: C.stone, fontSize: 11, fontWeight: '700' },
+  filterToggle: { backgroundColor: '#eff6ff', borderRadius: 14, paddingHorizontal: 10, paddingVertical: 5 },
+  filterToggleText: { color: C.primary, fontSize: 11, fontWeight: '800' },
+  filterPanel: { backgroundColor: C.card, borderRadius: 12, borderWidth: 1, borderColor: C.border, padding: 12, marginTop: 8, gap: 6 },
+  filterLabel: { color: C.muted, fontSize: 10, fontWeight: '800', letterSpacing: 0.5, marginTop: 2 },
+  filterRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  fChip: { borderWidth: 1, borderColor: C.border, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 5 },
+  fChipActive: { backgroundColor: C.primary, borderColor: C.primary },
+  fChipText: { color: C.onDark, fontSize: 12, fontWeight: '700' },
+  fChipTextActive: { color: C.onPrimary },
+  filterHint: { color: C.muted, fontSize: 10, fontWeight: '600', marginTop: 4 },
 
   swipeWrap: { borderRadius: 12 },
   swipeDeleteBg: {
