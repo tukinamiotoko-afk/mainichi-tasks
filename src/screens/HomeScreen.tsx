@@ -812,7 +812,7 @@ export default function HomeScreen({ navigation }: Props) {
                   extrapolate: 'clamp',
                 }),
               }
-            : null;
+            : { opacity: 0 };
           const dragStyle = isDragging
             ? {
                 transform: [{ translateY: dragY }, { scale: dragScale }],
@@ -1106,7 +1106,7 @@ const s = StyleSheet.create({
     left: 0,
     right: 0,
     borderRadius: 12,
-    backgroundColor: '#dc2626',
+    backgroundColor: '#1f2937',
     alignItems: 'center',
     justifyContent: 'center',
   },
