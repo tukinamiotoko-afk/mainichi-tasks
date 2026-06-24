@@ -12,27 +12,32 @@ import { GRAD, GRAD_START, GRAD_END } from '../constants/theme';
 import TabBar from '../components/TabBar';
 
 const C = {
-  header:    '#2563eb',
-  body:      '#f4f8ff',
-  card:      '#ffffff',
-  border:    '#cbd5e1',
-  line:      '#94a3b8',
-  primary:   '#2563eb',
-  onPrimary: '#ffffff',
-  onDark:    '#2d3748',
+  header:    '#1d4ed8',
+  body:      '#ffffff',
+  line:      '#64748b',
+  // flowchart palette (matches reference)
+  termBg:    '#dbeafe',
+  termBorder:'#2563eb',
+  termText:  '#1e3a8a',
+  procBg:    '#dbeafe',
+  procBorder:'#2563eb',
+  procText:  '#1e3a8a',
+  diaBg:     '#bbf7d0',
+  diaBorder: '#16a34a',
+  diaText:   '#14532d',
+  doneBg:    '#16a34a',
+  doneBorder:'#15803d',
   muted:     '#6b7280',
   ink:       '#111827',
-  success:   '#16a34a',
-  successBg: '#f0fdf4',
 };
 
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'Flow'> };
 
-// Connector: a short vertical line with a downward arrowhead.
-function Connector({ color = C.line }: { color?: string }) {
+// vertical line + downward arrowhead
+function Down({ color = C.line, h = 22 }: { color?: string; h?: number }) {
   return (
-    <View style={s.connector} pointerEvents="none">
-      <View style={[s.connLine, { backgroundColor: color }]} />
+    <View style={s.down} pointerEvents="none">
+      <View style={[s.downLine, { height: h, backgroundColor: color }]} />
       <View style={[s.arrowHead, { borderTopColor: color }]} />
     </View>
   );
@@ -71,7 +76,8 @@ export default function FlowScreen({ navigation }: Props) {
       return a.sort_order - b.sort_order;
     });
   const doneCount = due.filter((t) => completedIds.has(t.id)).length;
-  const allDone = due.length > 0 && doneCount === due.length;
+  const remaining = due.length - doneCount;
+  const allDone = due.length > 0 && remaining === 0;
 
   return (
     <View style={s.safeArea}>
@@ -90,54 +96,66 @@ export default function FlowScreen({ navigation }: Props) {
           </View>
         ) : (
           <>
-            {/* Start terminator */}
+            {/* start terminator */}
             <View style={s.terminator}><Text style={s.terminatorText}>開始</Text></View>
 
+            {/* process boxes */}
             {due.map((task, i) => {
               const isDone = completedIds.has(task.id);
               return (
                 <View key={task.id} style={s.stepWrap}>
-                  <Connector color={isDone ? C.success : C.line} />
-                  {/* Process box */}
+                  <Down color={isDone ? C.doneBg : C.line} />
                   <TouchableOpacity
                     style={[s.process, isDone && s.processDone]}
                     onPress={() => toggle(task.id)}
                     activeOpacity={0.8}
                   >
                     <View style={[s.stepNo, isDone && s.stepNoDone]}>
-                      <Text style={[s.stepNoText, isDone && s.stepNoTextDone]}>{i + 1}</Text>
+                      <Text style={s.stepNoText}>{i + 1}</Text>
                     </View>
-                    <View style={s.processText}>
-                      <Text style={[s.processTitle, isDone && s.processTitleDone]} numberOfLines={2}>
-                        {task.icon ? `${task.icon} ` : ''}{task.title}
-                      </Text>
-                      {task.scheduled_time && <Text style={s.processTime}>⏱ {task.scheduled_time}</Text>}
-                    </View>
-                    <View style={[s.stepCheck, isDone && s.stepCheckDone]}>
-                      {isDone && <Text style={s.stepCheckMark}>✓</Text>}
-                    </View>
+                    <Text style={[s.processText, isDone && s.processTextDone]} numberOfLines={2}>
+                      {task.icon ? `${task.icon} ` : ''}{task.title}
+                      {task.scheduled_time ? `  (${task.scheduled_time})` : ''}
+                    </Text>
+                    {isDone && <Text style={s.processCheck}>✓</Text>}
                   </TouchableOpacity>
                 </View>
               );
             })}
 
-            {/* Decision diamond */}
-            <Connector color={allDone ? C.success : C.line} />
-            <View style={s.diamondWrap}>
-              <View style={[s.diamond, allDone && s.diamondDone]}>
-                <View style={s.diamondInner}>
-                  <Text style={[s.diamondText, allDone && s.diamondTextDone]}>全部{'\n'}完了?</Text>
-                </View>
+            {/* decision diamond */}
+            <Down color={allDone ? C.doneBg : C.line} />
+            <View style={[s.diamond, allDone && s.diamondDone]}>
+              <View style={s.diamondInner}>
+                <Text style={[s.diamondText, allDone && s.diamondTextDone]}>全部{'\n'}完了?</Text>
               </View>
-              <Text style={s.branchLabel}>{allDone ? 'Yes →' : 'まだ'}</Text>
             </View>
 
-            {/* End terminator */}
-            <Connector color={allDone ? C.success : C.line} />
+            {/* branch: はい / いいえ */}
+            <View style={s.branchRow}>
+              <View style={s.branchCol}>
+                <Text style={[s.branchLabel, { color: C.diaBorder }]}>はい</Text>
+                <Down color={allDone ? C.doneBg : C.line} h={16} />
+                <View style={[s.outBox, allDone && s.outBoxDone]}>
+                  <Text style={[s.outText, allDone && s.outTextDone]}>完了 🎉</Text>
+                </View>
+              </View>
+              <View style={s.branchCol}>
+                <Text style={[s.branchLabel, { color: C.muted }]}>いいえ</Text>
+                <Down color={C.line} h={16} />
+                <View style={[s.outBox, s.outBoxNo]}>
+                  <Text style={s.outNoText}>残り {remaining} 件</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* merge into 終了 */}
+            <View style={s.mergeRailWrap}>
+              <View style={s.mergeRail} />
+            </View>
+            <Down color={allDone ? C.doneBg : C.line} h={16} />
             <View style={[s.terminator, s.terminatorEnd, allDone && s.terminatorDone]}>
-              <Text style={[s.terminatorText, s.terminatorEndText, allDone && s.terminatorDoneText]}>
-                {allDone ? '完了 🎉' : '終了'}
-              </Text>
+              <Text style={[s.terminatorText, allDone && s.terminatorEndText]}>終了</Text>
             </View>
           </>
         )}
@@ -158,56 +176,61 @@ const s = StyleSheet.create({
   content: { padding: 16, paddingBottom: 40, alignItems: 'center' },
 
   // connectors
-  connector: { alignItems: 'center', justifyContent: 'center' },
-  connLine: { width: 2.5, height: 22 },
+  down: { alignItems: 'center', justifyContent: 'center' },
+  downLine: { width: 2 },
   arrowHead: {
     width: 0, height: 0,
-    borderLeftWidth: 7, borderRightWidth: 7, borderTopWidth: 10,
-    borderLeftColor: 'transparent', borderRightColor: 'transparent',
-    marginTop: -1,
+    borderLeftWidth: 6, borderRightWidth: 6, borderTopWidth: 9,
+    borderLeftColor: 'transparent', borderRightColor: 'transparent', marginTop: -1,
   },
 
-  // terminators (start / end)
-  terminator: { backgroundColor: C.ink, borderRadius: 24, paddingHorizontal: 30, paddingVertical: 11 },
-  terminatorText: { color: '#ffffff', fontSize: 14, fontWeight: '800', letterSpacing: 2 },
-  terminatorEnd: { backgroundColor: '#e2e8f0' },
-  terminatorEndText: { color: C.ink },
-  terminatorDone: { backgroundColor: C.success },
-  terminatorDoneText: { color: '#ffffff' },
+  // terminators (rounded blue, like reference)
+  terminator: { backgroundColor: C.termBg, borderWidth: 1.5, borderColor: C.termBorder, borderRadius: 22, paddingHorizontal: 30, paddingVertical: 10 },
+  terminatorText: { color: C.termText, fontSize: 14, fontWeight: '800', letterSpacing: 1 },
+  terminatorEnd: {},
+  terminatorEndText: { color: '#ffffff' },
+  terminatorDone: { backgroundColor: C.doneBg, borderColor: C.doneBorder },
 
-  // process boxes
+  // process boxes (blue rectangles)
   stepWrap: { alignItems: 'center', width: '100%' },
   process: {
-    flexDirection: 'row', alignItems: 'center', gap: 10, width: '90%',
-    backgroundColor: C.card, borderRadius: 8, borderWidth: 1.5, borderColor: C.border,
-    paddingHorizontal: 12, paddingVertical: 13,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 4, elevation: 2,
+    flexDirection: 'row', alignItems: 'center', gap: 10, width: '82%',
+    backgroundColor: C.procBg, borderWidth: 1.5, borderColor: C.procBorder, borderRadius: 4,
+    paddingHorizontal: 12, paddingVertical: 12,
   },
-  processDone: { borderColor: C.success, backgroundColor: C.successBg },
-  stepNo: { width: 26, height: 26, borderRadius: 6, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center' },
-  stepNoDone: { backgroundColor: C.success },
-  stepNoText: { color: '#ffffff', fontSize: 13, fontWeight: '800' },
-  stepNoTextDone: { color: '#ffffff' },
-  processText: { flex: 1, gap: 2 },
-  processTitle: { color: C.onDark, fontSize: 14, fontWeight: '700' },
-  processTitleDone: { color: C.muted, textDecorationLine: 'line-through' },
-  processTime: { color: C.primary, fontSize: 11, fontWeight: '800' },
-  stepCheck: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
-  stepCheckDone: { backgroundColor: C.success, borderColor: C.success },
-  stepCheckMark: { color: '#ffffff', fontSize: 12, fontWeight: '800' },
+  processDone: { backgroundColor: '#dcfce7', borderColor: C.doneBorder },
+  stepNo: { width: 22, height: 22, borderRadius: 4, backgroundColor: C.procBorder, alignItems: 'center', justifyContent: 'center' },
+  stepNoDone: { backgroundColor: C.doneBg },
+  stepNoText: { color: '#ffffff', fontSize: 12, fontWeight: '800' },
+  processText: { flex: 1, color: C.procText, fontSize: 13, fontWeight: '700' },
+  processTextDone: { color: '#166534', textDecorationLine: 'line-through' },
+  processCheck: { color: C.doneBg, fontSize: 14, fontWeight: '900' },
 
-  // decision diamond
-  diamondWrap: { height: 150, alignItems: 'center', justifyContent: 'center' },
+  // decision diamond (green)
   diamond: {
-    width: 104, height: 104, borderRadius: 10, borderWidth: 1.5, borderColor: C.border,
-    backgroundColor: C.card, alignItems: 'center', justifyContent: 'center',
+    width: 96, height: 96, borderRadius: 8, borderWidth: 1.5, borderColor: C.diaBorder,
+    backgroundColor: C.diaBg, alignItems: 'center', justifyContent: 'center',
     transform: [{ rotate: '45deg' }],
   },
-  diamondDone: { borderColor: C.success, backgroundColor: C.successBg },
-  diamondInner: { width: 150, alignItems: 'center', transform: [{ rotate: '-45deg' }] },
-  diamondText: { color: C.onDark, fontSize: 13, fontWeight: '800', textAlign: 'center' },
-  diamondTextDone: { color: C.success },
-  branchLabel: { position: 'absolute', right: 24, top: '50%', color: C.muted, fontSize: 11, fontWeight: '800' },
+  diamondDone: { backgroundColor: '#86efac' },
+  diamondInner: { width: 140, alignItems: 'center', transform: [{ rotate: '-45deg' }] },
+  diamondText: { color: C.diaText, fontSize: 13, fontWeight: '800', textAlign: 'center' },
+  diamondTextDone: { color: '#14532d' },
+
+  // branch
+  branchRow: { flexDirection: 'row', width: '100%', marginTop: 2 },
+  branchCol: { flex: 1, alignItems: 'center' },
+  branchLabel: { fontSize: 12, fontWeight: '800', marginBottom: -2 },
+  outBox: { backgroundColor: C.termBg, borderWidth: 1.5, borderColor: C.termBorder, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 8, minWidth: 92, alignItems: 'center' },
+  outBoxDone: { backgroundColor: C.doneBg, borderColor: C.doneBorder },
+  outBoxNo: { backgroundColor: '#fef3c7', borderColor: '#d97706' },
+  outText: { color: C.termText, fontSize: 13, fontWeight: '800' },
+  outTextDone: { color: '#ffffff' },
+  outNoText: { color: '#92400e', fontSize: 13, fontWeight: '800' },
+
+  // merge rail
+  mergeRailWrap: { width: '50%', alignItems: 'center', marginTop: 14 },
+  mergeRail: { width: '100%', height: 2, backgroundColor: C.line },
 
   empty: { paddingVertical: 60, alignItems: 'center', gap: 8 },
   emptyTitle: { color: C.ink, fontSize: 16, fontWeight: '700' },
