@@ -600,14 +600,17 @@ export default function HomeScreen({ navigation }: Props) {
       )}
       {notify && !time && <Text style={s.scheduleHint}>※ 通知するには時間を設定してください</Text>}
       {notify && (
-        <View style={s.notifyTypeRow}>
-          <TouchableOpacity style={[s.notifyTypeChip, notifyType === 'push' && s.notifyTypeChipActive]} onPress={() => onSetNotifyType('push')}>
-            <Text style={[s.notifyTypeText, notifyType === 'push' && s.notifyTypeTextActive]}>🔔 プッシュ通知</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[s.notifyTypeChip, notifyType === 'alarm' && s.notifyTypeChipActive]} onPress={() => onSetNotifyType('alarm')}>
-            <Text style={[s.notifyTypeText, notifyType === 'alarm' && s.notifyTypeTextActive]}>⏰ アラーム音</Text>
-          </TouchableOpacity>
-        </View>
+        <>
+          <Text style={s.notifyTypeLabel}>通知の種類</Text>
+          <View style={s.notifyTypeRow}>
+            <TouchableOpacity style={[s.notifyTypeChip, notifyType === 'push' && s.notifyTypeChipActive]} onPress={() => onSetNotifyType('push')}>
+              <Text style={[s.notifyTypeText, notifyType === 'push' && s.notifyTypeTextActive]}>🔔 プッシュ通知</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[s.notifyTypeChip, notifyType === 'alarm' && s.notifyTypeChipActive]} onPress={() => onSetNotifyType('alarm')}>
+              <Text style={[s.notifyTypeText, notifyType === 'alarm' && s.notifyTypeTextActive]}>⏰ アラート</Text>
+            </TouchableOpacity>
+          </View>
+        </>
       )}
     </View>
   );
@@ -1269,6 +1272,7 @@ const s = StyleSheet.create({
   clearTimeBtn: { alignSelf: 'flex-start' },
   clearTimeText: { color: C.muted, fontSize: 11, fontWeight: '700' },
   scheduleHint: { color: C.error, fontSize: 11, fontWeight: '600' },
+  notifyTypeLabel: { color: C.muted, fontSize: 11, fontWeight: '700', marginTop: 4 },
   notifyTypeRow: { flexDirection: 'row', gap: 8, marginTop: 2 },
   notifyTypeChip: { flex: 1, borderWidth: 1, borderColor: C.border, borderRadius: 10, paddingVertical: 8, alignItems: 'center', backgroundColor: '#ffffff' },
   notifyTypeChipActive: { backgroundColor: C.primary, borderColor: C.primary },
