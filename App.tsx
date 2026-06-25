@@ -25,7 +25,7 @@ export default function App() {
     <SQLiteProvider databaseName="daily_tasks.db" onInit={migrateDb}>
       <NavigationContainer>
         <StatusBar style="light" />
-        <Stack.Navigator screenOptions={{ headerShown: false, animation: 'none' }}>
+        <Stack.Navigator screenOptions={{ headerShown: false, animation: 'fade', animationDuration: 220 }}>
           <Stack.Screen name="Home" component={HomeScreen} />
           <Stack.Screen name="Stats" component={StatsScreen} />
           <Stack.Screen name="Notifications" component={NotificationScreen} />
