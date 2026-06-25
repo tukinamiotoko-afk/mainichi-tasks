@@ -147,7 +147,7 @@ export default function HomeScreen({ navigation }: Props) {
   const [showThumb, setShowThumb] = useState(false);
   const thumbAnim = useRef(new Animated.Value(0)).current;
   const progressAnim = useRef(new Animated.Value(0)).current;
-  const fabPosition = useRef({ x: Math.max(screen.width - 72, 20), y: Math.max(screen.height - 150, 120) });
+  const fabPosition = useRef({ x: Math.max(screen.width - 72, 20), y: Math.max(screen.height - insets.bottom - 132, 120) });
   const fabStartPosition = useRef(fabPosition.current);
   const fabAnim = useRef(new Animated.ValueXY(fabPosition.current)).current;
   const [activeDragId, setActiveDragId] = useState<number | null>(null);
@@ -535,7 +535,7 @@ export default function HomeScreen({ navigation }: Props) {
   });
   const clampFab = (x: number, y: number) => ({
     x: Math.max(8, Math.min(x, screen.width - 60)),
-    y: Math.max(100, Math.min(y, screen.height - 130)),
+    y: Math.max(100, Math.min(y, screen.height - insets.bottom - 124)),
   });
   const fabPanResponder = useRef(PanResponder.create({
     onStartShouldSetPanResponder: () => false,
