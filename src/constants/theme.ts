@@ -1,8 +1,8 @@
 // Shared gradient palettes (used with expo-linear-gradient).
 
 export const GRAD = {
-  header: ['#1e40af', '#1d4ed8'] as const,
-  brand: ['#2563eb', '#1e40af'] as const,
+  header: ['#3b82f6', '#1e3a8a'] as const,
+  brand: ['#3b82f6', '#1e3a8a'] as const,
   success: ['#4ade80', '#16a34a'] as const,
   danger: ['#f87171', '#dc2626'] as const,
 };

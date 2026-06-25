@@ -708,7 +708,6 @@ export default function HomeScreen({ navigation }: Props) {
         <Text style={s.headerLabel}>今日の進捗</Text>
         <View style={s.progressRow}>
           <View style={s.progressBg}>
-            <LinearGradient colors={['#60a5fa', '#1e3a8a']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
             <Animated.View
               style={[s.progressFill, { width: progressAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }]}
             >
@@ -1086,7 +1085,7 @@ const s = StyleSheet.create({
   dateText: { color: '#ffffff', fontSize: 22, fontWeight: '800', marginBottom: 12 },
   headerLabel: { color: 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
   progressRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 6 },
-  progressBg: { flex: 1, height: 4, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 2, overflow: 'hidden' },
+  progressBg: { flex: 1, height: 4, backgroundColor: 'rgba(255,255,255,0.45)', borderRadius: 2, overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: 2, overflow: 'hidden' },
   progressGrad: { flex: 1 },
   progressText: { color: '#ffffff', fontSize: 11, fontWeight: '700' },
