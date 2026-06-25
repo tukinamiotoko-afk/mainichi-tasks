@@ -434,7 +434,6 @@ export default function HomeScreen({ navigation }: Props) {
       if (fromIndex < 0) return current;
       const nextIndex = Math.max(0, Math.min(toIndex, ordered.length - 1));
       if (fromIndex === nextIndex) return current;
-      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
       const [moved] = ordered.splice(fromIndex, 1);
       ordered.splice(nextIndex, 0, moved);
       dragState.current.changed = true;
@@ -510,6 +509,7 @@ export default function HomeScreen({ navigation }: Props) {
         swipeAnim.setValue(0);
       }
     },
+    onPanResponderTerminationRequest: () => dragState.current.taskId !== task.id,
     onPanResponderMove: (_, gesture) => {
       if (dragState.current.taskId === task.id) {
         updateDrag(gesture.dy);
