@@ -22,13 +22,14 @@ export const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
 
 // Recurrence -----------------------------------------------------------------
 
-export type FreqType = 'daily' | 'weekly' | 'monthly_nth' | 'monthly_day';
+export type FreqType = 'daily' | 'weekly' | 'monthly_nth' | 'monthly_day' | 'once';
 
 export const FREQ_TYPES: { value: FreqType; label: string }[] = [
   { value: 'daily', label: '毎日' },
   { value: 'weekly', label: '毎週' },
   { value: 'monthly_nth', label: '毎月（曜日）' },
   { value: 'monthly_day', label: '毎月（日付）' },
+  { value: 'once', label: 'その日限り' },
 ];
 
 // week=5 means "last week of the month".
@@ -46,7 +47,12 @@ export type TaskFreq = {
   freq_week: number | null;     // monthly_nth: 1-5 (5 = last)
   freq_weekday: number | null;  // monthly_nth: 0-6
   freq_day: number | null;      // monthly_day: 1-31
+  once_date?: string | null;    // once: 'YYYY-MM-DD' the single day it applies
 };
+
+function ymd(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 
 export function parseDays(csv: string | null): number[] {
   return (csv ?? '')
@@ -73,6 +79,11 @@ export function frequencyLabel(t: TaskFreq): string {
     }
     case 'monthly_day':
       return `毎月 ${t.freq_day ?? 1}日`;
+    case 'once': {
+      if (!t.once_date) return 'その日限り';
+      const [, m, d] = t.once_date.split('-');
+      return `${Number(m)}/${Number(d)} 限定`;
+    }
     case 'daily':
     default:
       return '毎日';
@@ -122,6 +133,8 @@ export function isDueToday(t: TaskFreq, ref: Date = new Date()): boolean {
       const occ = nthWeekdayOfMonth(ref.getFullYear(), ref.getMonth(), t.freq_week ?? 1, t.freq_weekday ?? 0);
       return !!occ && occ.getDate() === ref.getDate();
     }
+    case 'once':
+      return t.once_date ? t.once_date === ymd(ref) : true;
     case 'daily':
     default:
       return true;

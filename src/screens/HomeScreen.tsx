@@ -68,11 +68,13 @@ type Schedulable = {
   scheduled_time: string | null;
   notify: number;
   notify_id?: string | null;
+  notify_type?: string;
   freq_type: FreqType;
   freq_days: string | null;
   freq_week: number | null;
   freq_weekday: number | null;
   freq_day: number | null;
+  once_date?: string | null;
 };
 
 async function ensurePermission(): Promise<boolean> {
@@ -89,7 +91,12 @@ async function scheduleTaskNotifs(task: Schedulable): Promise<string[]> {
   if (!task.scheduled_time) return [];
   const [h, m] = task.scheduled_time.split(':').map(Number);
   const body = `${task.icon ? task.icon + ' ' : ''}${task.title} の時間です`;
-  const content = { title: '毎日タスク', body, sound: true } as any;
+  const isAlarm = task.notify_type === 'alarm';
+  const content = {
+    title: '毎日タスク', body,
+    sound: isAlarm,
+    android: { channelId: isAlarm ? 'full' : 'silent' },
+  } as any;
   const ids: string[] = [];
   try {
     if (task.freq_type === 'daily') {
@@ -103,6 +110,11 @@ async function scheduleTaskNotifs(task: Schedulable): Promise<string[]> {
     } else if (task.freq_type === 'monthly_nth') {
       const when = nextNthWeekdayDate(task.freq_week ?? 1, task.freq_weekday ?? 0, h, m);
       ids.push(await Notifications.scheduleNotificationAsync({ content, trigger: { date: when } as any }));
+    } else if (task.freq_type === 'once') {
+      const when = task.once_date ? new Date(`${task.once_date}T${task.scheduled_time}:00`) : new Date();
+      if (when.getTime() > Date.now()) {
+        ids.push(await Notifications.scheduleNotificationAsync({ content, trigger: { date: when } as any }));
+      }
     }
   } catch {
     // ignore scheduling failures (e.g. permission revoked); UI still works.
@@ -164,6 +176,7 @@ export default function HomeScreen({ navigation }: Props) {
   const [newPriority, setNewPriority] = useState(1);
   const [newTime, setNewTime] = useState<string | null>(null);
   const [newNotify, setNewNotify] = useState(false);
+  const [newNotifyType, setNewNotifyType] = useState<'push' | 'alarm'>('push');
   const [newFreqType, setNewFreqType] = useState<FreqType>('daily');
   const [newDays, setNewDays] = useState<number[]>([]);
   const [newWeek, setNewWeek] = useState(1);
@@ -237,6 +250,7 @@ export default function HomeScreen({ navigation }: Props) {
     setNewPriority(1);
     setNewTime(null);
     setNewNotify(false);
+    setNewNotifyType('push');
     setNewFreqType('daily');
     setNewDays([]);
     setNewWeek(1);
@@ -253,18 +267,21 @@ export default function HomeScreen({ navigation }: Props) {
       priority: newPriority,
       scheduled_time: newTime,
       notify: newNotify ? 1 : 0,
+      notify_type: newNotifyType,
       freq_type: newFreqType,
       freq_days: newFreqType === 'weekly' ? daysToCsv(newDays) : null,
       freq_week: newFreqType === 'monthly_nth' ? newWeek : null,
       freq_weekday: newFreqType === 'monthly_nth' ? newWeekday : null,
       freq_day: newFreqType === 'monthly_day' ? newDay : null,
+      once_date: newFreqType === 'once' ? today : null,
     };
     await updateTask(db, taskId, fields);
     if (newNotify && newTime) {
       const notify_id = await rescheduleTask({
-        title, icon: newIcon, scheduled_time: newTime, notify: 1, notify_id: null,
+        title, icon: newIcon, scheduled_time: newTime, notify: 1, notify_id: null, notify_type: newNotifyType,
         freq_type: fields.freq_type!, freq_days: fields.freq_days ?? null,
         freq_week: fields.freq_week ?? null, freq_weekday: fields.freq_weekday ?? null, freq_day: fields.freq_day ?? null,
+        once_date: fields.once_date ?? null,
       });
       await updateTask(db, taskId, { notify_id });
     }
@@ -296,7 +313,7 @@ export default function HomeScreen({ navigation }: Props) {
     if (!detailTask) return;
     const merged = { ...detailTask, ...patch } as Task;
     await updateTask(db, detailTask.id, patch);
-    const scheduleKeys: (keyof TaskFields)[] = ['scheduled_time', 'notify', 'freq_type', 'freq_days', 'freq_week', 'freq_weekday', 'freq_day'];
+    const scheduleKeys: (keyof TaskFields)[] = ['scheduled_time', 'notify', 'notify_type', 'freq_type', 'freq_days', 'freq_week', 'freq_weekday', 'freq_day', 'once_date'];
     let next = merged;
     if (scheduleKeys.some(k => k in patch)) {
       const notify_id = await rescheduleTask(merged);
@@ -373,7 +390,8 @@ export default function HomeScreen({ navigation }: Props) {
   // Drag reorder only makes sense in unfiltered manual order.
   const reorderEnabled = sortKey === 'manual' && filterStatus === 'all' && filterFreq === 'all' && filterDue === 'all';
   const displayedTasks = (() => {
-    let list = sortedTasks;
+    // Hide one-time tasks whose day has already passed.
+    let list = sortedTasks.filter((t) => !(t.freq_type === 'once' && t.once_date && t.once_date < today));
     if (filterStatus === 'incomplete') list = list.filter((t) => !completedIds.has(t.id));
     else if (filterStatus === 'done') list = list.filter((t) => completedIds.has(t.id));
     if (filterFreq === 'daily') list = list.filter((t) => t.freq_type === 'daily');
@@ -552,11 +570,13 @@ export default function HomeScreen({ navigation }: Props) {
     onPick: () => void,
     onClear: () => void,
     onToggleNotify: (v: boolean) => void,
+    notifyType: 'push' | 'alarm',
+    onSetNotifyType: (t: 'push' | 'alarm') => void,
   ) => (
     <View style={s.scheduleCard}>
       <View style={s.scheduleRow}>
         <View style={s.scheduleLeft}>
-          <Text style={s.scheduleLabel}>やる時間</Text>
+          <Text style={s.scheduleLabel}>通知の時間</Text>
           <TouchableOpacity onPress={onPick}>
             <Text style={[s.scheduleTime, !time && s.scheduleTimeEmpty]}>{time ?? '未設定'}</Text>
           </TouchableOpacity>
@@ -577,6 +597,16 @@ export default function HomeScreen({ navigation }: Props) {
         </TouchableOpacity>
       )}
       {notify && !time && <Text style={s.scheduleHint}>※ 通知するには時間を設定してください</Text>}
+      {notify && (
+        <View style={s.notifyTypeRow}>
+          <TouchableOpacity style={[s.notifyTypeChip, notifyType === 'push' && s.notifyTypeChipActive]} onPress={() => onSetNotifyType('push')}>
+            <Text style={[s.notifyTypeText, notifyType === 'push' && s.notifyTypeTextActive]}>🔔 プッシュ通知</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[s.notifyTypeChip, notifyType === 'alarm' && s.notifyTypeChipActive]} onPress={() => onSetNotifyType('alarm')}>
+            <Text style={[s.notifyTypeText, notifyType === 'alarm' && s.notifyTypeTextActive]}>⏰ アラーム音</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 
@@ -914,16 +944,8 @@ export default function HomeScreen({ navigation }: Props) {
                 <View style={s.sheetHandle} />
                 <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}>
 
-                  {/* Time + notify (top) */}
-                  {renderSchedule(
-                    newTime,
-                    newNotify,
-                    () => openTimeEditor('add', newTime),
-                    () => setNewTime(null),
-                    toggleNewNotify,
-                  )}
-
-                  <Text style={[s.sheetSection, { marginTop: 16 }]}>タスク名</Text>
+                  {/* Task name (top) */}
+                  <Text style={s.sheetSection}>タスク名</Text>
                   <View style={s.sheetTitleRow}>
                     <TextInput
                       style={s.sheetTitleInput}
@@ -943,6 +965,18 @@ export default function HomeScreen({ navigation }: Props) {
                       </LinearGradient>
                     </TouchableOpacity>
                   </View>
+
+                  {/* Notification time + notify (second) */}
+                  <Text style={[s.sheetSection, { marginTop: 16 }]}>通知</Text>
+                  {renderSchedule(
+                    newTime,
+                    newNotify,
+                    () => openTimeEditor('add', newTime),
+                    () => setNewTime(null),
+                    toggleNewNotify,
+                    newNotifyType,
+                    setNewNotifyType,
+                  )}
 
                   {renderIconPriority(newIcon, newPriority, setNewIcon, setNewPriority)}
 
@@ -975,16 +1009,8 @@ export default function HomeScreen({ navigation }: Props) {
                 <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}>
                   {detailTask && (
                     <>
-                      {/* Time + notify (top) */}
-                      {renderSchedule(
-                        detailTask.scheduled_time,
-                        !!detailTask.notify,
-                        () => openTimeEditor('edit', detailTask.scheduled_time),
-                        () => patchDetail({ scheduled_time: null }),
-                        toggleDetailNotify,
-                      )}
-
-                      <Text style={[s.sheetSection, { marginTop: 16 }]}>タスク名</Text>
+                      {/* Task name (top) */}
+                      <Text style={s.sheetSection}>タスク名</Text>
                       <View style={s.sheetTitleRow}>
                         <TextInput
                           style={s.sheetTitleInput}
@@ -1002,6 +1028,18 @@ export default function HomeScreen({ navigation }: Props) {
                           </LinearGradient>
                         </TouchableOpacity>
                       </View>
+
+                      {/* Notification time + notify (second) */}
+                      <Text style={[s.sheetSection, { marginTop: 16 }]}>通知</Text>
+                      {renderSchedule(
+                        detailTask.scheduled_time,
+                        !!detailTask.notify,
+                        () => openTimeEditor('edit', detailTask.scheduled_time),
+                        () => patchDetail({ scheduled_time: null }),
+                        toggleDetailNotify,
+                        (detailTask.notify_type === 'alarm' ? 'alarm' : 'push'),
+                        (t) => patchDetail({ notify_type: t }),
+                      )}
 
                       {renderIconPriority(
                         detailTask.icon,
@@ -1022,6 +1060,7 @@ export default function HomeScreen({ navigation }: Props) {
                             if (t === 'weekly') patch.freq_days = daysToCsv(parseDays(detailTask.freq_days).length ? parseDays(detailTask.freq_days) : [new Date().getDay()]);
                             if (t === 'monthly_nth') { patch.freq_week = detailTask.freq_week ?? 1; patch.freq_weekday = detailTask.freq_weekday ?? 1; }
                             if (t === 'monthly_day') patch.freq_day = detailTask.freq_day ?? 1;
+                            if (t === 'once') patch.once_date = detailTask.once_date ?? today;
                             patchDetail(patch);
                           },
                           toggleDay: (d) => {
@@ -1191,6 +1230,11 @@ const s = StyleSheet.create({
   clearTimeBtn: { alignSelf: 'flex-start' },
   clearTimeText: { color: C.muted, fontSize: 11, fontWeight: '700' },
   scheduleHint: { color: C.error, fontSize: 11, fontWeight: '600' },
+  notifyTypeRow: { flexDirection: 'row', gap: 8, marginTop: 2 },
+  notifyTypeChip: { flex: 1, borderWidth: 1, borderColor: C.border, borderRadius: 10, paddingVertical: 8, alignItems: 'center', backgroundColor: '#ffffff' },
+  notifyTypeChipActive: { backgroundColor: C.primary, borderColor: C.primary },
+  notifyTypeText: { color: C.onDark, fontSize: 12, fontWeight: '700' },
+  notifyTypeTextActive: { color: C.onPrimary },
 
   // Icon
   iconRow: { gap: 8, paddingVertical: 2 },
