@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, Platform, StatusBar, ScrollView, Dimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSQLiteContext } from 'expo-sqlite';
@@ -10,6 +10,7 @@ import { RootStackParamList } from '../../App';
 import {
   Task, getToday, subtractDays, daysBetween, getTasks,
   getCompletionCountInRange, getFirstCompletionDate, getCompletionsForMonth,
+  getSetting, setSetting,
 } from '../db/database';
 import { GRAD, GRAD_START, GRAD_END } from '../constants/theme';
 import TabBar from '../components/TabBar';
@@ -64,6 +65,17 @@ export default function StatsScreen({ navigation }: Props) {
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [columns, setColumns] = useState<1 | 2>(2);
   const [calTasks, setCalTasks] = useState<Task[]>([]);
+
+  // Persist the calendar column choice.
+  useEffect(() => {
+    getSetting(db, 'calendar_columns').then((v) => {
+      if (v === '1' || v === '2') setColumns(Number(v) as 1 | 2);
+    });
+  }, [db]);
+  const changeColumns = (n: 1 | 2) => {
+    setColumns(n);
+    setSetting(db, 'calendar_columns', String(n));
+  };
   const [doneByTask, setDoneByTask] = useState<Record<number, Set<number>>>({});
 
   const loadRates = useCallback(async () => {
@@ -202,7 +214,7 @@ export default function StatsScreen({ navigation }: Props) {
             </View>
             <View style={s.chipRow}>
               {([1, 2] as const).map((n) => (
-                <TouchableOpacity key={n} style={[s.chip, columns === n && s.chipActive]} onPress={() => setColumns(n)}>
+                <TouchableOpacity key={n} style={[s.chip, columns === n && s.chipActive]} onPress={() => changeColumns(n)}>
                   <Text style={[s.chipText, columns === n && s.chipTextActive]}>{n}列</Text>
                 </TouchableOpacity>
               ))}
