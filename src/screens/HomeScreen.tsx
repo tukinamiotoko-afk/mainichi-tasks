@@ -174,6 +174,7 @@ export default function HomeScreen({ navigation }: Props) {
   const [newTitle, setNewTitle] = useState('');
   const [newIcon, setNewIcon] = useState<string | null>(null);
   const [newPriority, setNewPriority] = useState(-1);
+  const [addPicker, setAddPicker] = useState<'icon' | 'priority' | null>(null);
   const [newTime, setNewTime] = useState<string | null>(null);
   const [newNotify, setNewNotify] = useState(false);
   const [newNotifyType, setNewNotifyType] = useState<'push' | 'alarm'>('push');
@@ -186,6 +187,7 @@ export default function HomeScreen({ navigation }: Props) {
   // Task detail sheet
   const [detailTask, setDetailTask] = useState<Task | null>(null);
   const [detailTitle, setDetailTitle] = useState('');
+  const [detailPicker, setDetailPicker] = useState<'icon' | 'priority' | null>(null);
 
   // Shared time editor (numeric input)
   const [timePickerFor, setTimePickerFor] = useState<'add' | 'edit' | null>(null);
@@ -248,6 +250,7 @@ export default function HomeScreen({ navigation }: Props) {
     setNewTitle('');
     setNewIcon(null);
     setNewPriority(-1);
+    setAddPicker(null);
     setNewTime(null);
     setNewNotify(false);
     setNewNotifyType('push');
@@ -299,6 +302,7 @@ export default function HomeScreen({ navigation }: Props) {
   const openDetail = (task: Task) => {
     setDetailTask(task);
     setDetailTitle(task.title);
+    setDetailPicker(null);
   };
 
   const handleSaveTitle = async () => {
@@ -706,32 +710,60 @@ export default function HomeScreen({ navigation }: Props) {
     priority: number,
     onIcon: (ic: string | null) => void,
     onPriority: (p: number) => void,
+    openPicker: 'icon' | 'priority' | null,
+    setOpenPicker: (picker: 'icon' | 'priority' | null) => void,
   ) => (
     <>
       <Text style={[s.sheetSection, { marginTop: 16 }]}>アイコン</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.iconRow}>
-        <TouchableOpacity style={[s.iconChip, icon === null && s.iconChipActive]} onPress={() => onIcon(null)}>
-          <Text style={s.iconNone}>なし</Text>
-        </TouchableOpacity>
-        {TASK_ICONS.map((ic) => (
-          <TouchableOpacity key={ic} style={[s.iconChip, icon === ic && s.iconChipActive]} onPress={() => onIcon(ic)}>
-            <Text style={s.iconEmoji}>{ic}</Text>
+      <TouchableOpacity
+        style={s.metaSelectBtn}
+        onPress={() => setOpenPicker(openPicker === 'icon' ? null : 'icon')}
+        activeOpacity={0.8}
+      >
+        <View style={s.metaSelectLeft}>
+          <Text style={[s.metaSelectIcon, !icon && s.metaSelectIconEmpty]}>{icon ?? '🏷'}</Text>
+          <Text style={s.metaSelectText}>{icon ? 'アイコンを変更' : 'アイコンなし'}</Text>
+        </View>
+        <Text style={s.metaSelectArrow}>{openPicker === 'icon' ? '▲' : '▼'}</Text>
+      </TouchableOpacity>
+      {openPicker === 'icon' && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.iconRow}>
+          <TouchableOpacity style={[s.iconChip, icon === null && s.iconChipActive]} onPress={() => { onIcon(null); setOpenPicker(null); }}>
+            <Text style={s.iconNone}>なし</Text>
           </TouchableOpacity>
-        ))}
-      </ScrollView>
+          {TASK_ICONS.map((ic) => (
+            <TouchableOpacity key={ic} style={[s.iconChip, icon === ic && s.iconChipActive]} onPress={() => { onIcon(ic); setOpenPicker(null); }}>
+              <Text style={s.iconEmoji}>{ic}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
 
       <Text style={[s.sheetSection, { marginTop: 16 }]}>優先度</Text>
-      <View style={s.typeRow}>
-        {PRIORITIES.map((p) => (
-          <TouchableOpacity
-            key={p.value}
-            style={[s.typeChip, priority === p.value && { backgroundColor: p.color, borderColor: p.color }]}
-            onPress={() => onPriority(p.value)}
-          >
-            <Text style={[s.typeChipText, priority === p.value && s.typeChipTextActive]}>{p.label}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+      <TouchableOpacity
+        style={s.metaSelectBtn}
+        onPress={() => setOpenPicker(openPicker === 'priority' ? null : 'priority')}
+        activeOpacity={0.8}
+      >
+        <View style={s.metaSelectLeft}>
+          <View style={[s.prioritySwatch, { backgroundColor: priorityMeta(priority).cardColor, borderColor: priorityMeta(priority).borderColor }]} />
+          <Text style={s.metaSelectText}>優先度：{priorityMeta(priority).label}</Text>
+        </View>
+        <Text style={s.metaSelectArrow}>{openPicker === 'priority' ? '▲' : '▼'}</Text>
+      </TouchableOpacity>
+      {openPicker === 'priority' && (
+        <View style={s.typeRow}>
+          {PRIORITIES.map((p) => (
+            <TouchableOpacity
+              key={p.value}
+              style={[s.typeChip, priority === p.value && { backgroundColor: p.color, borderColor: p.color }]}
+              onPress={() => { onPriority(p.value); setOpenPicker(null); }}
+            >
+              <Text style={[s.typeChipText, priority === p.value && s.typeChipTextActive]}>{p.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
     </>
   );
 
@@ -985,7 +1017,7 @@ export default function HomeScreen({ navigation }: Props) {
                     setNewNotifyType,
                   )}
 
-                  {renderIconPriority(newIcon, newPriority, setNewIcon, setNewPriority)}
+                  {renderIconPriority(newIcon, newPriority, setNewIcon, setNewPriority, addPicker, setAddPicker)}
 
                   {renderFrequency(newFreqType, newDays, newWeek, newWeekday, newDay, {
                     setType: (t) => {
@@ -1053,6 +1085,8 @@ export default function HomeScreen({ navigation }: Props) {
                         detailTask.priority,
                         (ic) => patchDetail({ icon: ic }),
                         (p) => patchDetail({ priority: p }),
+                        detailPicker,
+                        setDetailPicker,
                       )}
 
                       {renderFrequency(
@@ -1244,6 +1278,13 @@ const s = StyleSheet.create({
   notifyTypeTextActive: { color: C.onPrimary },
 
   // Icon
+  metaSelectBtn: { borderWidth: 1, borderColor: C.border, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 11, backgroundColor: '#ffffff', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  metaSelectLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  metaSelectIcon: { width: 28, textAlign: 'center', fontSize: 20 },
+  metaSelectIconEmpty: { opacity: 0.35 },
+  metaSelectText: { color: C.onDark, fontSize: 13, fontWeight: '700' },
+  metaSelectArrow: { color: C.muted, fontSize: 11, fontWeight: '800' },
+  prioritySwatch: { width: 28, height: 20, borderRadius: 7, borderWidth: 1 },
   iconRow: { gap: 8, paddingVertical: 2 },
   iconChip: { width: 44, height: 44, borderRadius: 12, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
   iconChipActive: { backgroundColor: '#eff6ff', borderColor: C.primary },
