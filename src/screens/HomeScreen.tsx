@@ -45,6 +45,7 @@ const DRAG_ROW_HEIGHT = 88;
 type FilterStatus = 'all' | 'incomplete' | 'done';
 type FilterFreq = 'all' | 'daily' | 'other';
 type FilterDue = 'all' | 'today';
+type MetaPicker = 'icon' | 'priority' | 'freq' | null;
 type SortKey = 'manual' | 'priority' | 'time' | 'name';
 
 const STATUS_OPTS: { k: FilterStatus; l: string }[] = [
@@ -174,7 +175,7 @@ export default function HomeScreen({ navigation }: Props) {
   const [newTitle, setNewTitle] = useState('');
   const [newIcon, setNewIcon] = useState<string | null>(null);
   const [newPriority, setNewPriority] = useState(-1);
-  const [addPicker, setAddPicker] = useState<'icon' | 'priority' | null>(null);
+  const [addPicker, setAddPicker] = useState<MetaPicker>(null);
   const [newTime, setNewTime] = useState<string | null>(null);
   const [newNotify, setNewNotify] = useState(false);
   const [newNotifyType, setNewNotifyType] = useState<'push' | 'alarm'>('push');
@@ -187,7 +188,7 @@ export default function HomeScreen({ navigation }: Props) {
   // Task detail sheet
   const [detailTask, setDetailTask] = useState<Task | null>(null);
   const [detailTitle, setDetailTitle] = useState('');
-  const [detailPicker, setDetailPicker] = useState<'icon' | 'priority' | null>(null);
+  const [detailPicker, setDetailPicker] = useState<MetaPicker>(null);
 
   // Shared time editor (numeric input)
   const [timePickerFor, setTimePickerFor] = useState<'add' | 'edit' | null>(null);
@@ -590,22 +591,20 @@ export default function HomeScreen({ navigation }: Props) {
     onSetNotifyType: (t: 'push' | 'alarm') => void,
   ) => (
     <View style={s.scheduleCard}>
-      <View style={s.scheduleRow}>
-        <View style={s.scheduleLeft}>
-          <Text style={s.scheduleLabel}>通知の時間</Text>
-          <TouchableOpacity onPress={onPick}>
-            <Text style={[s.scheduleTime, !time && s.scheduleTimeEmpty]}>{time ?? '未設定'}</Text>
-          </TouchableOpacity>
+      <TouchableOpacity style={s.metaSelectBtn} onPress={onPick} activeOpacity={0.8}>
+        <View style={s.metaSelectLeft}>
+          <Text style={s.metaSelectText}>通知の時間：{time ?? '未設定'}</Text>
         </View>
-        <View style={s.scheduleRight}>
-          <Text style={s.scheduleLabel}>通知する</Text>
-          <Switch
-            value={notify}
-            onValueChange={onToggleNotify}
-            trackColor={{ true: C.primary, false: C.border }}
-            thumbColor="#ffffff"
-          />
-        </View>
+        <Text style={s.metaSelectArrow}>›</Text>
+      </TouchableOpacity>
+      <View style={s.scheduleToggleRow}>
+        <Text style={s.scheduleLabel}>通知する</Text>
+        <Switch
+          value={notify}
+          onValueChange={onToggleNotify}
+          trackColor={{ true: C.primary, false: C.border }}
+          thumbColor="#ffffff"
+        />
       </View>
       {time && (
         <TouchableOpacity onPress={onClear} style={s.clearTimeBtn}>
@@ -642,9 +641,26 @@ export default function HomeScreen({ navigation }: Props) {
       setWeekday: (d: number) => void;
       setDay: (d: number) => void;
     },
-  ) => (
+    openPicker: MetaPicker,
+    setOpenPicker: (picker: MetaPicker) => void,
+  ) => {
+    const freqText = frequencyLabel({ freq_type: freqType, freq_days: daysToCsv(days), freq_week: week, freq_weekday: weekday, freq_day: day });
+    return (
     <>
       <Text style={[s.sheetSection, { marginTop: 16 }]}>頻度</Text>
+      <TouchableOpacity
+        style={s.metaSelectBtn}
+        onPress={() => setOpenPicker(openPicker === 'freq' ? null : 'freq')}
+        activeOpacity={0.8}
+      >
+        <View style={s.metaSelectLeft}>
+          <Text style={s.metaSelectText} numberOfLines={1}>頻度：{freqText}</Text>
+        </View>
+        <Text style={s.metaSelectArrow}>{openPicker === 'freq' ? '▲' : '▼'}</Text>
+      </TouchableOpacity>
+
+      {openPicker === 'freq' && (
+        <View style={s.freqPanel}>
       <View style={s.freqTypeRow}>
         {FREQ_TYPES.map((ft) => (
           <TouchableOpacity
@@ -717,16 +733,19 @@ export default function HomeScreen({ navigation }: Props) {
           ))}
         </ScrollView>
       )}
+        </View>
+      )}
     </>
-  );
+    );
+  };
 
   const renderIconPriority = (
     icon: string | null,
     priority: number,
     onIcon: (ic: string | null) => void,
     onPriority: (p: number) => void,
-    openPicker: 'icon' | 'priority' | null,
-    setOpenPicker: (picker: 'icon' | 'priority' | null) => void,
+    openPicker: MetaPicker,
+    setOpenPicker: (picker: MetaPicker) => void,
   ) => (
     <>
       <Text style={[s.sheetSection, { marginTop: 16 }]}>アイコン</Text>
@@ -1006,7 +1025,7 @@ export default function HomeScreen({ navigation }: Props) {
                       value={newTitle}
                       onChangeText={setNewTitle}
                       placeholder="例：歯磨き、運動、水を飲む"
-                      placeholderTextColor={C.muted}
+                      placeholderTextColor="#9ca3af"
                       returnKeyType="done"
                       onSubmitEditing={handleAdd}
                     />
@@ -1043,7 +1062,7 @@ export default function HomeScreen({ navigation }: Props) {
                     setWeek: setNewWeek,
                     setWeekday: setNewWeekday,
                     setDay: setNewDay,
-                  })}
+                  }, addPicker, setAddPicker)}
 
                   <View style={{ height: 12 }} />
                 </ScrollView>
@@ -1128,6 +1147,8 @@ export default function HomeScreen({ navigation }: Props) {
                           setWeekday: (d) => patchDetail({ freq_weekday: d }),
                           setDay: (d) => patchDetail({ freq_day: d }),
                         },
+                        detailPicker,
+                        setDetailPicker,
                       )}
 
                       <View style={{ height: 12 }} />
@@ -1154,7 +1175,7 @@ export default function HomeScreen({ navigation }: Props) {
                 maxLength={2}
                 selectTextOnFocus
                 placeholder="8"
-                placeholderTextColor={C.muted}
+                placeholderTextColor="#9ca3af"
               />
               <Text style={s.timeColon}>:</Text>
               <TextInput
@@ -1165,7 +1186,7 @@ export default function HomeScreen({ navigation }: Props) {
                 maxLength={2}
                 selectTextOnFocus
                 placeholder="00"
-                placeholderTextColor={C.muted}
+                placeholderTextColor="#9ca3af"
               />
             </View>
             <Text style={s.timeHint}>24時間制（時 0〜23 ／ 分 0〜59）</Text>
@@ -1277,6 +1298,7 @@ const s = StyleSheet.create({
 
   // Schedule (time + notify)
   scheduleCard: { backgroundColor: '#eff6ff', borderRadius: 14, padding: 14, gap: 8 },
+  scheduleToggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 2 },
   scheduleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   scheduleLeft: { gap: 2 },
   scheduleRight: { alignItems: 'center', gap: 2 },
@@ -1314,6 +1336,7 @@ const s = StyleSheet.create({
   typeChipTextActive: { color: C.onPrimary },
 
   // Frequency
+  freqPanel: { gap: 8, marginTop: 8 },
   freqTypeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   freqTypeChip: { borderWidth: 1, borderColor: C.border, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 8 },
   freqTypeChipActive: { backgroundColor: C.primary, borderColor: C.primary },
