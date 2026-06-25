@@ -897,7 +897,7 @@ export default function HomeScreen({ navigation }: Props) {
         <TouchableOpacity style={s.sheetBg} activeOpacity={1} onPress={closeAddSheet}>
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <TouchableOpacity activeOpacity={1} onPress={() => {}}>
-              <View style={s.sheet}>
+              <View style={[s.sheet, { maxHeight: screen.height * 0.85 }]}>
                 <View style={s.sheetHandle} />
                 <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}>
 
@@ -957,7 +957,7 @@ export default function HomeScreen({ navigation }: Props) {
         <TouchableOpacity style={s.sheetBg} activeOpacity={1} onPress={() => setDetailTask(null)}>
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <TouchableOpacity activeOpacity={1} onPress={() => {}}>
-              <View style={s.sheet}>
+              <View style={[s.sheet, { maxHeight: screen.height * 0.85 }]}>
                 <View style={s.sheetHandle} />
                 <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}>
                   {detailTask && (

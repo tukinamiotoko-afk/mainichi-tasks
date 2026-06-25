@@ -151,7 +151,7 @@ export default function NotificationScreen({ navigation }: Props) {
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
       <LinearGradient colors={GRAD.header} start={GRAD_START} end={GRAD_END} style={[s.headerCard, { paddingTop: insets.top + 12 }]}>
-        <Text style={s.headerTitle}>通知</Text>
+        <Text style={s.headerTitle}>設定</Text>
       </LinearGradient>
 
       <FlatList

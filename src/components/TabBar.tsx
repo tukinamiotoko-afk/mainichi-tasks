@@ -9,11 +9,11 @@ const TABS = [
   { name: 'Schedule', label: '予定', icon: '📅' },
   { name: 'Timer', label: 'タイマー', icon: '⏱️' },
   { name: 'Stats', label: '統計', icon: '📊' },
-  { name: 'Notifications', label: '通知', icon: '🔔' },
+  { name: 'Notifications', label: '設定', icon: '⚙️' },
 ] as const;
 
-// Selected tab uses a distinct (soft orange) color so it stands out from the blue UI.
-const ACTIVE_GRAD = ['#fdba74', '#fb923c'] as const;
+// Selected tab uses a distinct (soft green) color so it stands out from the blue UI.
+const ACTIVE_GRAD = ['#bbf7d0', '#86efac'] as const;
 
 type TabName = typeof TABS[number]['name'];
 
@@ -22,7 +22,7 @@ interface Props {
   navigation: { navigate: (screen: string) => void };
 }
 
-const C = { card: '#ffffff', border: '#dbeafe', active: '#9a3412', activeBar: '#f97316', inactive: '#94a3b8' };
+const C = { card: '#ffffff', border: '#dbeafe', active: '#166534', activeBar: '#22c55e', inactive: '#94a3b8' };
 
 export default function TabBar({ current, navigation }: Props) {
   const insets = useSafeAreaInsets();
