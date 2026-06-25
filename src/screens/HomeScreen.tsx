@@ -872,12 +872,8 @@ export default function HomeScreen({ navigation }: Props) {
                 ]}
                 {...panResponder.panHandlers}
               >
-              <TouchableOpacity
-                style={[s.checkBox, isDone && s.checkBoxDone]}
-                onPress={() => toggle(item.id)}
-                hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
-              >
-                {isDone && <Text style={s.checkMark}>✓</Text>}
+              <TouchableOpacity style={s.tagBtn} onPress={() => openDetail(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Text style={[s.tagIcon, !item.icon && s.tagIconEmpty]}>{item.icon ?? '🏷'}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={s.taskBody}
@@ -895,8 +891,12 @@ export default function HomeScreen({ navigation }: Props) {
                 </View>
                 {isDone && <View style={s.doneBadge}><Text style={s.doneBadgeText}>完了</Text></View>}
               </TouchableOpacity>
-              <TouchableOpacity style={s.tagBtn} onPress={() => openDetail(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Text style={[s.tagIcon, !item.icon && s.tagIconEmpty]}>{item.icon ?? '🏷'}</Text>
+              <TouchableOpacity
+                style={[s.checkBox, isDone && s.checkBoxDone]}
+                onPress={() => toggle(item.id)}
+                hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+              >
+                {isDone && <Text style={s.checkMark}>✓</Text>}
               </TouchableOpacity>
               </Animated.View>
             </View>
