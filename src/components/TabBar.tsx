@@ -13,7 +13,7 @@ const TABS = [
 ] as const;
 
 // Selected tab uses a distinct (soft orange) color so it stands out from the blue UI.
-const ACTIVE_GRAD = ['#fed7aa', '#fdba74'] as const;
+const ACTIVE_GRAD = ['#fdba74', '#fb923c'] as const;
 
 type TabName = typeof TABS[number]['name'];
 
