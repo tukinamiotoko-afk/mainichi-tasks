@@ -151,8 +151,10 @@ export default function HomeScreen({ navigation }: Props) {
   const [filterFreq, setFilterFreq] = useState<FilterFreq>('all');
   const [filterDue, setFilterDue] = useState<FilterDue>('all');
   const [sortKey, setSortKey] = useState<SortKey>('manual');
-  const [showFilters, setShowFilters] = useState(false);
-  const [showSort, setShowSort] = useState(false);
+  const [activePanel, setActivePanel] = useState<'filter' | 'sort' | null>(null);
+  const panelAnim = useRef(new Animated.Value(0)).current;
+  const lastPanelRef = useRef<'filter' | 'sort'>('filter');
+  if (activePanel) lastPanelRef.current = activePanel;
   const today = getToday();
 
   // Add task sheet draft
@@ -535,6 +537,10 @@ export default function HomeScreen({ navigation }: Props) {
     Animated.timing(progressAnim, { toValue: progress, duration: 450, useNativeDriver: false }).start();
   }, [progress, progressAnim]);
 
+  useEffect(() => {
+    Animated.timing(panelAnim, { toValue: activePanel ? 1 : 0, duration: 200, useNativeDriver: true }).start();
+  }, [activePanel, panelAnim]);
+
   const now = new Date();
   const dateLabel = `${now.getFullYear()}/${pad(now.getMonth() + 1)}/${pad(now.getDate())} (${WEEKDAYS[now.getDay()]})`;
 
@@ -718,70 +724,26 @@ export default function HomeScreen({ navigation }: Props) {
         </View>
       </LinearGradient>
 
+      {/* fixed section bar with toggles */}
+      <View style={s.sectionBar}>
+        <Text style={s.metaLabel}>チェックリスト</Text>
+        <View style={s.toggleRow}>
+          <TouchableOpacity style={[s.filterToggle, activePanel === 'filter' && s.filterToggleActive]} onPress={() => setActivePanel((p) => (p === 'filter' ? null : 'filter'))}>
+            <Text style={[s.filterToggleText, activePanel === 'filter' && s.filterToggleTextActive]}>絞り込み {activePanel === 'filter' ? '▲' : '▼'}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[s.filterToggle, activePanel === 'sort' && s.filterToggleActive]} onPress={() => setActivePanel((p) => (p === 'sort' ? null : 'sort'))}>
+            <Text style={[s.filterToggleText, activePanel === 'sort' && s.filterToggleTextActive]}>並び替え {activePanel === 'sort' ? '▲' : '▼'}</Text>
+          </TouchableOpacity>
+        </View>
+        {total > 0 && <Text style={s.stone}>{displayedTasks.length}/{total}件</Text>}
+      </View>
+
+      <View style={s.listWrap}>
       <FlatList
         data={displayedTasks}
         keyExtractor={(item) => String(item.id)}
         style={s.list}
         contentContainerStyle={{ padding: 16, gap: 10 }}
-        ListHeaderComponent={
-          <View style={s.listHeader}>
-            <View style={s.sectionBar}>
-              <Text style={s.metaLabel}>チェックリスト</Text>
-              <View style={s.toggleRow}>
-                <TouchableOpacity style={[s.filterToggle, showFilters && s.filterToggleActive]} onPress={() => setShowFilters((v) => !v)}>
-                  <Text style={[s.filterToggleText, showFilters && s.filterToggleTextActive]}>絞り込み {showFilters ? '▲' : '▼'}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={[s.filterToggle, showSort && s.filterToggleActive]} onPress={() => setShowSort((v) => !v)}>
-                  <Text style={[s.filterToggleText, showSort && s.filterToggleTextActive]}>並び替え {showSort ? '▲' : '▼'}</Text>
-                </TouchableOpacity>
-              </View>
-              {total > 0 && <Text style={s.stone}>{displayedTasks.length}/{total}件</Text>}
-            </View>
-
-            {showFilters && (
-              <View style={s.filterPanel}>
-                <Text style={s.filterLabel}>状態</Text>
-                <View style={s.filterRow}>
-                  {STATUS_OPTS.map((o) => (
-                    <TouchableOpacity key={o.k} style={[s.fChip, filterStatus === o.k && s.fChipActive]} onPress={() => setFilterStatus(o.k)}>
-                      <Text style={[s.fChipText, filterStatus === o.k && s.fChipTextActive]}>{o.l}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-                <Text style={s.filterLabel}>頻度</Text>
-                <View style={s.filterRow}>
-                  {FREQ_OPTS.map((o) => (
-                    <TouchableOpacity key={o.k} style={[s.fChip, filterFreq === o.k && s.fChipActive]} onPress={() => setFilterFreq(o.k)}>
-                      <Text style={[s.fChipText, filterFreq === o.k && s.fChipTextActive]}>{o.l}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-                <Text style={s.filterLabel}>対象</Text>
-                <View style={s.filterRow}>
-                  {DUE_OPTS.map((o) => (
-                    <TouchableOpacity key={o.k} style={[s.fChip, filterDue === o.k && s.fChipActive]} onPress={() => setFilterDue(o.k)}>
-                      <Text style={[s.fChipText, filterDue === o.k && s.fChipTextActive]}>{o.l}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-            )}
-
-            {showSort && (
-              <View style={s.filterPanel}>
-                <Text style={s.filterLabel}>並べ替え</Text>
-                <View style={s.filterRow}>
-                  {SORT_OPTS.map((o) => (
-                    <TouchableOpacity key={o.k} style={[s.fChip, sortKey === o.k && s.fChipActive]} onPress={() => setSortKey(o.k)}>
-                      <Text style={[s.fChipText, sortKey === o.k && s.fChipTextActive]}>{o.l}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-                {!reorderEnabled && <Text style={s.filterHint}>※ この表示中はドラッグでの並び替えはできません（「手動」かつ絞り込み「すべて」で可能）</Text>}
-              </View>
-            )}
-          </View>
-        }
         ListEmptyComponent={
           <View style={s.empty}>
             <Text style={s.emptyTitle}>{total > 0 ? '該当なし' : 'タスクなし'}</Text>
@@ -872,6 +834,57 @@ export default function HomeScreen({ navigation }: Props) {
         }}
         ListFooterComponent={<View style={{ height: 80 }} />}
       />
+
+      {/* Slide-down filter / sort overlay (overlaps the list) */}
+      <Animated.View
+        pointerEvents={activePanel ? 'auto' : 'none'}
+        style={[s.panelOverlay, {
+          opacity: panelAnim,
+          transform: [{ translateY: panelAnim.interpolate({ inputRange: [0, 1], outputRange: [-16, 0] }) }],
+        }]}
+      >
+        {lastPanelRef.current === 'filter' ? (
+          <View style={s.filterPanel}>
+            <Text style={s.filterLabel}>状態</Text>
+            <View style={s.filterRow}>
+              {STATUS_OPTS.map((o) => (
+                <TouchableOpacity key={o.k} style={[s.fChip, filterStatus === o.k && s.fChipActive]} onPress={() => setFilterStatus(o.k)}>
+                  <Text style={[s.fChipText, filterStatus === o.k && s.fChipTextActive]}>{o.l}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={s.filterLabel}>頻度</Text>
+            <View style={s.filterRow}>
+              {FREQ_OPTS.map((o) => (
+                <TouchableOpacity key={o.k} style={[s.fChip, filterFreq === o.k && s.fChipActive]} onPress={() => setFilterFreq(o.k)}>
+                  <Text style={[s.fChipText, filterFreq === o.k && s.fChipTextActive]}>{o.l}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={s.filterLabel}>対象</Text>
+            <View style={s.filterRow}>
+              {DUE_OPTS.map((o) => (
+                <TouchableOpacity key={o.k} style={[s.fChip, filterDue === o.k && s.fChipActive]} onPress={() => setFilterDue(o.k)}>
+                  <Text style={[s.fChipText, filterDue === o.k && s.fChipTextActive]}>{o.l}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        ) : (
+          <View style={s.filterPanel}>
+            <Text style={s.filterLabel}>並べ替え</Text>
+            <View style={s.filterRow}>
+              {SORT_OPTS.map((o) => (
+                <TouchableOpacity key={o.k} style={[s.fChip, sortKey === o.k && s.fChipActive]} onPress={() => setSortKey(o.k)}>
+                  <Text style={[s.fChipText, sortKey === o.k && s.fChipTextActive]}>{o.l}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            {!reorderEnabled && <Text style={s.filterHint}>※ この表示中はドラッグでの並び替えはできません（「手動」かつ絞り込み「すべて」で可能）</Text>}
+          </View>
+        )}
+      </Animated.View>
+      </View>
 
       <TabBar current="Home" navigation={navigation} />
 
@@ -1091,6 +1104,8 @@ const s = StyleSheet.create({
   progressText: { color: '#ffffff', fontSize: 11, fontWeight: '700' },
 
   list: { flex: 1, backgroundColor: C.body },
+  listWrap: { flex: 1, position: 'relative' },
+  panelOverlay: { position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: 16, paddingTop: 8, zIndex: 20 },
   listHeader: { marginBottom: 4 },
   sectionBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   sectionRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
@@ -1101,7 +1116,7 @@ const s = StyleSheet.create({
   filterToggleActive: { backgroundColor: C.primary },
   filterToggleText: { color: C.primary, fontSize: 11, fontWeight: '800' },
   filterToggleTextActive: { color: C.onPrimary },
-  filterPanel: { backgroundColor: C.card, borderRadius: 12, borderWidth: 1, borderColor: C.border, padding: 12, marginTop: 8, gap: 6 },
+  filterPanel: { backgroundColor: C.card, borderRadius: 12, borderWidth: 1, borderColor: C.border, padding: 12, marginTop: 8, gap: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 10, elevation: 8 },
   filterLabel: { color: C.muted, fontSize: 10, fontWeight: '800', letterSpacing: 0.5, marginTop: 2 },
   filterRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   fChip: { borderWidth: 1, borderColor: C.border, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 5 },
