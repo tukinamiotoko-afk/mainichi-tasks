@@ -173,7 +173,7 @@ export default function HomeScreen({ navigation }: Props) {
   const [showAdd, setShowAdd] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newIcon, setNewIcon] = useState<string | null>(null);
-  const [newPriority, setNewPriority] = useState(1);
+  const [newPriority, setNewPriority] = useState(-1);
   const [newTime, setNewTime] = useState<string | null>(null);
   const [newNotify, setNewNotify] = useState(false);
   const [newNotifyType, setNewNotifyType] = useState<'push' | 'alarm'>('push');
@@ -247,7 +247,7 @@ export default function HomeScreen({ navigation }: Props) {
   const resetAddDraft = () => {
     setNewTitle('');
     setNewIcon(null);
-    setNewPriority(1);
+    setNewPriority(-1);
     setNewTime(null);
     setNewNotify(false);
     setNewNotifyType('push');
@@ -823,12 +823,22 @@ export default function HomeScreen({ navigation }: Props) {
                 shadowRadius: 10,
               }
             : null;
+          const priority = priorityMeta(item.priority);
           return (
             <View style={s.swipeWrap}>
               <Animated.View style={[s.swipeDeleteBg, swipeBgStyle]}>
                 <Text style={s.swipeDeleteText}>削除</Text>
               </Animated.View>
-              <Animated.View style={[s.taskCard, isDone && s.taskCardDone, swipeStyle, dragStyle]} {...panResponder.panHandlers}>
+              <Animated.View
+                style={[
+                  s.taskCard,
+                  { backgroundColor: priority.cardColor, borderColor: priority.borderColor },
+                  isDone && s.taskCardDone,
+                  swipeStyle,
+                  dragStyle,
+                ]}
+                {...panResponder.panHandlers}
+              >
               <TouchableOpacity
                 style={[s.checkBox, isDone && s.checkBoxDone]}
                 onPress={() => toggle(item.id)}
@@ -846,9 +856,6 @@ export default function HomeScreen({ navigation }: Props) {
                 <View style={s.taskTextWrap}>
                   <Text style={[s.taskTitle, isDone && s.taskTitleDone]} numberOfLines={2}>{item.title}</Text>
                   <View style={s.taskMetaRow}>
-                    <View style={[s.priorityBadge, { backgroundColor: priorityMeta(item.priority).color }]}>
-                      <Text style={s.priorityBadgeText}>{priorityMeta(item.priority).label}</Text>
-                    </View>
                     {item.scheduled_time && <Text style={s.scheduleTag}>{item.notify ? '🔔 ' : ''}{item.scheduled_time}</Text>}
                     <Text style={s.freqTag}>{frequencyLabel(item)}</Text>
                   </View>
@@ -1178,7 +1185,7 @@ const s = StyleSheet.create({
   },
   swipeDeleteText: { color: '#ffffff', fontSize: 14, fontWeight: '800', letterSpacing: 1 },
   taskCard: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: C.card, borderRadius: 12,
+    flexDirection: 'row', alignItems: 'center', backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 12,
     paddingHorizontal: 14, paddingVertical: 14, gap: 12,
     shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2,
   },

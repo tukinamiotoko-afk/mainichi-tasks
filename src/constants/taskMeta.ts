@@ -5,17 +5,18 @@ export const TASK_ICONS = [
   '🧹', '🛏️', '☀️', '🌙', '✏️', '🎯', '💰', '🐶',
 ];
 
-export type PriorityMeta = { value: number; label: string; color: string };
+export type PriorityMeta = { value: number; label: string; color: string; cardColor: string; borderColor: string };
 
 // Higher value = higher priority. Sorted high → low for display.
 export const PRIORITIES: PriorityMeta[] = [
-  { value: 2, label: '高', color: '#ef4444' },
-  { value: 1, label: '中', color: '#f59e0b' },
-  { value: 0, label: '低', color: '#94a3b8' },
+  { value: 2, label: '高', color: '#dc2626', cardColor: '#fee2e2', borderColor: '#fca5a5' },
+  { value: 1, label: '中', color: '#d97706', cardColor: '#fef3c7', borderColor: '#fbbf24' },
+  { value: 0, label: '低', color: '#2563eb', cardColor: '#dbeafe', borderColor: '#93c5fd' },
+  { value: -1, label: 'なし', color: '#94a3b8', cardColor: '#ffffff', borderColor: '#dbeafe' },
 ];
 
 export function priorityMeta(value: number): PriorityMeta {
-  return PRIORITIES.find((p) => p.value === value) ?? PRIORITIES[1];
+  return PRIORITIES.find((p) => p.value === value) ?? PRIORITIES[3];
 }
 
 export const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
