@@ -1185,7 +1185,7 @@ const s = StyleSheet.create({
   listWrap: { flex: 1, position: 'relative' },
   panelOverlay: { position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: 16, paddingTop: 14, zIndex: 20 },
   listHeader: { marginBottom: 4 },
-  sectionBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  sectionBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 10, paddingBottom: 4 },
   sectionRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   metaLabel: { color: C.muted, fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
   stone: { color: C.stone, fontSize: 11, fontWeight: '700' },
