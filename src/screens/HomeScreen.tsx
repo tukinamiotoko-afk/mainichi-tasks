@@ -496,43 +496,57 @@ export default function HomeScreen({ navigation }: Props) {
     });
   };
 
-  const createTaskPanResponder = (task: Task, index: number) => PanResponder.create({
+  const createTaskPanResponder = (taskId: number) => PanResponder.create({
     onStartShouldSetPanResponder: () => false,
     onMoveShouldSetPanResponder: (_, gesture) => {
-      if (dragState.current.taskId === task.id) return true;
+      if (dragState.current.taskId === taskId) return true;
       return Math.abs(gesture.dx) > 18 && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.4;
     },
     onPanResponderGrant: () => {
-      if (dragState.current.taskId !== task.id) {
-        swipeState.current.taskId = task.id;
-        setSwipingId(task.id);
+      if (dragState.current.taskId !== taskId) {
+        swipeState.current.taskId = taskId;
+        setSwipingId(taskId);
         swipeAnim.setValue(0);
       }
     },
-    onPanResponderTerminationRequest: () => dragState.current.taskId !== task.id,
+    onPanResponderTerminationRequest: () => dragState.current.taskId !== taskId,
     onPanResponderMove: (_, gesture) => {
-      if (dragState.current.taskId === task.id) {
+      if (dragState.current.taskId === taskId) {
         updateDrag(gesture.dy);
         return;
       }
       swipeAnim.setValue(Math.max(-220, Math.min(220, gesture.dx)));
     },
     onPanResponderRelease: (_, gesture) => {
-      if (dragState.current.taskId === task.id) {
+      if (dragState.current.taskId === taskId) {
         endDrag();
         return;
       }
       if (Math.abs(gesture.dx) >= SWIPE_DELETE_THRESHOLD) {
-        confirmSwipeDelete(task, gesture.dx);
+        const task = tasksRef.current.find((t) => t.id === taskId);
+        if (task) confirmSwipeDelete(task, gesture.dx);
+        else resetSwipe();
       } else {
         resetSwipe();
       }
     },
     onPanResponderTerminate: () => {
-      if (dragState.current.taskId === task.id) endDrag();
+      if (dragState.current.taskId === taskId) endDrag();
       resetSwipe();
     },
   });
+
+  // Cache pan responders by task id so re-renders during a drag don't swap the
+  // active responder (which would interrupt continuous reordering).
+  const panResponders = useRef<Map<number, ReturnType<typeof PanResponder.create>>>(new Map());
+  const getPanResponder = (taskId: number) => {
+    let pr = panResponders.current.get(taskId);
+    if (!pr) {
+      pr = createTaskPanResponder(taskId);
+      panResponders.current.set(taskId, pr);
+    }
+    return pr;
+  };
   const clampFab = (x: number, y: number) => ({
     x: Math.max(8, Math.min(x, screen.width - 60)),
     y: Math.max(100, Math.min(y, screen.height - insets.bottom - 124)),
@@ -815,7 +829,7 @@ export default function HomeScreen({ navigation }: Props) {
         }
         renderItem={({ item, index }) => {
           const isDone = completedIds.has(item.id);
-          const panResponder = createTaskPanResponder(item, index);
+          const panResponder = getPanResponder(item.id);
           const isDragging = activeDragId === item.id;
           const swipeStyle = swipingId === item.id
             ? {
