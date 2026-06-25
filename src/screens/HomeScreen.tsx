@@ -1183,7 +1183,7 @@ const s = StyleSheet.create({
 
   list: { flex: 1, backgroundColor: C.body },
   listWrap: { flex: 1, position: 'relative' },
-  panelOverlay: { position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: 16, paddingTop: 8, zIndex: 20 },
+  panelOverlay: { position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: 16, paddingTop: 14, zIndex: 20 },
   listHeader: { marginBottom: 4 },
   sectionBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   sectionRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
