@@ -223,8 +223,10 @@ export default function StatsScreen({ navigation }: Props) {
               <TouchableOpacity style={s.dateBtn} onPress={() => setShowEndPicker(true)}>
                 <Text style={s.dateBtnText}>{toDateString(customEnd)}</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={s.applyBtn} onPress={loadRates}>
-                <Text style={s.applyBtnText}>適用</Text>
+              <TouchableOpacity onPress={loadRates} activeOpacity={0.85}>
+                <LinearGradient colors={GRAD.brand} start={GRAD_START} end={GRAD_END} style={s.applyBtn}>
+                  <Text style={s.applyBtnText}>適用</Text>
+                </LinearGradient>
               </TouchableOpacity>
             </View>
           )}
@@ -279,7 +281,7 @@ export default function StatsScreen({ navigation }: Props) {
                 <View key={task.id} style={[s.calCard, { width: cardW }]}>
                   <View style={s.calHeader}>
                     <Text style={s.calTitle} numberOfLines={1}>{task.icon ? `${task.icon} ` : ''}{task.title}</Text>
-                    <View style={s.countBadge}><Text style={s.countText}>{count}</Text></View>
+                    <LinearGradient colors={GRAD.brand} start={GRAD_START} end={GRAD_END} style={s.countBadge}><Text style={s.countText}>{count}</Text></LinearGradient>
                   </View>
                   <View style={s.weekRow}>
                     {WEEKDAYS.map((w, i) => (

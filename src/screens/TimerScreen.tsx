@@ -383,11 +383,15 @@ export default function TimerScreen({ navigation }: Props) {
                   onEndEditing={applyCustomMinutes}
                 />
                 <Text style={s.customUnit}>分</Text>
-                <TouchableOpacity style={[s.smallBtn, running && s.modeChipDisabled]} onPress={applyCustomMinutes} disabled={running}>
-                  <Text style={s.smallBtnText}>反映</Text>
+                <TouchableOpacity onPress={applyCustomMinutes} disabled={running} activeOpacity={0.85}>
+                  <LinearGradient colors={GRAD.brand} start={GRAD_START} end={GRAD_END} style={[s.smallBtn, running && s.modeChipDisabled]}>
+                    <Text style={s.smallBtnText}>反映</Text>
+                  </LinearGradient>
                 </TouchableOpacity>
-                <TouchableOpacity style={[s.smallBtn, running && s.modeChipDisabled]} onPress={saveCurrentTargetForTask} disabled={running}>
-                  <Text style={s.smallBtnText}>保存</Text>
+                <TouchableOpacity onPress={saveCurrentTargetForTask} disabled={running} activeOpacity={0.85}>
+                  <LinearGradient colors={GRAD.brand} start={GRAD_START} end={GRAD_END} style={[s.smallBtn, running && s.modeChipDisabled]}>
+                    <Text style={s.smallBtnText}>保存</Text>
+                  </LinearGradient>
                 </TouchableOpacity>
               </View>
               <View style={s.presetRow}>

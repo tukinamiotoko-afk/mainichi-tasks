@@ -167,8 +167,10 @@ export default function NotificationScreen({ navigation }: Props) {
                   <Text style={s.typeLabel}>今日のタイマー記録</Text>
                   <Text style={s.timerTotal}>{formatDuration(totalSeconds)}</Text>
                 </View>
-                <TouchableOpacity style={s.timerBtn} onPress={() => navigation.navigate('Timer')}>
-                  <Text style={s.timerBtnText}>開く</Text>
+                <TouchableOpacity onPress={() => navigation.navigate('Timer')} activeOpacity={0.85}>
+                  <LinearGradient colors={GRAD.brand} start={GRAD_START} end={GRAD_END} style={s.timerBtn}>
+                    <Text style={s.timerBtnText}>開く</Text>
+                  </LinearGradient>
                 </TouchableOpacity>
               </View>
               {timeLogs.length === 0 ? (

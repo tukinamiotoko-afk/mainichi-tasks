@@ -1066,8 +1066,10 @@ export default function HomeScreen({ navigation }: Props) {
               <TouchableOpacity style={s.timeCancelBtn} onPress={() => setTimePickerFor(null)}>
                 <Text style={s.timeCancelText}>キャンセル</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={s.timeConfirmBtn} onPress={confirmTime}>
-                <Text style={s.timeConfirmText}>決定</Text>
+              <TouchableOpacity style={s.timeConfirmBtnWrap} onPress={confirmTime} activeOpacity={0.85}>
+                <LinearGradient colors={GRAD.brand} start={GRAD_START} end={GRAD_END} style={s.timeConfirmBtn}>
+                  <Text style={s.timeConfirmText}>決定</Text>
+                </LinearGradient>
               </TouchableOpacity>
             </View>
           </View>
@@ -1223,7 +1225,8 @@ const s = StyleSheet.create({
   timeBtnRow: { flexDirection: 'row', gap: 10, alignSelf: 'stretch', marginTop: 4 },
   timeCancelBtn: { flex: 1, borderWidth: 1, borderColor: C.border, borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
   timeCancelText: { color: C.stone, fontSize: 14, fontWeight: '700' },
-  timeConfirmBtn: { flex: 1, backgroundColor: C.primary, borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
+  timeConfirmBtnWrap: { flex: 1 },
+  timeConfirmBtn: { borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
   timeConfirmText: { color: C.onPrimary, fontSize: 14, fontWeight: '700' },
 
   thumbOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },

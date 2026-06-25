@@ -1,6 +1,8 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { GRAD, GRAD_START, GRAD_END } from '../constants/theme';
 
 const TABS = [
   { name: 'Home', label: 'タスク', icon: '✓' },
@@ -31,6 +33,7 @@ export default function TabBar({ current, navigation }: Props) {
             style={[s.tabItem, active && s.tabItemActive]}
             onPress={() => { if (!active) navigation.navigate(name); }}
           >
+            {active && <LinearGradient colors={GRAD.brand} start={GRAD_START} end={GRAD_END} style={StyleSheet.absoluteFill} />}
             <Text style={[s.tabIcon, active && s.tabIconActive]}>{icon}</Text>
             <Text style={[s.tabLabel, active && s.tabLabelActive]} numberOfLines={1}>{label}</Text>
           </TouchableOpacity>
@@ -47,8 +50,8 @@ const s = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: C.border,
   },
-  tabItem: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 2, paddingTop: 4 },
-  tabItemActive: { borderTopWidth: 3, borderTopColor: C.activeBar, backgroundColor: C.activeBg },
+  tabItem: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 2, paddingTop: 4, overflow: 'hidden' },
+  tabItemActive: { borderTopWidth: 3, borderTopColor: C.activeBar },
   tabIcon: { color: C.inactive, fontSize: 16, fontWeight: '700' },
   tabIconActive: { color: C.active },
   tabLabel: { color: C.inactive, fontSize: 9, fontWeight: '700' },
