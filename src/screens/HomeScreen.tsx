@@ -138,6 +138,24 @@ async function rescheduleTask(task: Schedulable): Promise<string | null> {
   return ids.length ? ids.join(',') : null;
 }
 
+// Each option fades up on mount, staggered by index, so the list "floats up".
+function RiseIn({ index, style, children }: { index: number; style?: any; children: React.ReactNode }) {
+  const anim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(anim, {
+      toValue: 1,
+      duration: 260,
+      delay: Math.min(index, 14) * 35,
+      useNativeDriver: true,
+    }).start();
+  }, [anim, index]);
+  return (
+    <Animated.View style={[style, { opacity: anim, transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }] }]}>
+      {children}
+    </Animated.View>
+  );
+}
+
 export default function HomeScreen({ navigation }: Props) {
   const db = useSQLiteContext();
   const insets = useSafeAreaInsets();
@@ -665,14 +683,15 @@ export default function HomeScreen({ navigation }: Props) {
       {openPicker === 'freq' && (
         <View style={s.freqPanel}>
       <View style={s.freqTypeRow}>
-        {FREQ_TYPES.map((ft) => (
-          <TouchableOpacity
-            key={ft.value}
-            style={[s.freqTypeChip, freqType === ft.value && s.freqTypeChipActive]}
-            onPress={() => { animateNext(); on.setType(ft.value); }}
-          >
-            <Text style={[s.freqTypeText, freqType === ft.value && s.freqTypeTextActive]}>{ft.label}</Text>
-          </TouchableOpacity>
+        {FREQ_TYPES.map((ft, i) => (
+          <RiseIn key={ft.value} index={i}>
+            <TouchableOpacity
+              style={[s.freqTypeChip, freqType === ft.value && s.freqTypeChipActive]}
+              onPress={() => { animateNext(); on.setType(ft.value); }}
+            >
+              <Text style={[s.freqTypeText, freqType === ft.value && s.freqTypeTextActive]}>{ft.label}</Text>
+            </TouchableOpacity>
+          </RiseIn>
         ))}
       </View>
 
@@ -765,13 +784,17 @@ export default function HomeScreen({ navigation }: Props) {
       </TouchableOpacity>
       {openPicker === 'icon' && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.iconRow}>
-          <TouchableOpacity style={[s.iconChip, icon === null && s.iconChipActive]} onPress={() => { onIcon(null); animateNext(); setOpenPicker(null); }}>
-            <Text style={s.iconNone}>なし</Text>
-          </TouchableOpacity>
-          {TASK_ICONS.map((ic) => (
-            <TouchableOpacity key={ic} style={[s.iconChip, icon === ic && s.iconChipActive]} onPress={() => { onIcon(ic); animateNext(); setOpenPicker(null); }}>
-              <Text style={s.iconEmoji}>{ic}</Text>
+          <RiseIn index={0}>
+            <TouchableOpacity style={[s.iconChip, icon === null && s.iconChipActive]} onPress={() => { onIcon(null); animateNext(); setOpenPicker(null); }}>
+              <Text style={s.iconNone}>なし</Text>
             </TouchableOpacity>
+          </RiseIn>
+          {TASK_ICONS.map((ic, i) => (
+            <RiseIn key={ic} index={i + 1}>
+              <TouchableOpacity style={[s.iconChip, icon === ic && s.iconChipActive]} onPress={() => { onIcon(ic); animateNext(); setOpenPicker(null); }}>
+                <Text style={s.iconEmoji}>{ic}</Text>
+              </TouchableOpacity>
+            </RiseIn>
           ))}
         </ScrollView>
       )}
@@ -790,14 +813,15 @@ export default function HomeScreen({ navigation }: Props) {
       </TouchableOpacity>
       {openPicker === 'priority' && (
         <View style={s.typeRow}>
-          {PRIORITIES.map((p) => (
-            <TouchableOpacity
-              key={p.value}
-              style={[s.typeChip, priority === p.value && { backgroundColor: p.color, borderColor: p.color }]}
-              onPress={() => { onPriority(p.value); animateNext(); setOpenPicker(null); }}
-            >
-              <Text style={[s.typeChipText, priority === p.value && s.typeChipTextActive]}>{p.label}</Text>
-            </TouchableOpacity>
+          {PRIORITIES.map((p, i) => (
+            <RiseIn key={p.value} index={i} style={{ flex: 1 }}>
+              <TouchableOpacity
+                style={[s.typeChip, priority === p.value && { backgroundColor: p.color, borderColor: p.color }]}
+                onPress={() => { onPriority(p.value); animateNext(); setOpenPicker(null); }}
+              >
+                <Text style={[s.typeChipText, priority === p.value && s.typeChipTextActive]}>{p.label}</Text>
+              </TouchableOpacity>
+            </RiseIn>
           ))}
         </View>
       )}
@@ -1082,6 +1106,11 @@ export default function HomeScreen({ navigation }: Props) {
             <TouchableOpacity activeOpacity={1} onPress={() => {}}>
               <View style={[s.sheet, { maxHeight: screen.height * 0.85 }]}>
                 <View style={s.sheetHandle} />
+                {detailTask && (
+                  <TouchableOpacity style={s.sheetDeleteBtn} onPress={() => handleDelete(detailTask)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Text style={s.sheetDeleteText}>🗑 削除</Text>
+                  </TouchableOpacity>
+                )}
                 <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}>
                   {detailTask && (
                     <>
@@ -1289,9 +1318,11 @@ const s = StyleSheet.create({
   fab: { width: 52, height: 52, borderRadius: 26, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.25, shadowRadius: 6 },
   fabText: { color: C.onPrimary, fontSize: 26, fontWeight: '400', lineHeight: 30 },
 
-  sheetBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  sheetBg: { flex: 1, backgroundColor: 'transparent', justifyContent: 'flex-end' },
   sheet: { backgroundColor: C.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingTop: 12, gap: 8, maxHeight: '88%' },
   sheetHandle: { width: 40, height: 4, backgroundColor: C.border, borderRadius: 2, alignSelf: 'center', marginBottom: 12 },
+  sheetDeleteBtn: { position: 'absolute', top: 10, right: 14, backgroundColor: '#fee2e2', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 6, zIndex: 10 },
+  sheetDeleteText: { color: '#dc2626', fontSize: 12, fontWeight: '800' },
   sheetSection: { color: C.muted, fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
   sheetTitleRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   sheetTitleInput: { flex: 1, borderWidth: 1, borderColor: C.border, borderRadius: 10, padding: 12, fontSize: 15, color: C.onDark, backgroundColor: C.body },
