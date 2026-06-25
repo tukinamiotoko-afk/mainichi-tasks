@@ -581,6 +581,9 @@ export default function HomeScreen({ navigation }: Props) {
 
   // ── Reusable editor sections ────────────────────────────────────────────
 
+  // Animate the expand/collapse of the icon/priority/frequency option panels.
+  const animateNext = () => LayoutAnimation.configureNext(LayoutAnimation.create(220, LayoutAnimation.Types.easeInEaseOut, LayoutAnimation.Properties.opacity));
+
   const renderSchedule = (
     time: string | null,
     notify: boolean,
@@ -650,7 +653,7 @@ export default function HomeScreen({ navigation }: Props) {
       <Text style={[s.sheetSection, { marginTop: 16 }]}>頻度</Text>
       <TouchableOpacity
         style={s.metaSelectBtn}
-        onPress={() => setOpenPicker(openPicker === 'freq' ? null : 'freq')}
+        onPress={() => { animateNext(); setOpenPicker(openPicker === 'freq' ? null : 'freq'); }}
         activeOpacity={0.8}
       >
         <View style={s.metaSelectLeft}>
@@ -666,7 +669,7 @@ export default function HomeScreen({ navigation }: Props) {
           <TouchableOpacity
             key={ft.value}
             style={[s.freqTypeChip, freqType === ft.value && s.freqTypeChipActive]}
-            onPress={() => on.setType(ft.value)}
+            onPress={() => { animateNext(); on.setType(ft.value); }}
           >
             <Text style={[s.freqTypeText, freqType === ft.value && s.freqTypeTextActive]}>{ft.label}</Text>
           </TouchableOpacity>
@@ -751,7 +754,7 @@ export default function HomeScreen({ navigation }: Props) {
       <Text style={[s.sheetSection, { marginTop: 16 }]}>アイコン</Text>
       <TouchableOpacity
         style={s.metaSelectBtn}
-        onPress={() => setOpenPicker(openPicker === 'icon' ? null : 'icon')}
+        onPress={() => { animateNext(); setOpenPicker(openPicker === 'icon' ? null : 'icon'); }}
         activeOpacity={0.8}
       >
         <View style={s.metaSelectLeft}>
@@ -762,11 +765,11 @@ export default function HomeScreen({ navigation }: Props) {
       </TouchableOpacity>
       {openPicker === 'icon' && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.iconRow}>
-          <TouchableOpacity style={[s.iconChip, icon === null && s.iconChipActive]} onPress={() => { onIcon(null); setOpenPicker(null); }}>
+          <TouchableOpacity style={[s.iconChip, icon === null && s.iconChipActive]} onPress={() => { onIcon(null); animateNext(); setOpenPicker(null); }}>
             <Text style={s.iconNone}>なし</Text>
           </TouchableOpacity>
           {TASK_ICONS.map((ic) => (
-            <TouchableOpacity key={ic} style={[s.iconChip, icon === ic && s.iconChipActive]} onPress={() => { onIcon(ic); setOpenPicker(null); }}>
+            <TouchableOpacity key={ic} style={[s.iconChip, icon === ic && s.iconChipActive]} onPress={() => { onIcon(ic); animateNext(); setOpenPicker(null); }}>
               <Text style={s.iconEmoji}>{ic}</Text>
             </TouchableOpacity>
           ))}
@@ -776,7 +779,7 @@ export default function HomeScreen({ navigation }: Props) {
       <Text style={[s.sheetSection, { marginTop: 16 }]}>優先度</Text>
       <TouchableOpacity
         style={s.metaSelectBtn}
-        onPress={() => setOpenPicker(openPicker === 'priority' ? null : 'priority')}
+        onPress={() => { animateNext(); setOpenPicker(openPicker === 'priority' ? null : 'priority'); }}
         activeOpacity={0.8}
       >
         <View style={s.metaSelectLeft}>
@@ -791,7 +794,7 @@ export default function HomeScreen({ navigation }: Props) {
             <TouchableOpacity
               key={p.value}
               style={[s.typeChip, priority === p.value && { backgroundColor: p.color, borderColor: p.color }]}
-              onPress={() => { onPriority(p.value); setOpenPicker(null); }}
+              onPress={() => { onPriority(p.value); animateNext(); setOpenPicker(null); }}
             >
               <Text style={[s.typeChipText, priority === p.value && s.typeChipTextActive]}>{p.label}</Text>
             </TouchableOpacity>
