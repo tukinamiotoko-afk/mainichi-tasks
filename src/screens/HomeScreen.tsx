@@ -151,7 +151,7 @@ export default function HomeScreen({ navigation }: Props) {
   const fabStartPosition = useRef(fabPosition.current);
   const fabAnim = useRef(new Animated.ValueXY(fabPosition.current)).current;
   const [activeDragId, setActiveDragId] = useState<number | null>(null);
-  const dragState = useRef({ taskId: null as number | null, currentIndex: 0, anchorDy: 0, changed: false });
+  const dragState = useRef({ taskId: null as number | null, startIndex: 0, currentIndex: 0, changed: false });
   const dragY = useRef(new Animated.Value(0)).current;
   const dragScale = useRef(new Animated.Value(1)).current;
   const swipeState = useRef({ taskId: null as number | null });
@@ -447,7 +447,7 @@ export default function HomeScreen({ navigation }: Props) {
     setSwipingId(null);
     swipeAnim.setValue(0);
     setActiveDragId(taskId);
-    dragState.current = { taskId, currentIndex: index, anchorDy: 0, changed: false };
+    dragState.current = { taskId, startIndex: index, currentIndex: index, changed: false };
     dragY.setValue(0);
     Animated.spring(dragScale, {
       toValue: 1.04,
@@ -458,22 +458,20 @@ export default function HomeScreen({ navigation }: Props) {
   };
 
   const updateDrag = (dy: number) => {
-    const { taskId, currentIndex, anchorDy } = dragState.current;
+    const { taskId, startIndex, currentIndex } = dragState.current;
     if (taskId == null) return;
-    const relativeDy = dy - anchorDy;
-    dragY.setValue(Math.max(-DRAG_ROW_HEIGHT * 0.75, Math.min(DRAG_ROW_HEIGHT * 0.75, relativeDy)));
-    const nextIndex = Math.max(0, Math.min(currentIndex + Math.round(relativeDy / DRAG_ROW_HEIGHT), tasksRef.current.length - 1));
+    const nextIndex = Math.max(0, Math.min(startIndex + Math.round(dy / DRAG_ROW_HEIGHT), tasksRef.current.length - 1));
+    const visualDy = dy - (nextIndex - startIndex) * DRAG_ROW_HEIGHT;
+    dragY.setValue(Math.max(-DRAG_ROW_HEIGHT * 0.9, Math.min(DRAG_ROW_HEIGHT * 0.9, visualDy)));
     if (nextIndex !== currentIndex) {
       moveTask(taskId, nextIndex);
       dragState.current.currentIndex = nextIndex;
-      dragState.current.anchorDy = dy;
-      dragY.setValue(0);
     }
   };
 
   const endDrag = () => {
     if (dragState.current.changed) persistTaskOrder();
-    dragState.current = { taskId: null, currentIndex: 0, anchorDy: 0, changed: false };
+    dragState.current = { taskId: null, startIndex: 0, currentIndex: 0, changed: false };
     setActiveDragId(null);
     Animated.parallel([
       Animated.spring(dragY, { toValue: 0, useNativeDriver: true, tension: 220, friction: 14 }),
