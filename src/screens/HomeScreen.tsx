@@ -1082,39 +1082,44 @@ export default function HomeScreen({ navigation }: Props) {
                 ]}
                 {...panResponder.panHandlers}
               >
-              {!tagRight && (
-                <TouchableOpacity style={s.tagBtn} onPress={() => openDetail(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <Text style={[s.tagIcon, !item.icon && s.tagIconEmpty]}>{item.icon ?? '🏷'}</Text>
-                </TouchableOpacity>
-              )}
-              <TouchableOpacity
-                style={s.taskBody}
-                onPress={() => openDetail(item)}
-                onLongPress={reorderEnabled ? () => startDrag(item.id, index) : undefined}
-                delayLongPress={250}
-                activeOpacity={0.7}
-              >
-                <View style={s.taskTextWrap}>
-                  <Text style={[s.taskTitle, isDone && s.taskTitleDone]} numberOfLines={2}>{item.title}</Text>
-                  <View style={s.taskMetaRow}>
-                    {item.scheduled_time && <Text style={s.scheduleTag}>{item.notify ? '🔔 ' : ''}{item.scheduled_time}</Text>}
-                    <Text style={s.freqTag}>{frequencyLabel(item)}</Text>
-                  </View>
-                </View>
-                {isDone && <View style={s.doneBadge}><Text style={s.doneBadgeText}>完了</Text></View>}
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[s.checkBox, isDone && s.checkBoxDone]}
-                onPress={() => toggle(item.id)}
-                hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
-              >
-                {isDone && <Text style={s.checkMark}>✓</Text>}
-              </TouchableOpacity>
-              {tagRight && (
-                <TouchableOpacity style={s.tagBtn} onPress={() => openDetail(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <Text style={[s.tagIcon, !item.icon && s.tagIconEmpty]}>{item.icon ?? '🏷'}</Text>
-                </TouchableOpacity>
-              )}
+              {(() => {
+                const tagEl = (
+                  <TouchableOpacity style={s.tagBtn} onPress={() => openDetail(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Text style={[s.tagIcon, !item.icon && s.tagIconEmpty]}>{item.icon ?? '🏷'}</Text>
+                  </TouchableOpacity>
+                );
+                const checkEl = (
+                  <TouchableOpacity
+                    style={[s.checkBox, isDone && s.checkBoxDone]}
+                    onPress={() => toggle(item.id)}
+                    hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+                  >
+                    {isDone && <Text style={s.checkMark}>✓</Text>}
+                  </TouchableOpacity>
+                );
+                return (
+                  <>
+                    {tagRight ? checkEl : tagEl}
+                    <TouchableOpacity
+                      style={s.taskBody}
+                      onPress={() => openDetail(item)}
+                      onLongPress={reorderEnabled ? () => startDrag(item.id, index) : undefined}
+                      delayLongPress={250}
+                      activeOpacity={0.7}
+                    >
+                      <View style={s.taskTextWrap}>
+                        <Text style={[s.taskTitle, isDone && s.taskTitleDone]} numberOfLines={2}>{item.title}</Text>
+                        <View style={s.taskMetaRow}>
+                          {item.scheduled_time && <Text style={s.scheduleTag}>{item.notify ? '🔔 ' : ''}{item.scheduled_time}</Text>}
+                          <Text style={s.freqTag}>{frequencyLabel(item)}</Text>
+                        </View>
+                      </View>
+                      {isDone && <View style={s.doneBadge}><Text style={s.doneBadgeText}>完了</Text></View>}
+                    </TouchableOpacity>
+                    {tagRight ? tagEl : checkEl}
+                  </>
+                );
+              })()}
               </Animated.View>
             </View>
           );
