@@ -783,7 +783,7 @@ export default function HomeScreen({ navigation }: Props) {
         <Text style={s.metaSelectArrow}>{openPicker === 'icon' ? '▲' : '▼'}</Text>
       </TouchableOpacity>
       {openPicker === 'icon' && (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.iconRow}>
+        <View style={s.iconGrid}>
           <RiseIn index={0}>
             <TouchableOpacity style={[s.iconChip, icon === null && s.iconChipActive]} onPress={() => { onIcon(null); animateNext(); setOpenPicker(null); }}>
               <Text style={s.iconNone}>なし</Text>
@@ -796,7 +796,7 @@ export default function HomeScreen({ navigation }: Props) {
               </TouchableOpacity>
             </RiseIn>
           ))}
-        </ScrollView>
+        </View>
       )}
 
       <Text style={[s.sheetSection, { marginTop: 16 }]}>優先度</Text>
@@ -1357,7 +1357,7 @@ const s = StyleSheet.create({
   metaSelectText: { color: C.onDark, fontSize: 13, fontWeight: '700' },
   metaSelectArrow: { color: C.muted, fontSize: 11, fontWeight: '800' },
   prioritySwatch: { width: 28, height: 20, borderRadius: 7, borderWidth: 1 },
-  iconRow: { gap: 8, paddingVertical: 2 },
+  iconGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingVertical: 6 },
   iconChip: { width: 44, height: 44, borderRadius: 12, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
   iconChipActive: { backgroundColor: '#eff6ff', borderColor: C.primary },
   iconEmoji: { fontSize: 22 },
