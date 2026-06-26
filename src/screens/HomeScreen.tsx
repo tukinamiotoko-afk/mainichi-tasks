@@ -1523,7 +1523,7 @@ const s = StyleSheet.create({
   fabText: { color: C.onPrimary, fontSize: 26, fontWeight: '400', lineHeight: 30 },
 
   sheetBg: { flex: 1, backgroundColor: 'transparent', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: C.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingTop: 12, gap: 8, maxHeight: '88%' },
+  sheet: { backgroundColor: '#eff4ff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingTop: 12, gap: 8, maxHeight: '88%' },
   sheetHandle: { width: 40, height: 4, backgroundColor: C.border, borderRadius: 2, alignSelf: 'center', marginBottom: 12 },
   sheetDeleteBtn: { position: 'absolute', top: 10, right: 14, backgroundColor: '#fee2e2', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 6, zIndex: 10 },
   sheetDeleteText: { color: '#dc2626', fontSize: 12, fontWeight: '800' },
@@ -1600,7 +1600,7 @@ const s = StyleSheet.create({
 
   calHint: { fontSize: 12, color: '#64748b', marginTop: 6, marginBottom: 2 },
   freqModalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end' },
-  freqModalCard: { backgroundColor: '#ffffff', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 8 },
+  freqModalCard: { backgroundColor: '#e8f0fe', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 8 },
   freqModalHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
   freqModalTitle: { fontSize: 16, fontWeight: '800', color: C.muted },
   freqModalDone: { fontSize: 15, fontWeight: '800', color: C.primary },
