@@ -175,11 +175,12 @@ function bounce(v: Animated.Value) {
   ]).start();
 }
 
-// A chip that bounces when tapped.
-function PulseChip({ onPress, style, children }: { onPress: () => void; style?: any; children: React.ReactNode }) {
+// A chip that bounces when tapped. `wrapStyle` lets the animated wrapper carry
+// layout props (e.g. flex) so the chip keeps its sizing inside flex rows.
+function PulseChip({ onPress, style, wrapStyle, children }: { onPress: () => void; style?: any; wrapStyle?: any; children: React.ReactNode }) {
   const scale = useRef(new Animated.Value(1)).current;
   return (
-    <Animated.View style={{ transform: [{ scale }] }}>
+    <Animated.View style={[wrapStyle, { transform: [{ scale }] }]}>
       <TouchableOpacity style={style} onPress={() => { bounce(scale); onPress(); }} activeOpacity={0.8}>
         {children}
       </TouchableOpacity>
@@ -858,6 +859,7 @@ export default function HomeScreen({ navigation }: Props) {
             return (
               <PulseChip
                 key={w}
+                wrapStyle={{ flex: 1 }}
                 style={[s.dayChip, active && s.dayChipActive, i === 0 && s.daySun, i === 6 && s.daySat]}
                 onPress={() => on.toggleDay(i)}
               >
@@ -874,6 +876,7 @@ export default function HomeScreen({ navigation }: Props) {
             {NTH_WEEKS.map((w) => (
               <PulseChip
                 key={w.value}
+                wrapStyle={{ flex: 1 }}
                 style={[s.weekChip, week === w.value && s.weekChipActive]}
                 onPress={() => on.setWeek(w.value)}
               >
@@ -887,6 +890,7 @@ export default function HomeScreen({ navigation }: Props) {
               return (
                 <PulseChip
                   key={w}
+                  wrapStyle={{ flex: 1 }}
                   style={[s.dayChip, active && s.dayChipActive, i === 0 && s.daySun, i === 6 && s.daySat]}
                   onPress={() => on.setWeekday(i)}
                 >
