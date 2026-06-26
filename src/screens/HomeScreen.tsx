@@ -323,6 +323,13 @@ export default function HomeScreen({ navigation }: Props) {
   const lastPanelRef = useRef<'filter' | 'sort'>('filter');
   if (activePanel) lastPanelRef.current = activePanel;
   const today = getToday();
+  const [selectedDate, setSelectedDate] = useState(today);
+  const shiftSelected = (days: number) => {
+    const d = new Date(`${selectedDate}T00:00:00`);
+    d.setDate(d.getDate() + days);
+    setSelectedDate(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
+  };
+  const selDateObj = new Date(`${selectedDate}T00:00:00`);
 
   // Add task sheet draft
   const [showAdd, setShowAdd] = useState(false);
@@ -354,13 +361,13 @@ export default function HomeScreen({ navigation }: Props) {
   const load = useCallback(async () => {
     const [ts, ids, layout] = await Promise.all([
       getTasks(db),
-      getCompletedTaskIds(db, today),
+      getCompletedTaskIds(db, selectedDate),
       getSetting(db, 'card_layout'),
     ]);
     setTasks(ts);
     setCompletedIds(new Set(ids));
     setTagRight(layout === 'tag_right');
-  }, [db, today]);
+  }, [db, selectedDate]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
@@ -399,9 +406,9 @@ export default function HomeScreen({ navigation }: Props) {
 
   const toggle = async (id: number) => {
     if (completedIds.has(id)) {
-      await markIncomplete(db, id, today);
+      await markIncomplete(db, id, selectedDate);
     } else {
-      await markComplete(db, id, today);
+      await markComplete(db, id, selectedDate);
       triggerCelebration();
     }
     load();
@@ -560,10 +567,10 @@ export default function HomeScreen({ navigation }: Props) {
   const displayedTasks = (() => {
     // Hide one-time tasks whose day has already passed.
     let list = sortedTasks.filter((t) => {
-      if (t.freq_type === 'once' && t.once_date && t.once_date < today) return false;
+      if (t.freq_type === 'once' && t.once_date && t.once_date < selectedDate) return false;
       if (t.freq_type === 'dates') {
         const ds = parseDateList(t.freq_dates);
-        if (ds.length > 0 && ds.every((d) => d < today)) return false;
+        if (ds.length > 0 && ds.every((d) => d < selectedDate)) return false;
       }
       return true;
     });
@@ -571,7 +578,7 @@ export default function HomeScreen({ navigation }: Props) {
     else if (filterStatus === 'done') list = list.filter((t) => completedIds.has(t.id));
     if (filterFreq === 'daily') list = list.filter((t) => t.freq_type === 'daily');
     else if (filterFreq === 'other') list = list.filter((t) => t.freq_type !== 'daily');
-    if (filterDue === 'today') list = list.filter((t) => isDueToday(t));
+    if (filterDue === 'today') list = list.filter((t) => isDueToday(t, selDateObj));
     if (sortKey === 'priority') {
       list = [...list].sort((a, b) => (b.priority - a.priority) || (a.sort_order - b.sort_order));
     } else if (sortKey === 'time') {
@@ -746,8 +753,8 @@ export default function HomeScreen({ navigation }: Props) {
     Animated.timing(panelAnim, { toValue: activePanel ? 1 : 0, duration: 200, useNativeDriver: true }).start();
   }, [activePanel, panelAnim]);
 
-  const now = new Date();
-  const dateLabel = `${now.getFullYear()}/${pad(now.getMonth() + 1)}/${pad(now.getDate())} (${WEEKDAYS[now.getDay()]})`;
+  const dateLabel = `${selDateObj.getFullYear()}/${pad(selDateObj.getMonth() + 1)}/${pad(selDateObj.getDate())} (${WEEKDAYS[selDateObj.getDay()]})`;
+  const isToday = selectedDate === today;
 
   // ── Reusable editor sections ────────────────────────────────────────────
 
@@ -1014,8 +1021,19 @@ export default function HomeScreen({ navigation }: Props) {
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
       <LinearGradient colors={GRAD.header} start={GRAD_START} end={GRAD_END} style={[s.headerCard, { paddingTop: insets.top + 12 }]}>
-        <Text style={s.dateText}>{dateLabel}</Text>
-        <Text style={s.headerLabel}>今日の進捗</Text>
+        <View style={s.dateNavRow}>
+          <TouchableOpacity onPress={() => shiftSelected(-1)} style={s.dateNavBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Text style={s.dateNavArrow}>‹</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setSelectedDate(today)} activeOpacity={0.7} style={s.dateNavCenter}>
+            <Text style={s.dateText}>{dateLabel}</Text>
+            {!isToday && <Text style={s.dateTodayHint}>タップで今日へ</Text>}
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => shiftSelected(1)} style={s.dateNavBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Text style={s.dateNavArrow}>›</Text>
+          </TouchableOpacity>
+        </View>
+        <Text style={s.headerLabel}>{isToday ? '今日の進捗' : 'この日の進捗'}</Text>
         <View style={s.progressRow}>
           <View style={s.progressBg}>
             <Animated.View
@@ -1447,7 +1465,12 @@ const s = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: C.body },
 
   headerCard: { backgroundColor: C.header, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 24 },
-  dateText: { color: '#ffffff', fontSize: 22, fontWeight: '800', marginBottom: 12 },
+  dateNavRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  dateNavBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
+  dateNavArrow: { color: '#ffffff', fontSize: 26, fontWeight: '800', marginTop: -2 },
+  dateNavCenter: { flex: 1, alignItems: 'center' },
+  dateText: { color: '#ffffff', fontSize: 22, fontWeight: '800' },
+  dateTodayHint: { color: 'rgba(255,255,255,0.75)', fontSize: 10, fontWeight: '700', marginTop: 2 },
   headerLabel: { color: 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
   progressRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 6 },
   progressBg: { flex: 1, height: 8, backgroundColor: 'rgba(255,255,255,0.45)', borderRadius: 4, overflow: 'hidden' },
