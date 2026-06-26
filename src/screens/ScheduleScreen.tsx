@@ -1,5 +1,5 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, StatusBar, LayoutChangeEvent } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, StatusBar } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useFocusEffect } from '@react-navigation/native';
@@ -35,10 +35,10 @@ const C = {
   doneBorder: '#15803d',
 };
 
-// Day runs 5:00 → 0:00 (midnight) like a printed timetable.
-const HOURS: number[] = [...Array.from({ length: 19 }, (_, i) => i + 5), 0];
+// Day runs 5:00 → 4:00 next morning, like a printed timetable.
+const HOURS: number[] = [...Array.from({ length: 19 }, (_, i) => i + 5), 0, 1, 2, 3, 4];
 const hourLabel = (h: number) => `${h}:00`;
-const bucketHour = (h: number) => (h >= 5 && h <= 23 ? h : 0); // 0–4時 は 0:00 行へ
+const bucketHour = (h: number) => h; // every hour now has its own row
 
 type Mode = 'schedule' | 'flow';
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'Schedule'> };
@@ -67,16 +67,6 @@ export default function ScheduleScreen({ navigation }: Props) {
   const [scheduleSize, setScheduleSize] = useState<'small' | 'normal' | 'large'>('normal');
   const rowMinHeight = scheduleSize === 'small' ? 36 : scheduleSize === 'large' ? 68 : 44;
 
-  const scrollRef = useRef<ScrollView>(null);
-  const nowRowY = useRef<number | null>(null);
-  const wantScroll = useRef(true);
-
-  const maybeScrollToNow = useCallback(() => {
-    if (wantScroll.current && nowRowY.current != null) {
-      scrollRef.current?.scrollTo({ y: Math.max(0, nowRowY.current - 70), animated: false });
-    }
-  }, []);
-
   const load = useCallback(async () => {
     const [ts, ids, size] = await Promise.all([
       getTasks(db),
@@ -88,10 +78,7 @@ export default function ScheduleScreen({ navigation }: Props) {
     if (size === 'small' || size === 'large' || size === 'normal') setScheduleSize(size);
   }, [db, today]);
 
-  useFocusEffect(useCallback(() => { wantScroll.current = true; load(); }, [load]));
-
-  // Re-center on the current hour once data/layout settle (until the user scrolls).
-  useEffect(() => { maybeScrollToNow(); }, [tasks, mode, maybeScrollToNow]);
+  useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const toggle = async (id: number) => {
     if (completedIds.has(id)) await markIncomplete(db, id, today);
@@ -152,12 +139,7 @@ export default function ScheduleScreen({ navigation }: Props) {
       </LinearGradient>
 
       {mode === 'schedule' ? (
-        <ScrollView
-          ref={scrollRef}
-          style={s.bodyView}
-          contentContainerStyle={{ padding: 12, paddingBottom: 28 }}
-          onScrollBeginDrag={() => { wantScroll.current = false; }}
-        >
+        <ScrollView style={s.bodyView} contentContainerStyle={{ padding: 12, paddingBottom: 28 }}>
           <View style={s.table}>
             <View style={[s.row, s.headRow]}>
               <View style={[s.timeCell, s.headCell]}><Text style={s.headText}>時間</Text></View>
@@ -170,7 +152,6 @@ export default function ScheduleScreen({ navigation }: Props) {
                 <View
                   key={h}
                   style={[s.row, { minHeight: rowMinHeight }, idx === HOURS.length - 1 && s.rowLast]}
-                  onLayout={isNow ? (e: LayoutChangeEvent) => { nowRowY.current = 12 + e.nativeEvent.layout.y; maybeScrollToNow(); } : undefined}
                 >
                   <View style={[s.timeCell, isNow && s.timeCellNow]}>
                     <Text style={[s.timeText, isNow && s.timeTextNow]}>{hourLabel(h)}</Text>
