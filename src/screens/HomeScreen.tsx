@@ -849,7 +849,7 @@ export default function HomeScreen({ navigation }: Props) {
 
       <Modal visible={openPicker === 'freq'} transparent animationType="slide" onRequestClose={() => setOpenPicker(null)}>
         <TouchableOpacity style={s.freqModalBg} activeOpacity={1} onPress={() => setOpenPicker(null)}>
-          <TouchableOpacity activeOpacity={1} onPress={() => {}} style={[s.freqModalCard, { maxHeight: screen.height * 0.8, paddingBottom: insets.bottom + 12 }]}>
+          <TouchableOpacity activeOpacity={1} onPress={() => {}} style={[s.freqModalCard, { maxHeight: screen.height * 0.8, marginBottom: insets.bottom + 12 }]}>
             <View style={s.sheetHandle} />
             <View style={s.freqModalHead}>
               <Text style={s.freqModalTitle}>頻度</Text>
@@ -1510,7 +1510,7 @@ const s = StyleSheet.create({
   freqTag: { color: C.muted, fontSize: 10, fontWeight: '700' },
   doneBadge: { backgroundColor: '#fef3c7', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
   doneBadgeText: { color: '#b45309', fontSize: 9, fontWeight: '700', letterSpacing: 0.5 },
-  tagBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#f3f4f6', alignItems: 'center', justifyContent: 'center' },
+  tagBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e5e7eb', alignItems: 'center', justifyContent: 'center' },
   tagIcon: { fontSize: 17 },
   tagIconEmpty: { opacity: 0.35 },
 
@@ -1599,11 +1599,11 @@ const s = StyleSheet.create({
   monthDayTextActive: { color: C.onPrimary },
 
   calHint: { fontSize: 12, color: '#64748b', marginTop: 6, marginBottom: 2 },
-  freqModalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  freqModalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end', paddingHorizontal: 12 },
   freqModalCard: {
-    backgroundColor: '#e8f0fe', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 8,
-    borderWidth: 1, borderColor: '#c7d8fb',
-    elevation: 16, shadowColor: '#1e3a8a', shadowOffset: { width: 0, height: -6 }, shadowOpacity: 0.28, shadowRadius: 18,
+    backgroundColor: '#e8f0fe', borderRadius: 24, paddingHorizontal: 20, paddingTop: 8, paddingBottom: 16,
+    borderWidth: 2, borderColor: '#93b4f5',
+    elevation: 16, shadowColor: '#1e3a8a', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 20,
   },
   freqModalHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
   freqModalTitle: { fontSize: 16, fontWeight: '800', color: C.muted },
