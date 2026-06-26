@@ -18,7 +18,7 @@ import {
 } from '../db/database';
 import {
   TASK_ICONS, PRIORITIES, priorityMeta, WEEKDAYS,
-  FreqType, FREQ_TYPES, NTH_WEEKS, frequencyLabel, parseDays, nextNthWeekdayDate, isDueToday,
+  FreqType, TaskFreq, FREQ_TYPES, NTH_WEEKS, frequencyLabel, parseDays, nextNthWeekdayDate, isDueToday,
 } from '../constants/taskMeta';
 import { GRAD, GRAD_START, GRAD_END } from '../constants/theme';
 import TabBar from '../components/TabBar';
@@ -156,9 +156,16 @@ function RiseIn({ index, style, children }: { index: number; style?: any; childr
   );
 }
 
-// Month calendar used to pick the single date of a "その日限り" task.
-function OnceCalendar({ value, onChange }: { value: string | null; onChange: (d: string) => void }) {
-  const base = value ? new Date(`${value}T00:00:00`) : new Date();
+// Month calendar that previews which days a task's recurrence falls on, and
+// lets the user tap a day to configure the rule (set the once-date, toggle a
+// weekday, choose the monthly day, or pick the nth-weekday).
+function FreqCalendar({ freq, onceDate, onSelect }: {
+  freq: TaskFreq;
+  onceDate: string | null;
+  onSelect: (ref: Date, ds: string) => void;
+}) {
+  const isOnce = freq.freq_type === 'once';
+  const base = isOnce && onceDate ? new Date(`${onceDate}T00:00:00`) : new Date();
   const [view, setView] = useState({ y: base.getFullYear(), m: base.getMonth() });
   const startDow = new Date(view.y, view.m, 1).getDay();
   const daysInMonth = new Date(view.y, view.m + 1, 0).getDate();
@@ -191,10 +198,16 @@ function OnceCalendar({ value, onChange }: { value: string | null; onChange: (d:
         {cells.map((d, i) => {
           if (d === null) return <View key={`e${i}`} style={s.calCell} />;
           const ds = fmt(d);
-          const active = value === ds;
+          const ref = new Date(view.y, view.m, d);
+          const active = isOnce ? onceDate === ds : isDueToday(freq, ref);
           const dow = i % 7;
           return (
-            <TouchableOpacity key={ds} style={s.calCell} onPress={() => onChange(ds)} activeOpacity={0.7}>
+            <TouchableOpacity
+              key={ds}
+              style={s.calCell}
+              onPress={() => onSelect(ref, ds)}
+              activeOpacity={0.7}
+            >
               <View style={[s.calDay, active && s.calDayActive]}>
                 <Text style={[s.calDayText, dow === 0 && s.calSun, dow === 6 && s.calSat, active && s.calDayTextActive]}>{d}</Text>
               </View>
@@ -720,6 +733,19 @@ export default function HomeScreen({ navigation }: Props) {
     onceDate: string | null,
   ) => {
     const freqText = frequencyLabel({ freq_type: freqType, freq_days: daysToCsv(days), freq_week: week, freq_weekday: weekday, freq_day: day });
+    const onSelectDate = (ref: Date, ds: string) => {
+      switch (freqType) {
+        case 'once': on.setOnceDate(ds); break;
+        case 'weekly': on.toggleDay(ref.getDay()); break;
+        case 'monthly_day': on.setDay(ref.getDate()); break;
+        case 'monthly_nth': {
+          on.setWeek(Math.min(Math.ceil(ref.getDate() / 7), 5));
+          on.setWeekday(ref.getDay());
+          break;
+        }
+        // 'daily' covers every day already → tapping has no effect.
+      }
+    };
     return (
     <>
       <Text style={[s.sheetSection, { marginTop: 16 }]}>頻度</Text>
@@ -810,9 +836,11 @@ export default function HomeScreen({ navigation }: Props) {
         </ScrollView>
       )}
 
-      {freqType === 'once' && (
-        <OnceCalendar value={onceDate} onChange={on.setOnceDate} />
-      )}
+      <FreqCalendar
+        freq={{ freq_type: freqType, freq_days: daysToCsv(days), freq_week: week, freq_weekday: weekday, freq_day: day, once_date: onceDate }}
+        onceDate={onceDate}
+        onSelect={onSelectDate}
+      />
         </View>
       )}
     </>
