@@ -6,7 +6,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import { RootStackParamList } from '../../App';
-import { Task, getToday, getTasks, getCompletedTaskIds, markComplete, markIncomplete } from '../db/database';
+import { Task, getToday, getTasks, getCompletedTaskIds, markComplete, markIncomplete, getSetting } from '../db/database';
 import { isDueToday, WEEKDAYS } from '../constants/taskMeta';
 import { GRAD, GRAD_START, GRAD_END } from '../constants/theme';
 import TabBar from '../components/TabBar';
@@ -64,6 +64,8 @@ export default function ScheduleScreen({ navigation }: Props) {
   const [mode, setMode] = useState<Mode>('schedule');
   const [tasks, setTasks] = useState<Task[]>([]);
   const [completedIds, setCompletedIds] = useState<Set<number>>(new Set());
+  const [scheduleSize, setScheduleSize] = useState<'small' | 'normal' | 'large'>('normal');
+  const rowMinHeight = scheduleSize === 'small' ? 36 : scheduleSize === 'large' ? 68 : 44;
 
   const scrollRef = useRef<ScrollView>(null);
   const nowRowY = useRef<number | null>(null);
@@ -76,10 +78,14 @@ export default function ScheduleScreen({ navigation }: Props) {
   }, []);
 
   const load = useCallback(async () => {
-    const ts = await getTasks(db);
-    const ids = await getCompletedTaskIds(db, today);
+    const [ts, ids, size] = await Promise.all([
+      getTasks(db),
+      getCompletedTaskIds(db, today),
+      getSetting(db, 'schedule_size'),
+    ]);
     setTasks(ts);
     setCompletedIds(new Set(ids));
+    if (size === 'small' || size === 'large' || size === 'normal') setScheduleSize(size);
   }, [db, today]);
 
   useFocusEffect(useCallback(() => { wantScroll.current = true; load(); }, [load]));
@@ -163,7 +169,7 @@ export default function ScheduleScreen({ navigation }: Props) {
               return (
                 <View
                   key={h}
-                  style={[s.row, idx === HOURS.length - 1 && s.rowLast]}
+                  style={[s.row, { minHeight: rowMinHeight }, idx === HOURS.length - 1 && s.rowLast]}
                   onLayout={isNow ? (e: LayoutChangeEvent) => { nowRowY.current = 12 + e.nativeEvent.layout.y; maybeScrollToNow(); } : undefined}
                 >
                   <View style={[s.timeCell, isNow && s.timeCellNow]}>

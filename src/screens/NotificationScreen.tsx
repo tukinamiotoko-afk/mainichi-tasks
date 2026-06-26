@@ -91,23 +91,31 @@ export default function NotificationScreen({ navigation }: Props) {
   const [pickerTime, setPickerTime] = useState(new Date());
   const [newType, setNewType] = useState<NotifType>('full');
   const [tagRight, setTagRight] = useState(false);
+  const [scheduleSize, setScheduleSize] = useState<'small' | 'normal' | 'large'>('normal');
 
   const load = useCallback(async () => {
-    const [data, logs, total, layout] = await Promise.all([
+    const [data, logs, total, layout, size] = await Promise.all([
       getNotificationSettings(db),
       getTimeLogsForDate(db, today),
       getTotalTimeForDate(db, today),
       getSetting(db, 'card_layout'),
+      getSetting(db, 'schedule_size'),
     ]);
     setSettings(data);
     setTimeLogs(logs);
     setTotalSeconds(total);
     setTagRight(layout === 'tag_right');
+    if (size === 'small' || size === 'large' || size === 'normal') setScheduleSize(size);
   }, [db, today]);
 
   const toggleTagRight = async (val: boolean) => {
     setTagRight(val);
     await setSetting(db, 'card_layout', val ? 'tag_right' : 'tag_left');
+  };
+
+  const changeScheduleSize = async (val: 'small' | 'normal' | 'large') => {
+    setScheduleSize(val);
+    await setSetting(db, 'schedule_size', val);
   };
 
   useFocusEffect(useCallback(() => {
@@ -212,6 +220,20 @@ export default function NotificationScreen({ navigation }: Props) {
                   thumbColor="#ffffff"
                 />
               </View>
+              <View style={s.sizeBlock}>
+                <Text style={s.settingRowLabel}>タイムスケジュールの大きさ</Text>
+                <View style={s.typeRow}>
+                  {([['small', '小'], ['normal', '標準'], ['large', '大']] as ['small' | 'normal' | 'large', string][]).map(([v, label]) => (
+                    <TouchableOpacity
+                      key={v}
+                      style={[s.typeChip, scheduleSize === v && s.typeChipActive]}
+                      onPress={() => changeScheduleSize(v)}
+                    >
+                      <Text style={[s.typeChipText, scheduleSize === v && s.typeChipTextActive]}>{label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
             </View>
 
             <View style={s.typeCard}>
@@ -308,6 +330,7 @@ const s = StyleSheet.create({
   typeCard: { backgroundColor: C.card, borderRadius: 12, padding: 14, gap: 10, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4 },
   typeLabel: { color: C.stone, fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
   settingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  sizeBlock: { gap: 8, borderTopWidth: 1, borderTopColor: C.border, paddingTop: 10 },
   settingRowText: { flex: 1, gap: 2 },
   settingRowLabel: { color: C.onDark, fontSize: 13, fontWeight: '700' },
   settingRowSub: { color: '#64748b', fontSize: 11, fontWeight: '600' },
