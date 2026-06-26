@@ -847,84 +847,97 @@ export default function HomeScreen({ navigation }: Props) {
         <Text style={s.metaSelectArrow}>{openPicker === 'freq' ? '▲' : '▼'}</Text>
       </TouchableOpacity>
 
-      {openPicker === 'freq' && (
-        <View style={s.freqPanel}>
-      <FreqTypeChips freqType={freqType} onSetType={on.setType} />
+      <Modal visible={openPicker === 'freq'} transparent animationType="fade" onRequestClose={() => setOpenPicker(null)}>
+        <TouchableOpacity style={s.freqModalBg} activeOpacity={1} onPress={() => setOpenPicker(null)}>
+          <TouchableOpacity activeOpacity={1} onPress={() => {}} style={[s.freqModalCard, { maxHeight: screen.height * 0.8, paddingBottom: insets.bottom + 12 }]}>
+            <View style={s.sheetHandle} />
+            <View style={s.freqModalHead}>
+              <Text style={s.freqModalTitle}>頻度</Text>
+              <TouchableOpacity onPress={() => setOpenPicker(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Text style={s.freqModalDone}>完了</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: 4 }}>
+              <View style={s.freqPanel}>
+                <FreqTypeChips freqType={freqType} onSetType={on.setType} />
 
-      {freqType === 'weekly' && (
-        <View style={s.weekdayRow}>
-          {WEEKDAYS.map((w, i) => {
-            const active = days.includes(i);
-            return (
-              <PulseChip
-                key={w}
-                wrapStyle={{ flex: 1 }}
-                style={[s.dayChip, active && s.dayChipActive, i === 0 && s.daySun, i === 6 && s.daySat]}
-                onPress={() => on.toggleDay(i)}
-              >
-                <Text style={[s.dayChipText, active && s.dayChipTextActive]}>{w}</Text>
-              </PulseChip>
-            );
-          })}
-        </View>
-      )}
+                {freqType === 'weekly' && (
+                  <View style={s.weekdayRow}>
+                    {WEEKDAYS.map((w, i) => {
+                      const active = days.includes(i);
+                      return (
+                        <PulseChip
+                          key={w}
+                          wrapStyle={{ flex: 1 }}
+                          style={[s.dayChip, active && s.dayChipActive, i === 0 && s.daySun, i === 6 && s.daySat]}
+                          onPress={() => on.toggleDay(i)}
+                        >
+                          <Text style={[s.dayChipText, active && s.dayChipTextActive]}>{w}</Text>
+                        </PulseChip>
+                      );
+                    })}
+                  </View>
+                )}
 
-      {freqType === 'monthly_nth' && (
-        <>
-          <View style={s.weekChoiceRow}>
-            {NTH_WEEKS.map((w) => (
-              <PulseChip
-                key={w.value}
-                wrapStyle={{ flex: 1 }}
-                style={[s.weekChip, week === w.value && s.weekChipActive]}
-                onPress={() => on.setWeek(w.value)}
-              >
-                <Text style={[s.weekChipText, week === w.value && s.weekChipTextActive]}>{w.label}</Text>
-              </PulseChip>
-            ))}
-          </View>
-          <View style={s.weekdayRow}>
-            {WEEKDAYS.map((w, i) => {
-              const active = weekday === i;
-              return (
-                <PulseChip
-                  key={w}
-                  wrapStyle={{ flex: 1 }}
-                  style={[s.dayChip, active && s.dayChipActive, i === 0 && s.daySun, i === 6 && s.daySat]}
-                  onPress={() => on.setWeekday(i)}
-                >
-                  <Text style={[s.dayChipText, active && s.dayChipTextActive]}>{w}</Text>
-                </PulseChip>
-              );
-            })}
-          </View>
-        </>
-      )}
+                {freqType === 'monthly_nth' && (
+                  <>
+                    <View style={s.weekChoiceRow}>
+                      {NTH_WEEKS.map((w) => (
+                        <PulseChip
+                          key={w.value}
+                          wrapStyle={{ flex: 1 }}
+                          style={[s.weekChip, week === w.value && s.weekChipActive]}
+                          onPress={() => on.setWeek(w.value)}
+                        >
+                          <Text style={[s.weekChipText, week === w.value && s.weekChipTextActive]}>{w.label}</Text>
+                        </PulseChip>
+                      ))}
+                    </View>
+                    <View style={s.weekdayRow}>
+                      {WEEKDAYS.map((w, i) => {
+                        const active = weekday === i;
+                        return (
+                          <PulseChip
+                            key={w}
+                            wrapStyle={{ flex: 1 }}
+                            style={[s.dayChip, active && s.dayChipActive, i === 0 && s.daySun, i === 6 && s.daySat]}
+                            onPress={() => on.setWeekday(i)}
+                          >
+                            <Text style={[s.dayChipText, active && s.dayChipTextActive]}>{w}</Text>
+                          </PulseChip>
+                        );
+                      })}
+                    </View>
+                  </>
+                )}
 
-      {freqType === 'monthly_day' && (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.monthDayRow}>
-          {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
-            <PulseChip
-              key={d}
-              style={[s.monthDayChip, day === d && s.monthDayChipActive]}
-              onPress={() => on.setDay(d)}
-            >
-              <Text style={[s.monthDayText, day === d && s.monthDayTextActive]}>{d}</Text>
-            </PulseChip>
-          ))}
-        </ScrollView>
-      )}
+                {freqType === 'monthly_day' && (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.monthDayRow}>
+                    {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+                      <PulseChip
+                        key={d}
+                        style={[s.monthDayChip, day === d && s.monthDayChipActive]}
+                        onPress={() => on.setDay(d)}
+                      >
+                        <Text style={[s.monthDayText, day === d && s.monthDayTextActive]}>{d}</Text>
+                      </PulseChip>
+                    ))}
+                  </ScrollView>
+                )}
 
-      {(freqType === 'once' || freqType === 'dates') && (
-        <Text style={s.calHint}>{freqType === 'dates' ? 'カレンダーをタップして任意の日を選択（複数可）' : 'カレンダーをタップして日付を選択'}</Text>
-      )}
-      <FreqCalendar
-        freq={{ freq_type: freqType, freq_days: daysToCsv(days), freq_week: week, freq_weekday: weekday, freq_day: day, once_date: onceDate, freq_dates: freqDates }}
-        onceDate={onceDate}
-        onSelect={onSelectDate}
-      />
-        </View>
-      )}
+                {(freqType === 'once' || freqType === 'dates') && (
+                  <Text style={s.calHint}>{freqType === 'dates' ? 'カレンダーをタップして任意の日を選択（複数可）' : 'カレンダーをタップして日付を選択'}</Text>
+                )}
+                <FreqCalendar
+                  freq={{ freq_type: freqType, freq_days: daysToCsv(days), freq_week: week, freq_weekday: weekday, freq_day: day, once_date: onceDate, freq_dates: freqDates }}
+                  onceDate={onceDate}
+                  onSelect={onSelectDate}
+                />
+              </View>
+            </ScrollView>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </>
     );
   };
@@ -1586,6 +1599,11 @@ const s = StyleSheet.create({
   monthDayTextActive: { color: C.onPrimary },
 
   calHint: { fontSize: 12, color: '#64748b', marginTop: 6, marginBottom: 2 },
+  freqModalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'flex-end' },
+  freqModalCard: { backgroundColor: '#ffffff', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 8 },
+  freqModalHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
+  freqModalTitle: { fontSize: 16, fontWeight: '800', color: C.muted },
+  freqModalDone: { fontSize: 15, fontWeight: '800', color: C.primary },
   cal: { marginTop: 4, borderWidth: 1, borderColor: C.border, borderRadius: 14, padding: 10, backgroundColor: '#f8fafc' },
   calHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 8, marginBottom: 8 },
   calNav: { fontSize: 26, color: C.primary, fontWeight: '700', width: 32, textAlign: 'center' },
