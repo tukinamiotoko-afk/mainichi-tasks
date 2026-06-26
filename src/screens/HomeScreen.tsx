@@ -165,49 +165,64 @@ function RiseIn({ index, style, children }: { index: number; style?: any; childr
   );
 }
 
-// Frequency type chip row. Pulses the "任意" chip when it becomes active via auto-switch.
+// Quick bounce used across selectable chips for tactile feedback.
+function bounce(v: Animated.Value) {
+  Animated.sequence([
+    Animated.timing(v, { toValue: 1.18, duration: 130, useNativeDriver: true }),
+    Animated.timing(v, { toValue: 0.92, duration: 100, useNativeDriver: true }),
+    Animated.timing(v, { toValue: 1.08, duration: 90, useNativeDriver: true }),
+    Animated.timing(v, { toValue: 1, duration: 80, useNativeDriver: true }),
+  ]).start();
+}
+
+// A chip that bounces when tapped.
+function PulseChip({ onPress, style, children }: { onPress: () => void; style?: any; children: React.ReactNode }) {
+  const scale = useRef(new Animated.Value(1)).current;
+  return (
+    <Animated.View style={{ transform: [{ scale }] }}>
+      <TouchableOpacity style={style} onPress={() => { bounce(scale); onPress(); }} activeOpacity={0.8}>
+        {children}
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
+
+// Frequency type chip row. Each chip bounces on tap, and the "任意" chip also
+// bounces when it becomes active via the calendar auto-switch.
 function FreqTypeChips({ freqType, onSetType, animateNext }: {
   freqType: FreqType;
   onSetType: (t: FreqType) => void;
   animateNext: () => void;
 }) {
-  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const scales = useRef<Record<string, Animated.Value>>({}).current;
+  const getScale = (k: string) => {
+    if (!scales[k]) scales[k] = new Animated.Value(1);
+    return scales[k];
+  };
   const prevType = useRef<FreqType>(freqType);
 
   useEffect(() => {
-    if (freqType === 'dates' && prevType.current !== 'dates') {
-      Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.18, duration: 130, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 0.92, duration: 100, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1.08, duration: 90, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1, duration: 80, useNativeDriver: true }),
-      ]).start();
-    }
+    if (freqType === 'dates' && prevType.current !== 'dates') bounce(getScale('dates'));
     prevType.current = freqType;
-  }, [freqType, pulseAnim]);
+  }, [freqType]);
 
   return (
     <View style={s.freqTypeRow}>
       {FREQ_TYPES.map((ft, i) => {
         const isActive = freqType === ft.value;
-        const chip = (
+        return (
           <RiseIn key={ft.value} index={i}>
-            <TouchableOpacity
-              style={[s.freqTypeChip, isActive && s.freqTypeChipActive]}
-              onPress={() => { animateNext(); onSetType(ft.value); }}
-            >
-              <Text style={[s.freqTypeText, isActive && s.freqTypeTextActive]}>{ft.label}</Text>
-            </TouchableOpacity>
+            <Animated.View style={{ transform: [{ scale: getScale(ft.value) }] }}>
+              <TouchableOpacity
+                style={[s.freqTypeChip, isActive && s.freqTypeChipActive]}
+                onPress={() => { bounce(getScale(ft.value)); animateNext(); onSetType(ft.value); }}
+                activeOpacity={0.8}
+              >
+                <Text style={[s.freqTypeText, isActive && s.freqTypeTextActive]}>{ft.label}</Text>
+              </TouchableOpacity>
+            </Animated.View>
           </RiseIn>
         );
-        if (ft.value === 'dates') {
-          return (
-            <Animated.View key={ft.value} style={{ transform: [{ scale: pulseAnim }] }}>
-              {chip}
-            </Animated.View>
-          );
-        }
-        return chip;
       })}
     </View>
   );
@@ -841,13 +856,13 @@ export default function HomeScreen({ navigation }: Props) {
           {WEEKDAYS.map((w, i) => {
             const active = days.includes(i);
             return (
-              <TouchableOpacity
+              <PulseChip
                 key={w}
                 style={[s.dayChip, active && s.dayChipActive, i === 0 && s.daySun, i === 6 && s.daySat]}
                 onPress={() => on.toggleDay(i)}
               >
                 <Text style={[s.dayChipText, active && s.dayChipTextActive]}>{w}</Text>
-              </TouchableOpacity>
+              </PulseChip>
             );
           })}
         </View>
@@ -857,26 +872,26 @@ export default function HomeScreen({ navigation }: Props) {
         <>
           <View style={s.weekChoiceRow}>
             {NTH_WEEKS.map((w) => (
-              <TouchableOpacity
+              <PulseChip
                 key={w.value}
                 style={[s.weekChip, week === w.value && s.weekChipActive]}
                 onPress={() => on.setWeek(w.value)}
               >
                 <Text style={[s.weekChipText, week === w.value && s.weekChipTextActive]}>{w.label}</Text>
-              </TouchableOpacity>
+              </PulseChip>
             ))}
           </View>
           <View style={s.weekdayRow}>
             {WEEKDAYS.map((w, i) => {
               const active = weekday === i;
               return (
-                <TouchableOpacity
+                <PulseChip
                   key={w}
                   style={[s.dayChip, active && s.dayChipActive, i === 0 && s.daySun, i === 6 && s.daySat]}
                   onPress={() => on.setWeekday(i)}
                 >
                   <Text style={[s.dayChipText, active && s.dayChipTextActive]}>{w}</Text>
-                </TouchableOpacity>
+                </PulseChip>
               );
             })}
           </View>
@@ -886,13 +901,13 @@ export default function HomeScreen({ navigation }: Props) {
       {freqType === 'monthly_day' && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.monthDayRow}>
           {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
-            <TouchableOpacity
+            <PulseChip
               key={d}
               style={[s.monthDayChip, day === d && s.monthDayChipActive]}
               onPress={() => on.setDay(d)}
             >
               <Text style={[s.monthDayText, day === d && s.monthDayTextActive]}>{d}</Text>
-            </TouchableOpacity>
+            </PulseChip>
           ))}
         </ScrollView>
       )}
