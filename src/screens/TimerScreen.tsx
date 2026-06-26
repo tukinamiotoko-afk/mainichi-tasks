@@ -287,7 +287,6 @@ export default function TimerScreen({ navigation }: Props) {
         </TouchableOpacity>
 
         <View style={s.timerCard}>
-          <Text style={s.selectedLabel}>{selectedTask.title}</Text>
           <View style={s.modeRow}>
             <TouchableOpacity
               style={[s.modeChip, mode === 'stopwatch' && s.modeChipActive, running && s.modeChipDisabled]}
@@ -304,19 +303,6 @@ export default function TimerScreen({ navigation }: Props) {
               <Text style={[s.modeChipText, mode === 'countdown' && s.modeChipTextActive]}>タイマー</Text>
             </TouchableOpacity>
           </View>
-
-          <Text style={s.timerText}>{formatDuration(displaySeconds, true)}</Text>
-          <Text style={s.timerHint}>
-            {running
-              ? paused
-                ? '一時停止中'
-                : mode === 'countdown'
-                  ? 'カウントダウン中'
-                  : '計測中'
-              : mode === 'countdown'
-                ? '時間を決めて開始'
-                : '何秒でも計測できます'}
-          </Text>
 
           <View style={s.controls}>
             {/* Play / Pause toggle */}
@@ -419,8 +405,31 @@ export default function TimerScreen({ navigation }: Props) {
     <View style={s.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
       <LinearGradient colors={GRAD.header} start={GRAD_START} end={GRAD_END} style={[s.headerCard, { paddingTop: insets.top + 12 }]}>
-        <Text style={s.headerTitle}>タイマー</Text>
-        <Text style={s.headerSub}>今日の作業時間 {formatDuration(totalSeconds, true)}</Text>
+        {selectedTask ? (
+          <View style={s.headerTimer}>
+            <View style={s.headerTimerTop}>
+              <Text style={s.headerTimerTitle} numberOfLines={1}>{selectedTask.icon ? `${selectedTask.icon} ` : ''}{selectedTask.title}</Text>
+              <Text style={s.headerTimerTotal}>今日 {formatDuration(totalSeconds, true)}</Text>
+            </View>
+            <Text style={s.headerTimerClock}>{formatDuration(displaySeconds, true)}</Text>
+            <Text style={s.headerTimerHint}>
+              {running
+                ? paused
+                  ? '一時停止中'
+                  : mode === 'countdown'
+                    ? 'カウントダウン中'
+                    : '計測中'
+                : mode === 'countdown'
+                  ? '時間を決めて開始'
+                  : '何秒でも計測できます'}
+            </Text>
+          </View>
+        ) : (
+          <>
+            <Text style={s.headerTitle}>タイマー</Text>
+            <Text style={s.headerSub}>今日の作業時間 {formatDuration(totalSeconds, true)}</Text>
+          </>
+        )}
       </LinearGradient>
       {selectedTask ? renderTimer() : renderTaskList()}
       <TabBar current="Timer" navigation={navigation} />
@@ -433,6 +442,12 @@ const s = StyleSheet.create({
   headerCard: { backgroundColor: C.header, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16, gap: 4 },
   headerTitle: { color: C.onPrimary, fontSize: 20, fontWeight: '700' },
   headerSub: { color: 'rgba(255,255,255,0.8)', fontSize: 12, fontWeight: '700' },
+  headerTimer: { gap: 2, alignItems: 'center' },
+  headerTimerTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', alignSelf: 'stretch', gap: 10 },
+  headerTimerTitle: { flex: 1, color: C.onPrimary, fontSize: 14, fontWeight: '800' },
+  headerTimerTotal: { color: 'rgba(255,255,255,0.85)', fontSize: 11, fontWeight: '700' },
+  headerTimerClock: { color: C.onPrimary, fontSize: 52, fontWeight: '800', textAlign: 'center', letterSpacing: 1 },
+  headerTimerHint: { color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '700', textAlign: 'center' },
   body: { flex: 1, backgroundColor: C.body },
   content: { padding: 16, paddingBottom: 88, gap: 10 },
   sectionTitle: { color: C.stone, fontSize: 12, fontWeight: '800', marginTop: 4 },
@@ -453,15 +468,12 @@ const s = StyleSheet.create({
   taskSelectTitle: { flex: 1, color: C.onDark, fontSize: 14, fontWeight: '700' },
   openText: { color: C.onDark, fontSize: 12, fontWeight: '800' },
   timerCard: { backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 12, padding: 14, gap: 10 },
-  selectedLabel: { color: C.onDark, fontSize: 15, fontWeight: '800' },
   modeRow: { flexDirection: 'row', gap: 8 },
   modeChip: { flex: 1, borderWidth: 1, borderColor: C.border, borderRadius: 10, paddingVertical: 9, alignItems: 'center' },
   modeChipActive: { backgroundColor: C.primary, borderColor: C.primary },
   modeChipDisabled: { opacity: 0.45 },
   modeChipText: { color: C.stone, fontSize: 12, fontWeight: '800' },
   modeChipTextActive: { color: C.onPrimary },
-  timerText: { color: C.onDark, fontSize: 56, fontWeight: '800', textAlign: 'center' },
-  timerHint: { color: C.muted, fontSize: 12, fontWeight: '700', textAlign: 'center' },
   controls: { flexDirection: 'row', justifyContent: 'center', alignItems: 'flex-start', gap: 28, paddingVertical: 4 },
   controlItem: { alignItems: 'center', gap: 6 },
   iconCircle: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center', elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.18, shadowRadius: 4 },
