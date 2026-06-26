@@ -164,6 +164,54 @@ function RiseIn({ index, style, children }: { index: number; style?: any; childr
   );
 }
 
+// Frequency type chip row. Pulses the "任意" chip when it becomes active via auto-switch.
+function FreqTypeChips({ freqType, onSetType, animateNext }: {
+  freqType: FreqType;
+  onSetType: (t: FreqType) => void;
+  animateNext: () => void;
+}) {
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const prevType = useRef<FreqType>(freqType);
+
+  useEffect(() => {
+    if (freqType === 'dates' && prevType.current !== 'dates') {
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1.18, duration: 130, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 0.92, duration: 100, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1.08, duration: 90, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 80, useNativeDriver: true }),
+      ]).start();
+    }
+    prevType.current = freqType;
+  }, [freqType, pulseAnim]);
+
+  return (
+    <View style={s.freqTypeRow}>
+      {FREQ_TYPES.map((ft, i) => {
+        const isActive = freqType === ft.value;
+        const chip = (
+          <RiseIn key={ft.value} index={i}>
+            <TouchableOpacity
+              style={[s.freqTypeChip, isActive && s.freqTypeChipActive]}
+              onPress={() => { animateNext(); onSetType(ft.value); }}
+            >
+              <Text style={[s.freqTypeText, isActive && s.freqTypeTextActive]}>{ft.label}</Text>
+            </TouchableOpacity>
+          </RiseIn>
+        );
+        if (ft.value === 'dates') {
+          return (
+            <Animated.View key={ft.value} style={{ transform: [{ scale: pulseAnim }] }}>
+              {chip}
+            </Animated.View>
+          );
+        }
+        return chip;
+      })}
+    </View>
+  );
+}
+
 // Month calendar that previews which days a task's recurrence falls on, and
 // lets the user tap a day to configure the rule (set the once-date, toggle a
 // weekday, choose the monthly day, or pick the nth-weekday).
@@ -780,18 +828,7 @@ export default function HomeScreen({ navigation }: Props) {
 
       {openPicker === 'freq' && (
         <View style={s.freqPanel}>
-      <View style={s.freqTypeRow}>
-        {FREQ_TYPES.map((ft, i) => (
-          <RiseIn key={ft.value} index={i}>
-            <TouchableOpacity
-              style={[s.freqTypeChip, freqType === ft.value && s.freqTypeChipActive]}
-              onPress={() => { animateNext(); on.setType(ft.value); }}
-            >
-              <Text style={[s.freqTypeText, freqType === ft.value && s.freqTypeTextActive]}>{ft.label}</Text>
-            </TouchableOpacity>
-          </RiseIn>
-        ))}
-      </View>
+      <FreqTypeChips freqType={freqType} onSetType={on.setType} animateNext={animateNext} />
 
       {freqType === 'weekly' && (
         <View style={s.weekdayRow}>
