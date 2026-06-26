@@ -190,10 +190,9 @@ function PulseChip({ onPress, style, wrapStyle, children }: { onPress: () => voi
 
 // Frequency type chip row. Each chip bounces on tap, and the "任意" chip also
 // bounces when it becomes active via the calendar auto-switch.
-function FreqTypeChips({ freqType, onSetType, animateNext }: {
+function FreqTypeChips({ freqType, onSetType }: {
   freqType: FreqType;
   onSetType: (t: FreqType) => void;
-  animateNext: () => void;
 }) {
   const scales = useRef<Record<string, Animated.Value>>({}).current;
   const getScale = (k: string) => {
@@ -216,7 +215,7 @@ function FreqTypeChips({ freqType, onSetType, animateNext }: {
             <Animated.View style={{ transform: [{ scale: getScale(ft.value) }] }}>
               <TouchableOpacity
                 style={[s.freqTypeChip, isActive && s.freqTypeChipActive]}
-                onPress={() => { bounce(getScale(ft.value)); animateNext(); onSetType(ft.value); }}
+                onPress={() => { bounce(getScale(ft.value)); onSetType(ft.value); }}
                 activeOpacity={0.8}
               >
                 <Text style={[s.freqTypeText, isActive && s.freqTypeTextActive]}>{ft.label}</Text>
@@ -839,7 +838,7 @@ export default function HomeScreen({ navigation }: Props) {
       <Text style={[s.sheetSection, { marginTop: 16 }]}>頻度</Text>
       <TouchableOpacity
         style={s.metaSelectBtn}
-        onPress={() => { animateNext(); setOpenPicker(openPicker === 'freq' ? null : 'freq'); }}
+        onPress={() => setOpenPicker(openPicker === 'freq' ? null : 'freq')}
         activeOpacity={0.8}
       >
         <View style={s.metaSelectLeft}>
@@ -850,7 +849,7 @@ export default function HomeScreen({ navigation }: Props) {
 
       {openPicker === 'freq' && (
         <View style={s.freqPanel}>
-      <FreqTypeChips freqType={freqType} onSetType={on.setType} animateNext={animateNext} />
+      <FreqTypeChips freqType={freqType} onSetType={on.setType} />
 
       {freqType === 'weekly' && (
         <View style={s.weekdayRow}>
