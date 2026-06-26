@@ -48,7 +48,7 @@ export const FREQ_TYPES: { value: FreqType; label: string }[] = [
   { value: 'weekly', label: '毎週' },
   { value: 'monthly_nth', label: '毎月（曜日）' },
   { value: 'monthly_day', label: '毎月（日付）' },
-  { value: 'once', label: 'その日限り' },
+  { value: 'once', label: '今日だけ' },
   { value: 'dates', label: '任意' },
 ];
 
@@ -109,7 +109,7 @@ export function frequencyLabel(t: TaskFreq): string {
     case 'monthly_day':
       return `毎月 ${t.freq_day ?? 1}日`;
     case 'once': {
-      if (!t.once_date) return 'その日限り';
+      if (!t.once_date) return '今日だけ';
       const [, m, d] = t.once_date.split('-');
       return `${Number(m)}/${Number(d)} 限定`;
     }
