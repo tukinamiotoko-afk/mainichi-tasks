@@ -754,17 +754,14 @@ export default function HomeScreen({ navigation }: Props) {
   ) => {
     const freqText = frequencyLabel({ freq_type: freqType, freq_days: daysToCsv(days), freq_week: week, freq_weekday: weekday, freq_day: day, once_date: onceDate, freq_dates: freqDates });
     const onSelectDate = (ref: Date, ds: string) => {
-      switch (freqType) {
-        case 'once': on.setOnceDate(ds); break;
-        case 'dates': on.toggleDate(ds); break;
-        case 'weekly': on.toggleDay(ref.getDay()); break;
-        case 'monthly_day': on.setDay(ref.getDate()); break;
-        case 'monthly_nth': {
-          on.setWeek(Math.min(Math.ceil(ref.getDate() / 7), 5));
-          on.setWeekday(ref.getDay());
-          break;
-        }
-        // 'daily' covers every day already → tapping has no effect.
+      if (freqType === 'dates') {
+        on.toggleDate(ds);
+      } else if (freqType === 'once') {
+        on.setOnceDate(ds);
+      } else {
+        // 他の頻度でタップ → 「任意」に自動切り替えしてその日を追加
+        on.setType('dates');
+        on.toggleDate(ds);
       }
     };
     return (
