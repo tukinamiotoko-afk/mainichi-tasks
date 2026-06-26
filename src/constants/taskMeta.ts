@@ -49,7 +49,7 @@ export const FREQ_TYPES: { value: FreqType; label: string }[] = [
   { value: 'monthly_nth', label: '毎月（曜日）' },
   { value: 'monthly_day', label: '毎月（日付）' },
   { value: 'once', label: 'その日限り' },
-  { value: 'dates', label: '日付指定' },
+  { value: 'dates', label: '任意' },
 ];
 
 // week=5 means "last week of the month".
@@ -115,11 +115,11 @@ export function frequencyLabel(t: TaskFreq): string {
     }
     case 'dates': {
       const list = parseDateList(t.freq_dates);
-      if (list.length === 0) return '日付指定';
+      if (list.length === 0) return '任意';
       if (list.length <= 3) {
         return list.map((s) => { const [, m, d] = s.split('-'); return `${Number(m)}/${Number(d)}`; }).join('・');
       }
-      return `日付指定 (${list.length}日)`;
+      return `任意 (${list.length}日)`;
     }
     case 'daily':
     default:

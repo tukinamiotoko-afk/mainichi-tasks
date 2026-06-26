@@ -858,7 +858,7 @@ export default function HomeScreen({ navigation }: Props) {
       )}
 
       {(freqType === 'once' || freqType === 'dates') && (
-        <Text style={s.calHint}>{freqType === 'dates' ? 'カレンダーをタップして実行する日を選択（複数可）' : 'カレンダーをタップして日付を選択'}</Text>
+        <Text style={s.calHint}>{freqType === 'dates' ? 'カレンダーをタップして任意の日を選択（複数可）' : 'カレンダーをタップして日付を選択'}</Text>
       )}
       <FreqCalendar
         freq={{ freq_type: freqType, freq_days: daysToCsv(days), freq_week: week, freq_weekday: weekday, freq_day: day, once_date: onceDate, freq_dates: freqDates }}
