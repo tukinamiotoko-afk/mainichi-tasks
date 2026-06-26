@@ -15,6 +15,7 @@ import { RootStackParamList } from '../../App';
 import {
   Task, TaskFields, getToday, getTasks, addTask, updateTask, deleteTask,
   getCompletedTaskIds, markComplete, markIncomplete, updateTaskSortOrders,
+  getSetting,
 } from '../db/database';
 import {
   TASK_ICONS, PRIORITIES, priorityMeta, WEEKDAYS,
@@ -280,6 +281,7 @@ export default function HomeScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const screen = Dimensions.get('window');
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [tagRight, setTagRight] = useState(false);
   const tasksRef = useRef<Task[]>([]);
   const [completedIds, setCompletedIds] = useState<Set<number>>(new Set());
   const [showThumb, setShowThumb] = useState(false);
@@ -335,10 +337,14 @@ export default function HomeScreen({ navigation }: Props) {
   const [minuteInput, setMinuteInput] = useState('00');
 
   const load = useCallback(async () => {
-    const ts = await getTasks(db);
-    const ids = await getCompletedTaskIds(db, today);
+    const [ts, ids, layout] = await Promise.all([
+      getTasks(db),
+      getCompletedTaskIds(db, today),
+      getSetting(db, 'card_layout'),
+    ]);
     setTasks(ts);
     setCompletedIds(new Set(ids));
+    setTagRight(layout === 'tag_right');
   }, [db, today]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -1076,9 +1082,11 @@ export default function HomeScreen({ navigation }: Props) {
                 ]}
                 {...panResponder.panHandlers}
               >
-              <TouchableOpacity style={s.tagBtn} onPress={() => openDetail(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Text style={[s.tagIcon, !item.icon && s.tagIconEmpty]}>{item.icon ?? '🏷'}</Text>
-              </TouchableOpacity>
+              {!tagRight && (
+                <TouchableOpacity style={s.tagBtn} onPress={() => openDetail(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Text style={[s.tagIcon, !item.icon && s.tagIconEmpty]}>{item.icon ?? '🏷'}</Text>
+                </TouchableOpacity>
+              )}
               <TouchableOpacity
                 style={s.taskBody}
                 onPress={() => openDetail(item)}
@@ -1102,6 +1110,11 @@ export default function HomeScreen({ navigation }: Props) {
               >
                 {isDone && <Text style={s.checkMark}>✓</Text>}
               </TouchableOpacity>
+              {tagRight && (
+                <TouchableOpacity style={s.tagBtn} onPress={() => openDetail(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Text style={[s.tagIcon, !item.icon && s.tagIconEmpty]}>{item.icon ?? '🏷'}</Text>
+                </TouchableOpacity>
+              )}
               </Animated.View>
             </View>
           );
