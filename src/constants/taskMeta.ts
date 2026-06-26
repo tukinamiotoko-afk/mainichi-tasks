@@ -41,7 +41,7 @@ export const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
 
 // Recurrence -----------------------------------------------------------------
 
-export type FreqType = 'daily' | 'weekly' | 'monthly_nth' | 'monthly_day' | 'once';
+export type FreqType = 'daily' | 'weekly' | 'monthly_nth' | 'monthly_day' | 'once' | 'dates';
 
 export const FREQ_TYPES: { value: FreqType; label: string }[] = [
   { value: 'daily', label: '毎日' },
@@ -49,6 +49,7 @@ export const FREQ_TYPES: { value: FreqType; label: string }[] = [
   { value: 'monthly_nth', label: '毎月（曜日）' },
   { value: 'monthly_day', label: '毎月（日付）' },
   { value: 'once', label: 'その日限り' },
+  { value: 'dates', label: '日付指定' },
 ];
 
 // week=5 means "last week of the month".
@@ -67,7 +68,16 @@ export type TaskFreq = {
   freq_weekday: number | null;  // monthly_nth: 0-6
   freq_day: number | null;      // monthly_day: 1-31
   once_date?: string | null;    // once: 'YYYY-MM-DD' the single day it applies
+  freq_dates?: string | null;   // dates: csv of 'YYYY-MM-DD' specific days
 };
+
+export function parseDateList(csv: string | null | undefined): string[] {
+  return (csv ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => /^\d{4}-\d{2}-\d{2}$/.test(s))
+    .sort();
+}
 
 function ymd(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -102,6 +112,14 @@ export function frequencyLabel(t: TaskFreq): string {
       if (!t.once_date) return 'その日限り';
       const [, m, d] = t.once_date.split('-');
       return `${Number(m)}/${Number(d)} 限定`;
+    }
+    case 'dates': {
+      const list = parseDateList(t.freq_dates);
+      if (list.length === 0) return '日付指定';
+      if (list.length <= 3) {
+        return list.map((s) => { const [, m, d] = s.split('-'); return `${Number(m)}/${Number(d)}`; }).join('・');
+      }
+      return `日付指定 (${list.length}日)`;
     }
     case 'daily':
     default:
@@ -154,6 +172,8 @@ export function isDueToday(t: TaskFreq, ref: Date = new Date()): boolean {
     }
     case 'once':
       return t.once_date ? t.once_date === ymd(ref) : true;
+    case 'dates':
+      return parseDateList(t.freq_dates).includes(ymd(ref));
     case 'daily':
     default:
       return true;

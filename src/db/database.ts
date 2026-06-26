@@ -7,7 +7,7 @@ export type Task = {
   scheduled_time: string | null; notify: number; notify_id: string | null; notify_type: string;
   freq_type: FreqType; freq_days: string | null;
   freq_week: number | null; freq_weekday: number | null; freq_day: number | null;
-  once_date: string | null;
+  once_date: string | null; freq_dates: string | null;
 };
 export type NotificationSetting = { id: number; time: string; notification_type: string; identifier: string | null; task_id: number | null };
 export type CompletionDetail = { task_id: number; title: string; icon: string | null; date: string; completed_at: string | null };
@@ -32,7 +32,8 @@ export async function migrateDb(db: SQLite.SQLiteDatabase): Promise<void> {
       freq_weekday INTEGER,
       freq_day INTEGER,
       once_date TEXT,
-      notify_type TEXT NOT NULL DEFAULT 'push'
+      notify_type TEXT NOT NULL DEFAULT 'push',
+      freq_dates TEXT
     );
     CREATE TABLE IF NOT EXISTS completions (
       task_id INTEGER NOT NULL,
@@ -79,6 +80,7 @@ export async function migrateDb(db: SQLite.SQLiteDatabase): Promise<void> {
   try { await db.execAsync('ALTER TABLE tasks ADD COLUMN freq_day INTEGER'); } catch {}
   try { await db.execAsync('ALTER TABLE tasks ADD COLUMN once_date TEXT'); } catch {}
   try { await db.execAsync("ALTER TABLE tasks ADD COLUMN notify_type TEXT NOT NULL DEFAULT 'push'"); } catch {}
+  try { await db.execAsync('ALTER TABLE tasks ADD COLUMN freq_dates TEXT'); } catch {}
 }
 
 export async function getSetting(db: SQLite.SQLiteDatabase, key: string): Promise<string | null> {
@@ -115,12 +117,12 @@ export type TaskFields = {
   scheduled_time?: string | null; notify?: number; notify_id?: string | null; notify_type?: string;
   freq_type?: FreqType; freq_days?: string | null;
   freq_week?: number | null; freq_weekday?: number | null; freq_day?: number | null;
-  once_date?: string | null;
+  once_date?: string | null; freq_dates?: string | null;
 };
 
 const TASK_COLUMNS: (keyof TaskFields)[] = [
   'title', 'icon', 'priority', 'scheduled_time', 'notify', 'notify_id', 'notify_type',
-  'freq_type', 'freq_days', 'freq_week', 'freq_weekday', 'freq_day', 'once_date',
+  'freq_type', 'freq_days', 'freq_week', 'freq_weekday', 'freq_day', 'once_date', 'freq_dates',
 ];
 
 export async function addTask(db: SQLite.SQLiteDatabase, title: string): Promise<number> {

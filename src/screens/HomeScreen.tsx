@@ -18,7 +18,7 @@ import {
 } from '../db/database';
 import {
   TASK_ICONS, PRIORITIES, priorityMeta, WEEKDAYS,
-  FreqType, TaskFreq, FREQ_TYPES, NTH_WEEKS, frequencyLabel, parseDays, nextNthWeekdayDate, isDueToday,
+  FreqType, TaskFreq, FREQ_TYPES, NTH_WEEKS, frequencyLabel, parseDays, parseDateList, nextNthWeekdayDate, isDueToday,
 } from '../constants/taskMeta';
 import { GRAD, GRAD_START, GRAD_END } from '../constants/theme';
 import TabBar from '../components/TabBar';
@@ -76,6 +76,7 @@ type Schedulable = {
   freq_weekday: number | null;
   freq_day: number | null;
   once_date?: string | null;
+  freq_dates?: string | null;
 };
 
 async function ensurePermission(): Promise<boolean> {
@@ -115,6 +116,13 @@ async function scheduleTaskNotifs(task: Schedulable): Promise<string[]> {
       const when = task.once_date ? new Date(`${task.once_date}T${task.scheduled_time}:00`) : new Date();
       if (when.getTime() > Date.now()) {
         ids.push(await Notifications.scheduleNotificationAsync({ content, trigger: { date: when } as any }));
+      }
+    } else if (task.freq_type === 'dates') {
+      for (const ds of parseDateList(task.freq_dates)) {
+        const when = new Date(`${ds}T${task.scheduled_time}:00`);
+        if (when.getTime() > Date.now()) {
+          ids.push(await Notifications.scheduleNotificationAsync({ content, trigger: { date: when } as any }));
+        }
       }
     }
   } catch {
@@ -266,6 +274,7 @@ export default function HomeScreen({ navigation }: Props) {
   const [newWeekday, setNewWeekday] = useState(1);
   const [newDay, setNewDay] = useState(1);
   const [newOnceDate, setNewOnceDate] = useState<string>(today);
+  const [newFreqDates, setNewFreqDates] = useState<string[]>([]);
 
   // Task detail sheet
   const [detailTask, setDetailTask] = useState<Task | null>(null);
@@ -343,6 +352,7 @@ export default function HomeScreen({ navigation }: Props) {
     setNewWeekday(1);
     setNewDay(1);
     setNewOnceDate(today);
+    setNewFreqDates([]);
   };
 
   const handleAdd = async () => {
@@ -361,6 +371,7 @@ export default function HomeScreen({ navigation }: Props) {
       freq_weekday: newFreqType === 'monthly_nth' ? newWeekday : null,
       freq_day: newFreqType === 'monthly_day' ? newDay : null,
       once_date: newFreqType === 'once' ? newOnceDate : null,
+      freq_dates: newFreqType === 'dates' ? newFreqDates.slice().sort().join(',') : null,
     };
     await updateTask(db, taskId, fields);
     if (newNotify && newTime) {
@@ -368,7 +379,7 @@ export default function HomeScreen({ navigation }: Props) {
         title, icon: newIcon, scheduled_time: newTime, notify: 1, notify_id: null, notify_type: newNotifyType,
         freq_type: fields.freq_type!, freq_days: fields.freq_days ?? null,
         freq_week: fields.freq_week ?? null, freq_weekday: fields.freq_weekday ?? null, freq_day: fields.freq_day ?? null,
-        once_date: fields.once_date ?? null,
+        once_date: fields.once_date ?? null, freq_dates: fields.freq_dates ?? null,
       });
       await updateTask(db, taskId, { notify_id });
     }
@@ -479,7 +490,14 @@ export default function HomeScreen({ navigation }: Props) {
   const reorderEnabled = sortKey === 'manual' && filterStatus === 'all' && filterFreq === 'all' && filterDue === 'all';
   const displayedTasks = (() => {
     // Hide one-time tasks whose day has already passed.
-    let list = sortedTasks.filter((t) => !(t.freq_type === 'once' && t.once_date && t.once_date < today));
+    let list = sortedTasks.filter((t) => {
+      if (t.freq_type === 'once' && t.once_date && t.once_date < today) return false;
+      if (t.freq_type === 'dates') {
+        const ds = parseDateList(t.freq_dates);
+        if (ds.length > 0 && ds.every((d) => d < today)) return false;
+      }
+      return true;
+    });
     if (filterStatus === 'incomplete') list = list.filter((t) => !completedIds.has(t.id));
     else if (filterStatus === 'done') list = list.filter((t) => completedIds.has(t.id));
     if (filterFreq === 'daily') list = list.filter((t) => t.freq_type === 'daily');
@@ -727,15 +745,18 @@ export default function HomeScreen({ navigation }: Props) {
       setWeekday: (d: number) => void;
       setDay: (d: number) => void;
       setOnceDate: (d: string) => void;
+      toggleDate: (ds: string) => void;
     },
     openPicker: MetaPicker,
     setOpenPicker: (picker: MetaPicker) => void,
     onceDate: string | null,
+    freqDates: string | null,
   ) => {
-    const freqText = frequencyLabel({ freq_type: freqType, freq_days: daysToCsv(days), freq_week: week, freq_weekday: weekday, freq_day: day });
+    const freqText = frequencyLabel({ freq_type: freqType, freq_days: daysToCsv(days), freq_week: week, freq_weekday: weekday, freq_day: day, once_date: onceDate, freq_dates: freqDates });
     const onSelectDate = (ref: Date, ds: string) => {
       switch (freqType) {
         case 'once': on.setOnceDate(ds); break;
+        case 'dates': on.toggleDate(ds); break;
         case 'weekly': on.toggleDay(ref.getDay()); break;
         case 'monthly_day': on.setDay(ref.getDate()); break;
         case 'monthly_nth': {
@@ -836,8 +857,11 @@ export default function HomeScreen({ navigation }: Props) {
         </ScrollView>
       )}
 
+      {(freqType === 'once' || freqType === 'dates') && (
+        <Text style={s.calHint}>{freqType === 'dates' ? 'カレンダーをタップして実行する日を選択（複数可）' : 'カレンダーをタップして日付を選択'}</Text>
+      )}
       <FreqCalendar
-        freq={{ freq_type: freqType, freq_days: daysToCsv(days), freq_week: week, freq_weekday: weekday, freq_day: day, once_date: onceDate }}
+        freq={{ freq_type: freqType, freq_days: daysToCsv(days), freq_week: week, freq_weekday: weekday, freq_day: day, once_date: onceDate, freq_dates: freqDates }}
         onceDate={onceDate}
         onSelect={onSelectDate}
       />
@@ -1176,7 +1200,8 @@ export default function HomeScreen({ navigation }: Props) {
                     setWeekday: setNewWeekday,
                     setDay: setNewDay,
                     setOnceDate: setNewOnceDate,
-                  }, addPicker, setAddPicker, newOnceDate)}
+                    toggleDate: (ds) => setNewFreqDates((cur) => cur.includes(ds) ? cur.filter((x) => x !== ds) : [...cur, ds]),
+                  }, addPicker, setAddPicker, newOnceDate, newFreqDates.slice().sort().join(','))}
 
                   <View style={{ height: 12 }} />
                 </ScrollView>
@@ -1255,6 +1280,7 @@ export default function HomeScreen({ navigation }: Props) {
                             if (t === 'monthly_nth') { patch.freq_week = detailTask.freq_week ?? 1; patch.freq_weekday = detailTask.freq_weekday ?? 1; }
                             if (t === 'monthly_day') patch.freq_day = detailTask.freq_day ?? 1;
                             if (t === 'once') patch.once_date = detailTask.once_date ?? today;
+                            if (t === 'dates') patch.freq_dates = detailTask.freq_dates ?? '';
                             patchDetail(patch);
                           },
                           toggleDay: (d) => {
@@ -1266,10 +1292,16 @@ export default function HomeScreen({ navigation }: Props) {
                           setWeekday: (d) => patchDetail({ freq_weekday: d }),
                           setDay: (d) => patchDetail({ freq_day: d }),
                           setOnceDate: (d) => patchDetail({ once_date: d }),
+                          toggleDate: (ds) => {
+                            const cur = parseDateList(detailTask.freq_dates);
+                            const next = cur.includes(ds) ? cur.filter((x) => x !== ds) : [...cur, ds];
+                            patchDetail({ freq_dates: next.sort().join(',') });
+                          },
                         },
                         detailPicker,
                         setDetailPicker,
                         detailTask.once_date,
+                        detailTask.freq_dates,
                       )}
 
                       <View style={{ height: 12 }} />
@@ -1483,6 +1515,7 @@ const s = StyleSheet.create({
   monthDayText: { color: C.onDark, fontSize: 13, fontWeight: '700' },
   monthDayTextActive: { color: C.onPrimary },
 
+  calHint: { fontSize: 12, color: '#64748b', marginTop: 6, marginBottom: 2 },
   cal: { marginTop: 4, borderWidth: 1, borderColor: C.border, borderRadius: 14, padding: 10, backgroundColor: '#f8fafc' },
   calHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 8, marginBottom: 8 },
   calNav: { fontSize: 26, color: C.primary, fontWeight: '700', width: 32, textAlign: 'center' },
