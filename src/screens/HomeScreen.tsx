@@ -785,13 +785,13 @@ export default function HomeScreen({ navigation }: Props) {
       {openPicker === 'icon' && (
         <View style={s.iconGrid}>
           <RiseIn index={0}>
-            <TouchableOpacity style={[s.iconChip, icon === null && s.iconChipActive]} onPress={() => { onIcon(null); animateNext(); setOpenPicker(null); }}>
+            <TouchableOpacity style={[s.iconChip, icon === null && s.iconChipActive]} onPress={() => { onIcon(null); setOpenPicker(null); }}>
               <Text style={s.iconNone}>なし</Text>
             </TouchableOpacity>
           </RiseIn>
           {TASK_ICONS.map((ic, i) => (
             <RiseIn key={ic} index={i + 1}>
-              <TouchableOpacity style={[s.iconChip, icon === ic && s.iconChipActive]} onPress={() => { onIcon(ic); animateNext(); setOpenPicker(null); }}>
+              <TouchableOpacity style={[s.iconChip, icon === ic && s.iconChipActive]} onPress={() => { onIcon(ic); setOpenPicker(null); }}>
                 <Text style={s.iconEmoji}>{ic}</Text>
               </TouchableOpacity>
             </RiseIn>
@@ -817,7 +817,7 @@ export default function HomeScreen({ navigation }: Props) {
             <RiseIn key={p.value} index={i} style={{ flex: 1 }}>
               <TouchableOpacity
                 style={[s.typeChip, priority === p.value && { backgroundColor: p.color, borderColor: p.color }]}
-                onPress={() => { onPriority(p.value); animateNext(); setOpenPicker(null); }}
+                onPress={() => { onPriority(p.value); setOpenPicker(null); }}
               >
                 <Text style={[s.typeChipText, priority === p.value && s.typeChipTextActive]}>{p.label}</Text>
               </TouchableOpacity>
