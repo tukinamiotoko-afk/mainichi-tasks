@@ -156,6 +156,56 @@ function RiseIn({ index, style, children }: { index: number; style?: any; childr
   );
 }
 
+// Month calendar used to pick the single date of a "その日限り" task.
+function OnceCalendar({ value, onChange }: { value: string | null; onChange: (d: string) => void }) {
+  const base = value ? new Date(`${value}T00:00:00`) : new Date();
+  const [view, setView] = useState({ y: base.getFullYear(), m: base.getMonth() });
+  const startDow = new Date(view.y, view.m, 1).getDay();
+  const daysInMonth = new Date(view.y, view.m + 1, 0).getDate();
+  const cells: (number | null)[] = [];
+  for (let i = 0; i < startDow; i += 1) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d += 1) cells.push(d);
+  while (cells.length % 7 !== 0) cells.push(null);
+  const fmt = (d: number) => `${view.y}-${pad(view.m + 1)}-${pad(d)}`;
+  const shift = (delta: number) => {
+    const next = new Date(view.y, view.m + delta, 1);
+    setView({ y: next.getFullYear(), m: next.getMonth() });
+  };
+  return (
+    <View style={s.cal}>
+      <View style={s.calHeader}>
+        <TouchableOpacity onPress={() => shift(-1)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Text style={s.calNav}>‹</Text>
+        </TouchableOpacity>
+        <Text style={s.calTitle}>{view.y}年 {view.m + 1}月</Text>
+        <TouchableOpacity onPress={() => shift(1)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Text style={s.calNav}>›</Text>
+        </TouchableOpacity>
+      </View>
+      <View style={s.calWeekRow}>
+        {WEEKDAYS.map((w, i) => (
+          <Text key={w} style={[s.calWeekCell, i === 0 && s.calSun, i === 6 && s.calSat]}>{w}</Text>
+        ))}
+      </View>
+      <View style={s.calGrid}>
+        {cells.map((d, i) => {
+          if (d === null) return <View key={`e${i}`} style={s.calCell} />;
+          const ds = fmt(d);
+          const active = value === ds;
+          const dow = i % 7;
+          return (
+            <TouchableOpacity key={ds} style={s.calCell} onPress={() => onChange(ds)} activeOpacity={0.7}>
+              <View style={[s.calDay, active && s.calDayActive]}>
+                <Text style={[s.calDayText, dow === 0 && s.calSun, dow === 6 && s.calSat, active && s.calDayTextActive]}>{d}</Text>
+              </View>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
 export default function HomeScreen({ navigation }: Props) {
   const db = useSQLiteContext();
   const insets = useSafeAreaInsets();
@@ -202,6 +252,7 @@ export default function HomeScreen({ navigation }: Props) {
   const [newWeek, setNewWeek] = useState(1);
   const [newWeekday, setNewWeekday] = useState(1);
   const [newDay, setNewDay] = useState(1);
+  const [newOnceDate, setNewOnceDate] = useState<string>(today);
 
   // Task detail sheet
   const [detailTask, setDetailTask] = useState<Task | null>(null);
@@ -278,6 +329,7 @@ export default function HomeScreen({ navigation }: Props) {
     setNewWeek(1);
     setNewWeekday(1);
     setNewDay(1);
+    setNewOnceDate(today);
   };
 
   const handleAdd = async () => {
@@ -295,7 +347,7 @@ export default function HomeScreen({ navigation }: Props) {
       freq_week: newFreqType === 'monthly_nth' ? newWeek : null,
       freq_weekday: newFreqType === 'monthly_nth' ? newWeekday : null,
       freq_day: newFreqType === 'monthly_day' ? newDay : null,
-      once_date: newFreqType === 'once' ? today : null,
+      once_date: newFreqType === 'once' ? newOnceDate : null,
     };
     await updateTask(db, taskId, fields);
     if (newNotify && newTime) {
@@ -661,9 +713,11 @@ export default function HomeScreen({ navigation }: Props) {
       setWeek: (w: number) => void;
       setWeekday: (d: number) => void;
       setDay: (d: number) => void;
+      setOnceDate: (d: string) => void;
     },
     openPicker: MetaPicker,
     setOpenPicker: (picker: MetaPicker) => void,
+    onceDate: string | null,
   ) => {
     const freqText = frequencyLabel({ freq_type: freqType, freq_days: daysToCsv(days), freq_week: week, freq_weekday: weekday, freq_day: day });
     return (
@@ -754,6 +808,10 @@ export default function HomeScreen({ navigation }: Props) {
             </TouchableOpacity>
           ))}
         </ScrollView>
+      )}
+
+      {freqType === 'once' && (
+        <OnceCalendar value={onceDate} onChange={on.setOnceDate} />
       )}
         </View>
       )}
@@ -1089,7 +1147,8 @@ export default function HomeScreen({ navigation }: Props) {
                     setWeek: setNewWeek,
                     setWeekday: setNewWeekday,
                     setDay: setNewDay,
-                  }, addPicker, setAddPicker)}
+                    setOnceDate: setNewOnceDate,
+                  }, addPicker, setAddPicker, newOnceDate)}
 
                   <View style={{ height: 12 }} />
                 </ScrollView>
@@ -1178,9 +1237,11 @@ export default function HomeScreen({ navigation }: Props) {
                           setWeek: (w) => patchDetail({ freq_week: w }),
                           setWeekday: (d) => patchDetail({ freq_weekday: d }),
                           setDay: (d) => patchDetail({ freq_day: d }),
+                          setOnceDate: (d) => patchDetail({ once_date: d }),
                         },
                         detailPicker,
                         setDetailPicker,
+                        detailTask.once_date,
                       )}
 
                       <View style={{ height: 12 }} />
@@ -1393,6 +1454,21 @@ const s = StyleSheet.create({
   monthDayChipActive: { backgroundColor: C.primary, borderColor: C.primary },
   monthDayText: { color: C.onDark, fontSize: 13, fontWeight: '700' },
   monthDayTextActive: { color: C.onPrimary },
+
+  cal: { marginTop: 4, borderWidth: 1, borderColor: C.border, borderRadius: 14, padding: 10, backgroundColor: '#f8fafc' },
+  calHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 8, marginBottom: 8 },
+  calNav: { fontSize: 26, color: C.primary, fontWeight: '700', width: 32, textAlign: 'center' },
+  calTitle: { fontSize: 15, fontWeight: '800', color: C.muted },
+  calWeekRow: { flexDirection: 'row' },
+  calWeekCell: { flex: 1, textAlign: 'center', fontSize: 11, fontWeight: '700', color: '#94a3b8', paddingBottom: 4 },
+  calGrid: { flexDirection: 'row', flexWrap: 'wrap' },
+  calCell: { width: `${100 / 7}%`, aspectRatio: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 2 },
+  calDay: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  calDayActive: { backgroundColor: C.primary },
+  calDayText: { fontSize: 13, fontWeight: '700', color: C.onDark },
+  calDayTextActive: { color: C.onPrimary },
+  calSun: { color: '#ef4444' },
+  calSat: { color: '#3b82f6' },
 
   timeModalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center', padding: 32 },
   timeModalCard: { width: '100%', backgroundColor: C.card, borderRadius: 18, padding: 20, gap: 12, alignItems: 'center' },
