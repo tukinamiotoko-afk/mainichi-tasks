@@ -1,5 +1,5 @@
-import React, { useState, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, StatusBar } from 'react-native';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, StatusBar, LayoutChangeEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useFocusEffect } from '@react-navigation/native';
@@ -65,6 +65,16 @@ export default function ScheduleScreen({ navigation }: Props) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [completedIds, setCompletedIds] = useState<Set<number>>(new Set());
 
+  const scrollRef = useRef<ScrollView>(null);
+  const nowRowY = useRef<number | null>(null);
+  const wantScroll = useRef(true);
+
+  const maybeScrollToNow = useCallback(() => {
+    if (wantScroll.current && nowRowY.current != null) {
+      scrollRef.current?.scrollTo({ y: Math.max(0, nowRowY.current - 70), animated: false });
+    }
+  }, []);
+
   const load = useCallback(async () => {
     const ts = await getTasks(db);
     const ids = await getCompletedTaskIds(db, today);
@@ -72,7 +82,10 @@ export default function ScheduleScreen({ navigation }: Props) {
     setCompletedIds(new Set(ids));
   }, [db, today]);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  useFocusEffect(useCallback(() => { wantScroll.current = true; load(); }, [load]));
+
+  // Re-center on the current hour once data/layout settle (until the user scrolls).
+  useEffect(() => { maybeScrollToNow(); }, [tasks, mode, maybeScrollToNow]);
 
   const toggle = async (id: number) => {
     if (completedIds.has(id)) await markIncomplete(db, id, today);
@@ -133,7 +146,12 @@ export default function ScheduleScreen({ navigation }: Props) {
       </LinearGradient>
 
       {mode === 'schedule' ? (
-        <ScrollView style={s.bodyView} contentContainerStyle={{ padding: 12, paddingBottom: 28 }}>
+        <ScrollView
+          ref={scrollRef}
+          style={s.bodyView}
+          contentContainerStyle={{ padding: 12, paddingBottom: 28 }}
+          onScrollBeginDrag={() => { wantScroll.current = false; }}
+        >
           <View style={s.table}>
             <View style={[s.row, s.headRow]}>
               <View style={[s.timeCell, s.headCell]}><Text style={s.headText}>時間</Text></View>
@@ -143,7 +161,11 @@ export default function ScheduleScreen({ navigation }: Props) {
               const items = byHour[h] ?? [];
               const isNow = h === bucketHour(nowHour);
               return (
-                <View key={h} style={[s.row, idx === HOURS.length - 1 && s.rowLast]}>
+                <View
+                  key={h}
+                  style={[s.row, idx === HOURS.length - 1 && s.rowLast]}
+                  onLayout={isNow ? (e: LayoutChangeEvent) => { nowRowY.current = 12 + e.nativeEvent.layout.y; maybeScrollToNow(); } : undefined}
+                >
                   <View style={[s.timeCell, isNow && s.timeCellNow]}>
                     <Text style={[s.timeText, isNow && s.timeTextNow]}>{hourLabel(h)}</Text>
                   </View>
