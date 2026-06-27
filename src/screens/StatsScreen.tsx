@@ -23,6 +23,7 @@ const GRID_GAP = 10;
 type Mode = 'rate' | 'calendar';
 type Period = '7日' | '30日' | '全期間' | '任意';
 type FreqFilter = 'すべて' | '毎日' | 'その他';
+type DropdownKey = 'period' | 'freq';
 type Rate = { task: Task; completed: number; total: number; rate: number };
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'Stats'> };
 
@@ -40,16 +41,46 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   segText: { color: '#ffffff', fontSize: 13, fontWeight: '800' },
   segTextActive: { color: '#2563eb' },
 
-  chipRow: { flexDirection: 'row', gap: 8 },
-  chip: { borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6 },
-  chipActive: { backgroundColor: '#ffffff', borderColor: '#ffffff' },
-  chipText: { color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '700' },
-  chipTextActive: { color: '#2563eb' },
+  // compact selector buttons (replaces chip rows)
+  selectorRow: { flexDirection: 'row', gap: 8 },
+  selectorBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 10,
+    paddingHorizontal: 12, paddingVertical: 8,
+  },
+  selectorBtnOpen: { backgroundColor: 'rgba(255,255,255,0.3)' },
+  selectorLeft: { gap: 1 },
+  selectorLabel: { color: 'rgba(255,255,255,0.75)', fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
+  selectorValue: { color: '#ffffff', fontSize: 13, fontWeight: '800' },
+  selectorArrow: { color: 'rgba(255,255,255,0.8)', fontSize: 12, fontWeight: '700' },
+
+  // dropdown card
+  dropdown: {
+    position: 'absolute', left: 12, right: 12, zIndex: 100,
+    backgroundColor: C.card, borderRadius: 14, overflow: 'hidden',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.18, shadowRadius: 16, elevation: 12,
+  },
+  dropdownItem: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, paddingVertical: 13,
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.border,
+  },
+  dropdownItemLast: { borderBottomWidth: 0 },
+  dropdownItemText: { color: C.onDark, fontSize: 14, fontWeight: '600' },
+  dropdownItemTextActive: { color: C.primary, fontWeight: '800' },
+  dropdownCheck: { color: C.primary, fontSize: 16, fontWeight: '800' },
+  dropdownBackdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 50 },
 
   monthNav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   navBtn: { padding: 6 },
   navBtnText: { color: '#ffffff', fontSize: 26, fontWeight: '300' },
   monthLabel: { color: '#ffffff', fontSize: 17, fontWeight: '700' },
+
+  chipRow: { flexDirection: 'row', gap: 8 },
+  chip: { borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6 },
+  chipActive: { backgroundColor: '#ffffff', borderColor: '#ffffff' },
+  chipText: { color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '700' },
+  chipTextActive: { color: '#2563eb' },
 
   customBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.card, paddingHorizontal: 16, paddingVertical: 10, gap: 6, borderBottomWidth: 1, borderBottomColor: C.border },
   customLabel: { color: C.stone, fontSize: 11, fontWeight: '700' },
@@ -98,6 +129,19 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   calEmptyBody: { color: C.muted, fontSize: 13, textAlign: 'center', paddingHorizontal: 24 },
 });
 
+const PERIOD_OPTIONS: { value: Period; label: string }[] = [
+  { value: '7日', label: '直近 7日間' },
+  { value: '30日', label: '直近 30日間' },
+  { value: '全期間', label: '全期間' },
+  { value: '任意', label: '任意の期間を指定…' },
+];
+
+const FREQ_OPTIONS: { value: FreqFilter; label: string }[] = [
+  { value: 'すべて', label: 'すべてのタスク' },
+  { value: '毎日', label: '毎日タスクのみ' },
+  { value: 'その他', label: 'その他（毎日以外）' },
+];
+
 export default function StatsScreen({ navigation }: Props) {
   const db = useSQLiteContext();
   const insets = useSafeAreaInsets();
@@ -106,6 +150,8 @@ export default function StatsScreen({ navigation }: Props) {
   const today = getToday();
 
   const [mode, setMode] = useState<Mode>('rate');
+  const [openDropdown, setOpenDropdown] = useState<DropdownKey | null>(null);
+  const [headerHeight, setHeaderHeight] = useState(0);
 
   // ── Rate (execution rate) state ──
   const [period, setPeriod] = useState<Period>('7日');
@@ -123,7 +169,6 @@ export default function StatsScreen({ navigation }: Props) {
   const [columns, setColumns] = useState<1 | 2>(2);
   const [calTasks, setCalTasks] = useState<Task[]>([]);
 
-  // Persist the calendar column choice.
   useEffect(() => {
     getSetting(db, 'calendar_columns').then((v) => {
       if (v === '1' || v === '2') setColumns(Number(v) as 1 | 2);
@@ -177,7 +222,6 @@ export default function StatsScreen({ navigation }: Props) {
 
   useFocusEffect(useCallback(() => { loadRates(); loadCalendar(); }, [loadRates, loadCalendar]));
 
-  // ── Rate helpers ──
   const periodLabel = (): string => {
     if (period === '7日') return '直近7日間';
     if (period === '30日') return '直近30日間';
@@ -186,7 +230,6 @@ export default function StatsScreen({ navigation }: Props) {
   };
   const barColor = (rate: number) => rate >= 0.8 ? C.primary : rate >= 0.5 ? C.warning : C.muted;
 
-  // ── Calendar helpers ──
   const prevMonth = () => { if (month === 1) { setMonth(12); setYear(y => y - 1); } else setMonth(m => m - 1); };
   const nextMonth = () => { if (month === 12) { setMonth(1); setYear(y => y + 1); } else setMonth(m => m + 1); };
 
@@ -228,36 +271,59 @@ export default function StatsScreen({ navigation }: Props) {
     );
   };
 
+  const toggleDropdown = (key: DropdownKey) =>
+    setOpenDropdown(prev => prev === key ? null : key);
+
+  const periodDisplay = PERIOD_OPTIONS.find(o => o.value === period)?.label ?? period;
+  const freqDisplay = freqFilter;
+
   return (
     <View style={s.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
-      <LinearGradient colors={grad.header} start={GRAD_START} end={GRAD_END} style={[s.headerCard, { paddingTop: insets.top + 12 }]}>
+      <LinearGradient
+        colors={grad.header}
+        start={GRAD_START}
+        end={GRAD_END}
+        style={[s.headerCard, { paddingTop: insets.top + 12 }]}
+        onLayout={(e) => setHeaderHeight(e.nativeEvent.layout.height + insets.top)}
+      >
         <View style={s.segRow}>
           {(['rate', 'calendar'] as Mode[]).map((m) => (
-            <TouchableOpacity key={m} style={[s.segChip, mode === m && s.segChipActive]} onPress={() => setMode(m)}>
+            <TouchableOpacity key={m} style={[s.segChip, mode === m && s.segChipActive]} onPress={() => { setOpenDropdown(null); setMode(m); }}>
               <Text style={[s.segText, mode === m && s.segTextActive]}>{m === 'rate' ? '実行率' : 'カレンダー'}</Text>
             </TouchableOpacity>
           ))}
         </View>
 
         {mode === 'rate' ? (
-          <>
-            <View style={s.chipRow}>
-              {(['7日', '30日', '全期間', '任意'] as Period[]).map((p) => (
-                <TouchableOpacity key={p} style={[s.chip, period === p && s.chipActive]} onPress={() => setPeriod(p)}>
-                  <Text style={[s.chipText, period === p && s.chipTextActive]}>{p}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            <View style={s.chipRow}>
-              {(['すべて', '毎日', 'その他'] as FreqFilter[]).map((f) => (
-                <TouchableOpacity key={f} style={[s.chip, freqFilter === f && s.chipActive]} onPress={() => setFreqFilter(f)}>
-                  <Text style={[s.chipText, freqFilter === f && s.chipTextActive]}>{f}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </>
+          <View style={s.selectorRow}>
+            {/* 期間セレクター */}
+            <TouchableOpacity
+              style={[s.selectorBtn, openDropdown === 'period' && s.selectorBtnOpen]}
+              onPress={() => toggleDropdown('period')}
+              activeOpacity={0.8}
+            >
+              <View style={s.selectorLeft}>
+                <Text style={s.selectorLabel}>期間</Text>
+                <Text style={s.selectorValue} numberOfLines={1}>{periodDisplay}</Text>
+              </View>
+              <Text style={s.selectorArrow}>{openDropdown === 'period' ? '▲' : '▼'}</Text>
+            </TouchableOpacity>
+
+            {/* 頻度セレクター */}
+            <TouchableOpacity
+              style={[s.selectorBtn, openDropdown === 'freq' && s.selectorBtnOpen]}
+              onPress={() => toggleDropdown('freq')}
+              activeOpacity={0.8}
+            >
+              <View style={s.selectorLeft}>
+                <Text style={s.selectorLabel}>頻度</Text>
+                <Text style={s.selectorValue}>{freqDisplay}</Text>
+              </View>
+              <Text style={s.selectorArrow}>{openDropdown === 'freq' ? '▲' : '▼'}</Text>
+            </TouchableOpacity>
+          </View>
         ) : (
           <>
             <View style={s.monthNav}>
@@ -279,6 +345,55 @@ export default function StatsScreen({ navigation }: Props) {
           </>
         )}
       </LinearGradient>
+
+      {/* ドロップダウンの背後タップで閉じる */}
+      {openDropdown && (
+        <TouchableOpacity
+          style={s.dropdownBackdrop}
+          activeOpacity={1}
+          onPress={() => setOpenDropdown(null)}
+        />
+      )}
+
+      {/* 期間ドロップダウン */}
+      {openDropdown === 'period' && (
+        <View style={[s.dropdown, { top: headerHeight }]}>
+          {PERIOD_OPTIONS.map((opt, i) => {
+            const isActive = period === opt.value;
+            const isLast = i === PERIOD_OPTIONS.length - 1;
+            return (
+              <TouchableOpacity
+                key={opt.value}
+                style={[s.dropdownItem, isLast && s.dropdownItemLast]}
+                onPress={() => { setPeriod(opt.value); setOpenDropdown(null); }}
+              >
+                <Text style={[s.dropdownItemText, isActive && s.dropdownItemTextActive]}>{opt.label}</Text>
+                {isActive && <Text style={s.dropdownCheck}>✓</Text>}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
+
+      {/* 頻度ドロップダウン */}
+      {openDropdown === 'freq' && (
+        <View style={[s.dropdown, { top: headerHeight }]}>
+          {FREQ_OPTIONS.map((opt, i) => {
+            const isActive = freqFilter === opt.value;
+            const isLast = i === FREQ_OPTIONS.length - 1;
+            return (
+              <TouchableOpacity
+                key={opt.value}
+                style={[s.dropdownItem, isLast && s.dropdownItemLast]}
+                onPress={() => { setFreqFilter(opt.value); setOpenDropdown(null); }}
+              >
+                <Text style={[s.dropdownItemText, isActive && s.dropdownItemTextActive]}>{opt.label}</Text>
+                {isActive && <Text style={s.dropdownCheck}>✓</Text>}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
 
       {mode === 'rate' ? (
         <>
