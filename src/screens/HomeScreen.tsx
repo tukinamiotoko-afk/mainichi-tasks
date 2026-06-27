@@ -30,6 +30,8 @@ type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'Home'>
 const pad = (n: number) => String(n).padStart(2, '0');
 const daysToCsv = (days: number[]) => days.slice().sort((a, b) => a - b).join(',');
 const DRAG_ROW_HEIGHT = 88;
+const DRAG_GAP = 10;
+const DRAG_SLOT = DRAG_ROW_HEIGHT + DRAG_GAP; // actual slot size including gap
 
 type FilterStatus = 'all' | 'incomplete' | 'done';
 type FilterFreq = 'all' | 'daily' | 'other';
@@ -507,7 +509,7 @@ export default function HomeScreen({ navigation }: Props) {
   const fabStartPosition = useRef(fabPosition.current);
   const fabAnim = useRef(new Animated.ValueXY(fabPosition.current)).current;
   const [activeDragId, setActiveDragId] = useState<number | null>(null);
-  const dragState = useRef({ taskId: null as number | null, startIndex: 0, currentIndex: 0, changed: false });
+  const dragState = useRef({ taskId: null as number | null, startIndex: 0, currentIndex: 0, changed: false, accSlots: 0 });
   const dragY = useRef(new Animated.Value(0)).current;
   const dragScale = useRef(new Animated.Value(1)).current;
   const swipeState = useRef({ taskId: null as number | null });
@@ -821,6 +823,7 @@ export default function HomeScreen({ navigation }: Props) {
   };
 
   const moveTask = (taskId: number, toIndex: number) => {
+    LayoutAnimation.configureNext(LayoutAnimation.create(160, LayoutAnimation.Types.easeInEaseOut, LayoutAnimation.Properties.opacity));
     setTasks((current) => {
       const ordered = [...current].sort((a, b) => {
         if (a.sort_order !== b.sort_order) return a.sort_order - b.sort_order;
@@ -842,7 +845,7 @@ export default function HomeScreen({ navigation }: Props) {
     setSwipingId(null);
     swipeAnim.setValue(0);
     setActiveDragId(taskId);
-    dragState.current = { taskId, startIndex: index, currentIndex: index, changed: false };
+    dragState.current = { taskId, startIndex: index, currentIndex: index, changed: false, accSlots: 0 };
     dragY.setValue(0);
     Animated.spring(dragScale, {
       toValue: 1.04,
@@ -853,20 +856,29 @@ export default function HomeScreen({ navigation }: Props) {
   };
 
   const updateDrag = (dy: number) => {
-    const { taskId, startIndex, currentIndex } = dragState.current;
-    if (taskId == null) return;
-    const nextIndex = Math.max(0, Math.min(startIndex + Math.round(dy / DRAG_ROW_HEIGHT), tasksRef.current.length - 1));
-    const visualDy = dy - (nextIndex - startIndex) * DRAG_ROW_HEIGHT;
-    dragY.setValue(Math.max(-DRAG_ROW_HEIGHT * 0.9, Math.min(DRAG_ROW_HEIGHT * 0.9, visualDy)));
-    if (nextIndex !== currentIndex) {
-      moveTask(taskId, nextIndex);
-      dragState.current.currentIndex = nextIndex;
+    const state = dragState.current;
+    if (state.taskId == null) return;
+    // localDy is displacement relative to the current slot (not the start position)
+    const localDy = dy - state.accSlots * DRAG_SLOT;
+    if (localDy > DRAG_SLOT / 2 && state.currentIndex < tasksRef.current.length - 1) {
+      state.accSlots += 1;
+      state.currentIndex += 1;
+      state.changed = true;
+      moveTask(state.taskId, state.currentIndex);
+    } else if (localDy < -DRAG_SLOT / 2 && state.currentIndex > 0) {
+      state.accSlots -= 1;
+      state.currentIndex -= 1;
+      state.changed = true;
+      moveTask(state.taskId, state.currentIndex);
     }
+    // Recalculate after possible slot change so dragY reflects updated accSlots
+    const finalDy = dy - state.accSlots * DRAG_SLOT;
+    dragY.setValue(Math.max(-DRAG_SLOT * 0.9, Math.min(DRAG_SLOT * 0.9, finalDy)));
   };
 
   const endDrag = () => {
     if (dragState.current.changed) persistTaskOrder();
-    dragState.current = { taskId: null, startIndex: 0, currentIndex: 0, changed: false };
+    dragState.current = { taskId: null, startIndex: 0, currentIndex: 0, changed: false, accSlots: 0 };
     setActiveDragId(null);
     Animated.parallel([
       Animated.spring(dragY, { toValue: 0, useNativeDriver: true, tension: 220, friction: 14 }),
