@@ -24,21 +24,25 @@ import TabBar from '../components/TabBar';
 import { useTheme, ColorSet } from '../contexts/ThemeContext';
 
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'Timer'> };
+type TimerMode = 'stopwatch' | 'timer';
 type TimerItem = {
   task: Task;
   baseSeconds: number;
   startedAtMs: number | null;
   startedAtIso: string | null;
 };
+const TIMER_TARGET_SECONDS = 25 * 60;
 
 const makeStyles = (C: ColorSet) => StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: C.body },
   body: { flex: 1, backgroundColor: C.body },
   content: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 92, gap: 12 },
-  clockPanel: { alignItems: 'center', gap: 6, paddingTop: 4, paddingBottom: 8 },
-  clockLabel: { color: C.muted, fontSize: 12, fontWeight: '800' },
-  clockText: { color: C.onDark, fontSize: 54, fontWeight: '900', letterSpacing: 1 },
-  clockSub: { color: C.stone, fontSize: 12, fontWeight: '800' },
+  modeRow: { flexDirection: 'row', gap: 8 },
+  modeBtn: { flex: 1, borderWidth: 1, borderColor: C.border, borderRadius: 12, paddingVertical: 10, alignItems: 'center', backgroundColor: C.card },
+  modeBtnActive: { backgroundColor: C.primary, borderColor: C.primary },
+  modeText: { color: C.onDark, fontSize: 13, fontWeight: '900' },
+  modeTextActive: { color: C.onPrimary },
+  modeSub: { color: C.muted, fontSize: 11, fontWeight: '800', textAlign: 'center' },
   actionRow: { flexDirection: 'row', gap: 8 },
   addBtnWrap: { flex: 1 },
   addBtn: { borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
@@ -58,6 +62,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   timerTime: { color: C.onDark, fontSize: 42, fontWeight: '900', textAlign: 'center', letterSpacing: 1 },
   timerControls: { flexDirection: 'row', gap: 8 },
   controlBtn: { flex: 1, borderRadius: 10, paddingVertical: 11, alignItems: 'center' },
+  controlBtnDisabled: { opacity: 0.45 },
   pauseBtn: { backgroundColor: C.card, borderWidth: 1, borderColor: C.border },
   saveBtn: { backgroundColor: C.danger },
   controlText: { color: C.onPrimary, fontSize: 13, fontWeight: '900' },
@@ -110,6 +115,11 @@ function timerSeconds(item: TimerItem, now: number): number {
   return item.baseSeconds + Math.floor((now - item.startedAtMs) / 1000);
 }
 
+function displayTimerSeconds(item: TimerItem, now: number, mode: TimerMode): number {
+  const elapsed = timerSeconds(item, now);
+  return mode === 'timer' ? Math.max(TIMER_TARGET_SECONDS - elapsed, 0) : elapsed;
+}
+
 export default function TimerScreen({ navigation }: Props) {
   const db = useSQLiteContext();
   const insets = useSafeAreaInsets();
@@ -122,12 +132,12 @@ export default function TimerScreen({ navigation }: Props) {
   const [timers, setTimers] = useState<TimerItem[]>([]);
   const [logs, setLogs] = useState<TimeLog[]>([]);
   const [totalSeconds, setTotalSeconds] = useState(0);
+  const [mode, setMode] = useState<TimerMode>('stopwatch');
   const [pickerOpen, setPickerOpen] = useState(false);
   const [now, setNow] = useState(Date.now());
   const savingRef = useRef<Set<number>>(new Set());
 
   const runningCount = timers.filter((item) => item.startedAtMs).length;
-  const activeSeconds = timers.reduce((sum, item) => sum + timerSeconds(item, now), 0);
 
   const load = useCallback(async () => {
     const [loadedTasks, loadedLogs, loadedTotal] = await Promise.all([
@@ -196,7 +206,8 @@ export default function TimerScreen({ navigation }: Props) {
     const timer = timers.find((item) => item.task.id === taskId);
     if (!timer || savingRef.current.has(taskId)) return;
     const endedAtMs = Date.now();
-    const duration = timerSeconds(timer, endedAtMs);
+    const elapsed = timerSeconds(timer, endedAtMs);
+    const duration = mode === 'timer' ? Math.min(elapsed, TIMER_TARGET_SECONDS) : elapsed;
     if (duration <= 0) return;
     savingRef.current.add(taskId);
     const endedAt = new Date(endedAtMs).toISOString();
@@ -209,6 +220,15 @@ export default function TimerScreen({ navigation }: Props) {
     await load();
     savingRef.current.delete(taskId);
   };
+
+  useEffect(() => {
+    if (mode !== 'timer') return;
+    timers.forEach((item) => {
+      if (item.startedAtMs && timerSeconds(item, now) >= TIMER_TARGET_SECONDS) {
+        saveTimer(item.task.id);
+      }
+    });
+  }, [mode, now, timers]);
 
   const handleDeleteLog = (log: TimeLog) => {
     Alert.alert('履歴を削除', `${formatDate(log.date)} ${log.title} の ${formatDuration(log.duration_seconds, true)} を削除しますか？`, [
@@ -254,11 +274,26 @@ export default function TimerScreen({ navigation }: Props) {
     <View style={s.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor={C.body} />
       <ScrollView style={s.body} contentContainerStyle={[s.content, { paddingTop: insets.top + 16 }]}>
-        <View style={s.clockPanel}>
-          <Text style={s.clockLabel}>計測中</Text>
-          <Text style={s.clockText}>{formatDuration(activeSeconds, true)}</Text>
-          <Text style={s.clockSub}>今日の保存済み {formatDuration(totalSeconds, true)} ・ 動作中 {runningCount}件</Text>
+        <View style={s.modeRow}>
+          <TouchableOpacity
+            style={[s.modeBtn, mode === 'stopwatch' && s.modeBtnActive]}
+            onPress={() => setMode('stopwatch')}
+            activeOpacity={0.85}
+          >
+            <Text style={[s.modeText, mode === 'stopwatch' && s.modeTextActive]}>ストップウォッチ</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[s.modeBtn, mode === 'timer' && s.modeBtnActive]}
+            onPress={() => setMode('timer')}
+            activeOpacity={0.85}
+          >
+            <Text style={[s.modeText, mode === 'timer' && s.modeTextActive]}>タイマー</Text>
+          </TouchableOpacity>
         </View>
+        <Text style={s.modeSub}>
+          今日の保存済み {formatDuration(totalSeconds, true)} ・ 動作中 {runningCount}件
+          {mode === 'timer' ? ` ・ ${formatDuration(TIMER_TARGET_SECONDS, true)}で停止` : ''}
+        </Text>
 
         <View style={s.actionRow}>
           <TouchableOpacity style={s.addBtnWrap} onPress={() => setPickerOpen(true)} activeOpacity={0.86}>
@@ -279,6 +314,7 @@ export default function TimerScreen({ navigation }: Props) {
           </View>
         ) : timers.map((item) => {
           const seconds = timerSeconds(item, now);
+          const shownSeconds = displayTimerSeconds(item, now, mode);
           const running = !!item.startedAtMs;
           return (
             <View key={item.task.id} style={s.timerCard}>
@@ -294,18 +330,18 @@ export default function TimerScreen({ navigation }: Props) {
                   <Text style={s.removeText}>×</Text>
                 </TouchableOpacity>
               </View>
-              <Text style={s.timerTime}>{formatDuration(seconds, true)}</Text>
+              <Text style={s.timerTime}>{formatDuration(shownSeconds, true)}</Text>
               <View style={s.timerControls}>
-                <TouchableOpacity onPress={() => running ? pauseTimer(item.task.id) : startTimer(item.task.id)} activeOpacity={0.86} style={{ flex: 1 }}>
-                  <LinearGradient colors={running ? GRAD.brand : GRAD.success} start={GRAD_START} end={GRAD_END} style={s.controlBtn}>
-                    <Text style={s.controlText}>{running ? '一時停止' : seconds > 0 ? '再開' : '開始'}</Text>
+                <TouchableOpacity onPress={() => startTimer(item.task.id)} disabled={running} activeOpacity={0.86} style={{ flex: 1 }}>
+                  <LinearGradient colors={GRAD.success} start={GRAD_START} end={GRAD_END} style={[s.controlBtn, running && s.controlBtnDisabled]}>
+                    <Text style={s.controlText}>開始</Text>
                   </LinearGradient>
                 </TouchableOpacity>
                 <TouchableOpacity style={[s.controlBtn, s.pauseBtn]} onPress={() => pauseTimer(item.task.id)} disabled={!running}>
-                  <Text style={[s.controlText, s.pauseText]}>ずらす</Text>
+                  <Text style={[s.controlText, s.pauseText]}>一時停止</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={[s.controlBtn, s.saveBtn]} onPress={() => saveTimer(item.task.id)} disabled={seconds <= 0}>
-                  <Text style={[s.controlText, s.saveText]}>保存</Text>
+                  <Text style={[s.controlText, s.saveText]}>完全停止</Text>
                 </TouchableOpacity>
               </View>
             </View>
