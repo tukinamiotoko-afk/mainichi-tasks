@@ -188,7 +188,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   dateTodayHint: { color: 'rgba(255,255,255,0.75)', fontSize: 10, fontWeight: '700', marginTop: 2 },
   headerLabel: { color: 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
   progressRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 6 },
-  progressBg: { flex: 1, height: 12, backgroundColor: 'rgba(255,255,255,0.45)', borderRadius: 6, overflow: 'hidden' },
+  progressBg: { flex: 1, height: 10, backgroundColor: 'rgba(255,255,255,0.45)', borderRadius: 5, overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: 4, overflow: 'hidden' },
   progressGrad: { flex: 1 },
   progressText: { color: '#ffffff', fontSize: 11, fontWeight: '700' },
