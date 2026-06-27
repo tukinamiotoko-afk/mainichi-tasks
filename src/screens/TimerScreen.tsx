@@ -43,12 +43,9 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   modeText: { color: C.onDark, fontSize: 13, fontWeight: '900' },
   modeTextActive: { color: C.onPrimary },
   modeSub: { color: C.muted, fontSize: 11, fontWeight: '800', textAlign: 'center' },
-  actionRow: { flexDirection: 'row', gap: 8 },
   addBtnWrap: { flex: 1 },
   addBtn: { borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
   addBtnText: { color: C.onPrimary, fontSize: 14, fontWeight: '900' },
-  startAllBtn: { flex: 1, borderWidth: 1, borderColor: C.border, borderRadius: 12, paddingVertical: 12, alignItems: 'center', backgroundColor: C.card },
-  startAllText: { color: C.onDark, fontSize: 14, fontWeight: '900' },
   sectionTitle: { color: C.stone, fontSize: 12, fontWeight: '900', marginTop: 4 },
   timerCard: { backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 12, padding: 14, gap: 12 },
   timerTop: { flexDirection: 'row', alignItems: 'center', gap: 10 },
@@ -194,14 +191,6 @@ export default function TimerScreen({ navigation }: Props) {
     )));
   };
 
-  const startAll = () => {
-    const stamp = Date.now();
-    const iso = new Date(stamp).toISOString();
-    setTimers((current) => current.map((item) => (
-      item.startedAtMs ? item : { ...item, startedAtMs: stamp, startedAtIso: iso }
-    )));
-  };
-
   const saveTimer = async (taskId: number) => {
     const timer = timers.find((item) => item.task.id === taskId);
     if (!timer || savingRef.current.has(taskId)) return;
@@ -295,16 +284,11 @@ export default function TimerScreen({ navigation }: Props) {
           {mode === 'timer' ? ` ・ ${formatDuration(TIMER_TARGET_SECONDS, true)}で停止` : ''}
         </Text>
 
-        <View style={s.actionRow}>
-          <TouchableOpacity style={s.addBtnWrap} onPress={() => setPickerOpen(true)} activeOpacity={0.86}>
-            <LinearGradient colors={grad.brand} start={GRAD_START} end={GRAD_END} style={s.addBtn}>
-              <Text style={s.addBtnText}>＋ 測るものを追加</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-          <TouchableOpacity style={s.startAllBtn} onPress={startAll} disabled={timers.length === 0} activeOpacity={0.86}>
-            <Text style={s.startAllText}>同時に開始</Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity style={s.addBtnWrap} onPress={() => setPickerOpen(true)} activeOpacity={0.86}>
+          <LinearGradient colors={grad.brand} start={GRAD_START} end={GRAD_END} style={s.addBtn}>
+            <Text style={s.addBtnText}>＋ 測るものを追加</Text>
+          </LinearGradient>
+        </TouchableOpacity>
 
         <Text style={s.sectionTitle}>計測するもの</Text>
         {timers.length === 0 ? (
