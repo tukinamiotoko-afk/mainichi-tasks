@@ -1479,19 +1479,19 @@ export default function HomeScreen({ navigation }: Props) {
                   {
                     translateY: thumbAnim.interpolate({
                       inputRange: [0, 0.14, 0.28, 0.44, 0.6, 0.78, 1],
-                      outputRange: [26, -24, 6, -18, 4, -10, 0],
+                      outputRange: [18, -16, 4, -12, 3, -6, 0],
                     }),
                   },
                   {
                     rotate: thumbAnim.interpolate({
                       inputRange: [0, 0.14, 0.28, 0.44, 0.6, 0.78, 1],
-                      outputRange: ['0deg', '-14deg', '9deg', '12deg', '-8deg', '5deg', '0deg'],
+                      outputRange: ['0deg', '-8deg', '5deg', '7deg', '-4deg', '3deg', '0deg'],
                     }),
                   },
                   {
                     scale: thumbAnim.interpolate({
                       inputRange: [0, 0.14, 0.28, 0.44, 0.6, 0.78, 1],
-                      outputRange: [0.55, 1.38, 0.9, 1.24, 0.95, 1.12, 1],
+                      outputRange: [0.7, 1.18, 0.96, 1.12, 0.98, 1.06, 1],
                     }),
                   },
                 ],
