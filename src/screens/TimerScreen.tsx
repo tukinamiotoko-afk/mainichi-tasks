@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, StatusBar, Alert, ScrollView, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, StatusBar, Alert, ScrollView, Modal, Dimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useFocusEffect } from '@react-navigation/native';
@@ -74,8 +74,9 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   logDuration: { color: C.onDark, fontSize: 15, fontWeight: '900' },
   deleteLogBtn: { backgroundColor: '#fee2e2', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7 },
   deleteLogText: { color: '#dc2626', fontSize: 11, fontWeight: '900' },
-  modalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  pickerSheet: { height: '92%', backgroundColor: C.card, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 18, paddingBottom: 0, gap: 12 },
+  modalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' },
+  modalBackdrop: { ...StyleSheet.absoluteFillObject },
+  pickerSheet: { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: C.card, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 18, gap: 12 },
   sheetHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: C.border, alignSelf: 'center' },
   pickerTitle: { color: C.onDark, fontSize: 16, fontWeight: '900' },
   pickerList: { flex: 1 },
@@ -115,6 +116,7 @@ export default function TimerScreen({ navigation }: Props) {
   const { C, grad } = useTheme();
   const s = useMemo(() => makeStyles(C), [C]);
   const today = getToday();
+  const sheetHeight = Math.max(360, Dimensions.get('window').height - insets.top - 12);
 
   const [tasks, setTasks] = useState<Task[]>([]);
   const [timers, setTimers] = useState<TimerItem[]>([]);
@@ -313,29 +315,28 @@ export default function TimerScreen({ navigation }: Props) {
         {renderHistory()}
       </ScrollView>
 
-      <Modal visible={pickerOpen} transparent animationType="slide" onRequestClose={() => setPickerOpen(false)}>
-        <TouchableOpacity style={s.modalBg} activeOpacity={1} onPress={() => setPickerOpen(false)}>
-          <TouchableOpacity activeOpacity={1} onPress={() => {}}>
-            <View style={s.pickerSheet}>
-              <View style={s.sheetHandle} />
-              <Text style={s.pickerTitle}>測るタスクを追加</Text>
-              <ScrollView style={s.pickerList} showsVerticalScrollIndicator contentContainerStyle={{ gap: 8, paddingBottom: insets.bottom + 56 }}>
-                {availableTasks.length === 0 ? (
-                  <View style={s.emptyBox}>
-                    <Text style={s.emptyTitle}>追加できるタスクがありません</Text>
-                    <Text style={s.emptyBody}>タスク画面で追加するか、計測中カードを外してください</Text>
-                  </View>
-                ) : availableTasks.map((task) => (
-                  <TouchableOpacity key={task.id} style={s.pickerItem} onPress={() => addTimer(task)}>
-                    <Text style={s.pickerIcon}>{task.icon ?? '⏱'}</Text>
-                    <Text style={s.pickerText} numberOfLines={2}>{task.title}</Text>
-                    <Text style={s.pickerAdd}>追加</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-          </TouchableOpacity>
-        </TouchableOpacity>
+      <Modal visible={pickerOpen} transparent animationType="slide" onRequestClose={() => setPickerOpen(false)} statusBarTranslucent>
+        <View style={s.modalBg}>
+          <TouchableOpacity style={s.modalBackdrop} activeOpacity={1} onPress={() => setPickerOpen(false)} />
+          <View style={[s.pickerSheet, { height: sheetHeight, paddingBottom: insets.bottom + 18 }]}>
+            <View style={s.sheetHandle} />
+            <Text style={s.pickerTitle}>測るタスクを追加</Text>
+            <ScrollView style={s.pickerList} showsVerticalScrollIndicator contentContainerStyle={{ gap: 8, paddingBottom: 24 }}>
+              {availableTasks.length === 0 ? (
+                <View style={s.emptyBox}>
+                  <Text style={s.emptyTitle}>追加できるタスクがありません</Text>
+                  <Text style={s.emptyBody}>タスク画面で追加するか、計測中カードを外してください</Text>
+                </View>
+              ) : availableTasks.map((task) => (
+                <TouchableOpacity key={task.id} style={s.pickerItem} onPress={() => addTimer(task)}>
+                  <Text style={s.pickerIcon}>{task.icon ?? '⏱'}</Text>
+                  <Text style={s.pickerText} numberOfLines={2}>{task.title}</Text>
+                  <Text style={s.pickerAdd}>追加</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
       </Modal>
 
       <TabBar current="Timer" navigation={navigation} />
