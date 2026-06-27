@@ -14,6 +14,8 @@ export type NotificationSetting = { id: number; time: string; notification_type:
 export type CompletionDetail = { task_id: number; title: string; icon: string | null; date: string; completed_at: string | null };
 export type TimeLog = { id: number; task_id: number; title: string; date: string; duration_seconds: number; started_at: string; ended_at: string };
 export type TimerSetting = { task_id: number; target_seconds: number };
+export type FlowProject = { id: number; title: string; sort_order: number };
+export type FlowStep = { id: number; project_id: number; title: string; sort_order: number };
 
 export async function migrateDb(db: SQLite.SQLiteDatabase): Promise<void> {
   await db.execAsync(`
@@ -83,6 +85,19 @@ export async function migrateDb(db: SQLite.SQLiteDatabase): Promise<void> {
   try { await db.execAsync("ALTER TABLE tasks ADD COLUMN notify_type TEXT NOT NULL DEFAULT 'push'"); } catch {}
   try { await db.execAsync('ALTER TABLE tasks ADD COLUMN freq_dates TEXT'); } catch {}
   try { await db.execAsync('ALTER TABLE tasks ADD COLUMN note TEXT'); } catch {}
+  await db.execAsync(`
+    CREATE TABLE IF NOT EXISTS flow_projects (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      sort_order INTEGER DEFAULT 0
+    );
+    CREATE TABLE IF NOT EXISTS flow_steps (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      project_id INTEGER NOT NULL,
+      title TEXT NOT NULL,
+      sort_order INTEGER DEFAULT 0
+    );
+  `);
 }
 
 export async function getSetting(db: SQLite.SQLiteDatabase, key: string): Promise<string | null> {
@@ -312,4 +327,63 @@ export async function saveTimerSettingForTask(
     'INSERT OR REPLACE INTO timer_settings (task_id, target_seconds) VALUES (?, ?)',
     [taskId, Math.max(60, Math.round(targetSeconds))]
   );
+}
+
+export async function getFlowProjects(db: SQLite.SQLiteDatabase): Promise<FlowProject[]> {
+  return db.getAllAsync<FlowProject>('SELECT * FROM flow_projects ORDER BY sort_order ASC, id ASC');
+}
+
+export async function addFlowProject(db: SQLite.SQLiteDatabase, title: string): Promise<number> {
+  const row = await db.getFirstAsync<{ next_order: number | null }>(
+    'SELECT COALESCE(MAX(sort_order), -1) + 1 as next_order FROM flow_projects'
+  );
+  const result = await db.runAsync(
+    'INSERT INTO flow_projects (title, sort_order) VALUES (?, ?)',
+    [title, row?.next_order ?? 0]
+  );
+  return result.lastInsertRowId;
+}
+
+export async function updateFlowProject(db: SQLite.SQLiteDatabase, id: number, title: string): Promise<void> {
+  await db.runAsync('UPDATE flow_projects SET title = ? WHERE id = ?', [title, id]);
+}
+
+export async function deleteFlowProject(db: SQLite.SQLiteDatabase, id: number): Promise<void> {
+  await db.runAsync('DELETE FROM flow_projects WHERE id = ?', [id]);
+  await db.runAsync('DELETE FROM flow_steps WHERE project_id = ?', [id]);
+}
+
+export async function getFlowSteps(db: SQLite.SQLiteDatabase, projectId: number): Promise<FlowStep[]> {
+  return db.getAllAsync<FlowStep>(
+    'SELECT * FROM flow_steps WHERE project_id = ? ORDER BY sort_order ASC, id ASC',
+    [projectId]
+  );
+}
+
+export async function addFlowStep(db: SQLite.SQLiteDatabase, projectId: number, title: string): Promise<number> {
+  const row = await db.getFirstAsync<{ next_order: number | null }>(
+    'SELECT COALESCE(MAX(sort_order), -1) + 1 as next_order FROM flow_steps WHERE project_id = ?',
+    [projectId]
+  );
+  const result = await db.runAsync(
+    'INSERT INTO flow_steps (project_id, title, sort_order) VALUES (?, ?, ?)',
+    [projectId, title, row?.next_order ?? 0]
+  );
+  return result.lastInsertRowId;
+}
+
+export async function updateFlowStep(db: SQLite.SQLiteDatabase, id: number, title: string): Promise<void> {
+  await db.runAsync('UPDATE flow_steps SET title = ? WHERE id = ?', [title, id]);
+}
+
+export async function deleteFlowStep(db: SQLite.SQLiteDatabase, id: number): Promise<void> {
+  await db.runAsync('DELETE FROM flow_steps WHERE id = ?', [id]);
+}
+
+export async function reorderFlowSteps(db: SQLite.SQLiteDatabase, orderedIds: number[]): Promise<void> {
+  await db.withTransactionAsync(async () => {
+    for (let i = 0; i < orderedIds.length; i++) {
+      await db.runAsync('UPDATE flow_steps SET sort_order = ? WHERE id = ?', [i, orderedIds[i]]);
+    }
+  });
 }
