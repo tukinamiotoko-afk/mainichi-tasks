@@ -75,9 +75,10 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   deleteLogBtn: { backgroundColor: '#fee2e2', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7 },
   deleteLogText: { color: '#dc2626', fontSize: 11, fontWeight: '900' },
   modalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  pickerSheet: { backgroundColor: C.card, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 18, gap: 12, maxHeight: '88%' },
+  pickerSheet: { height: '92%', backgroundColor: C.card, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 18, paddingBottom: 0, gap: 12 },
   sheetHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: C.border, alignSelf: 'center' },
   pickerTitle: { color: C.onDark, fontSize: 16, fontWeight: '900' },
+  pickerList: { flex: 1 },
   pickerItem: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderColor: C.border, borderRadius: 12, padding: 13, backgroundColor: C.body },
   pickerIcon: { width: 30, textAlign: 'center', fontSize: 18 },
   pickerText: { flex: 1, color: C.onDark, fontSize: 14, fontWeight: '800' },
@@ -315,10 +316,10 @@ export default function TimerScreen({ navigation }: Props) {
       <Modal visible={pickerOpen} transparent animationType="slide" onRequestClose={() => setPickerOpen(false)}>
         <TouchableOpacity style={s.modalBg} activeOpacity={1} onPress={() => setPickerOpen(false)}>
           <TouchableOpacity activeOpacity={1} onPress={() => {}}>
-            <View style={[s.pickerSheet, { paddingBottom: insets.bottom + 16 }]}>
+            <View style={s.pickerSheet}>
               <View style={s.sheetHandle} />
               <Text style={s.pickerTitle}>測るタスクを追加</Text>
-              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: insets.bottom + 24 }}>
+              <ScrollView style={s.pickerList} showsVerticalScrollIndicator contentContainerStyle={{ gap: 8, paddingBottom: insets.bottom + 56 }}>
                 {availableTasks.length === 0 ? (
                   <View style={s.emptyBox}>
                     <Text style={s.emptyTitle}>追加できるタスクがありません</Text>
