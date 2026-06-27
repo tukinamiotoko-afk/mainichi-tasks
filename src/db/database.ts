@@ -16,6 +16,15 @@ export type TimeLog = { id: number; task_id: number; title: string; date: string
 export type TimerSetting = { task_id: number; target_seconds: number };
 export type FlowProject = { id: number; title: string; sort_order: number };
 export type FlowStep = { id: number; project_id: number; title: string; sort_order: number };
+export type FlowBranch = {
+  id: number;
+  after_task_id: number | null;
+  question: string;
+  yes_label: string;
+  yes_text: string | null;
+  no_label: string;
+  no_text: string | null;
+};
 
 export async function migrateDb(db: SQLite.SQLiteDatabase): Promise<void> {
   await db.execAsync(`
@@ -96,6 +105,15 @@ export async function migrateDb(db: SQLite.SQLiteDatabase): Promise<void> {
       project_id INTEGER NOT NULL,
       title TEXT NOT NULL,
       sort_order INTEGER DEFAULT 0
+    );
+    CREATE TABLE IF NOT EXISTS flow_branches (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      after_task_id INTEGER,
+      question TEXT NOT NULL DEFAULT '確認',
+      yes_label TEXT NOT NULL DEFAULT 'はい',
+      yes_text TEXT,
+      no_label TEXT NOT NULL DEFAULT 'いいえ',
+      no_text TEXT
     );
   `);
 }
@@ -386,4 +404,27 @@ export async function reorderFlowSteps(db: SQLite.SQLiteDatabase, orderedIds: nu
       await db.runAsync('UPDATE flow_steps SET sort_order = ? WHERE id = ?', [i, orderedIds[i]]);
     }
   });
+}
+
+export async function getFlowBranches(db: SQLite.SQLiteDatabase): Promise<FlowBranch[]> {
+  return db.getAllAsync<FlowBranch>('SELECT * FROM flow_branches ORDER BY id');
+}
+
+export async function addFlowBranch(db: SQLite.SQLiteDatabase, b: Omit<FlowBranch, 'id'>): Promise<number> {
+  const r = await db.runAsync(
+    'INSERT INTO flow_branches (after_task_id, question, yes_label, yes_text, no_label, no_text) VALUES (?, ?, ?, ?, ?, ?)',
+    [b.after_task_id, b.question, b.yes_label, b.yes_text, b.no_label, b.no_text],
+  );
+  return r.lastInsertRowId;
+}
+
+export async function updateFlowBranch(db: SQLite.SQLiteDatabase, id: number, b: Omit<FlowBranch, 'id'>): Promise<void> {
+  await db.runAsync(
+    'UPDATE flow_branches SET after_task_id=?, question=?, yes_label=?, yes_text=?, no_label=?, no_text=? WHERE id=?',
+    [b.after_task_id, b.question, b.yes_label, b.yes_text, b.no_label, b.no_text, id],
+  );
+}
+
+export async function deleteFlowBranch(db: SQLite.SQLiteDatabase, id: number): Promise<void> {
+  await db.runAsync('DELETE FROM flow_branches WHERE id=?', [id]);
 }
