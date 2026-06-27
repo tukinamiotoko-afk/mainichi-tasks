@@ -257,9 +257,11 @@ export async function deleteNotificationSetting(
 export async function addTimeLog(
   db: SQLite.SQLiteDatabase, taskId: number, durationSeconds: number, startedAt: string, endedAt: string
 ): Promise<void> {
+  const ended = new Date(endedAt);
+  const date = `${ended.getFullYear()}-${String(ended.getMonth() + 1).padStart(2, '0')}-${String(ended.getDate()).padStart(2, '0')}`;
   await db.runAsync(
     'INSERT INTO time_logs (task_id, date, duration_seconds, started_at, ended_at) VALUES (?, ?, ?, ?, ?)',
-    [taskId, endedAt.slice(0, 10), Math.max(1, Math.round(durationSeconds)), startedAt, endedAt]
+    [taskId, date, Math.max(1, Math.round(durationSeconds)), startedAt, endedAt]
   );
 }
 
