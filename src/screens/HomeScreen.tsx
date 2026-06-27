@@ -347,6 +347,7 @@ export default function HomeScreen({ navigation }: Props) {
   const [newDay, setNewDay] = useState(1);
   const [newOnceDate, setNewOnceDate] = useState<string>(today);
   const [newFreqDates, setNewFreqDates] = useState<string[]>([]);
+  const [newNote, setNewNote] = useState('');
 
   // Task detail sheet
   const [detailTask, setDetailTask] = useState<Task | null>(null);
@@ -429,6 +430,7 @@ export default function HomeScreen({ navigation }: Props) {
     setNewDay(1);
     setNewOnceDate(today);
     setNewFreqDates([]);
+    setNewNote('');
   };
 
   const handleAdd = async () => {
@@ -448,6 +450,7 @@ export default function HomeScreen({ navigation }: Props) {
       freq_day: newFreqType === 'monthly_day' ? newDay : null,
       once_date: newFreqType === 'once' ? newOnceDate : null,
       freq_dates: newFreqType === 'dates' ? newFreqDates.slice().sort().join(',') : null,
+      note: newNote.trim() || null,
     };
     await updateTask(db, taskId, fields);
     if (newNotify && newTime) {
@@ -1276,6 +1279,14 @@ export default function HomeScreen({ navigation }: Props) {
                       </LinearGradient>
                     </TouchableOpacity>
                   </View>
+                  <TextInput
+                    style={s.noteInput}
+                    value={newNote}
+                    onChangeText={setNewNote}
+                    placeholder="メモ（任意）"
+                    placeholderTextColor="#9ca3af"
+                    returnKeyType="done"
+                  />
 
                   {/* Notification time + notify (second) */}
                   <Text style={[s.sheetSection, { marginTop: 16 }]}>通知</Text>
@@ -1346,6 +1357,15 @@ export default function HomeScreen({ navigation }: Props) {
                           </LinearGradient>
                         </TouchableOpacity>
                       </View>
+                      <TextInput
+                        style={s.noteInput}
+                        value={detailTask.note ?? ''}
+                        onChangeText={(text) => setDetailTask(t => t ? { ...t, note: text } : null)}
+                        onEndEditing={(e) => patchDetail({ note: e.nativeEvent.text.trim() || null })}
+                        placeholder="メモ（任意）"
+                        placeholderTextColor="#9ca3af"
+                        returnKeyType="done"
+                      />
 
                       {/* Notification time + notify (second) */}
                       <Text style={[s.sheetSection, { marginTop: 16 }]}>通知</Text>
@@ -1553,6 +1573,7 @@ const s = StyleSheet.create({
   sheetSection: { color: C.muted, fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
   sheetTitleRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   sheetTitleInput: { flex: 1, borderWidth: 1, borderColor: C.border, borderRadius: 10, padding: 12, fontSize: 15, color: C.onDark, backgroundColor: C.body },
+  noteInput: { borderWidth: 1, borderColor: C.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9, fontSize: 13, color: C.onDark, backgroundColor: C.body },
   sheetSaveBtn: { backgroundColor: C.primary, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 12, alignItems: 'center', justifyContent: 'center' },
   sheetSaveBtnDisabled: { backgroundColor: C.border },
   sheetSaveBtnText: { color: C.onPrimary, fontSize: 13, fontWeight: '700' },
