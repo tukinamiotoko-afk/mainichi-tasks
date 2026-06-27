@@ -1566,7 +1566,7 @@ const s = StyleSheet.create({
   fabText: { color: C.onPrimary, fontSize: 26, fontWeight: '400', lineHeight: 30 },
 
   sheetBg: { flex: 1, backgroundColor: 'transparent', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: '#eff4ff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingTop: 12, gap: 8, maxHeight: '88%' },
+  sheet: { backgroundColor: '#eff4ff', borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1.5, borderColor: '#93b4f5', padding: 20, paddingTop: 12, gap: 8, maxHeight: '88%' },
   sheetHandle: { width: 40, height: 4, backgroundColor: C.border, borderRadius: 2, alignSelf: 'center', marginBottom: 12 },
   sheetDeleteBtn: { position: 'absolute', top: 10, right: 14, backgroundColor: '#fee2e2', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 6, zIndex: 10 },
   sheetDeleteText: { color: '#dc2626', fontSize: 12, fontWeight: '800' },
