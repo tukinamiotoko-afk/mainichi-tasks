@@ -509,9 +509,17 @@ export default function HomeScreen({ navigation }: Props) {
   const fabStartPosition = useRef(fabPosition.current);
   const fabAnim = useRef(new Animated.ValueXY(fabPosition.current)).current;
   const [activeDragId, setActiveDragId] = useState<number | null>(null);
-  const dragState = useRef({ taskId: null as number | null, startIndex: 0, currentIndex: 0, changed: false, accSlots: 0 });
+  const dragState = useRef({ taskId: null as number | null, startIndex: 0, currentIndex: 0, changed: false });
+  const shiftAnims = useRef<Map<number, Animated.Value>>(new Map());
+  const currentDragYRef = useRef(0);
+  const displayedTasksAtDragStart = useRef<Task[]>([]);
   const dragY = useRef(new Animated.Value(0)).current;
   const dragScale = useRef(new Animated.Value(1)).current;
+  const getShiftAnim = (taskId: number): Animated.Value => {
+    let anim = shiftAnims.current.get(taskId);
+    if (!anim) { anim = new Animated.Value(0); shiftAnims.current.set(taskId, anim); }
+    return anim;
+  };
   const swipeState = useRef({ taskId: null as number | null });
   const swipeAnim = useRef(new Animated.Value(0)).current;
   // Mirror of the actively-swiping card id, in state so the swipe transform
@@ -823,7 +831,6 @@ export default function HomeScreen({ navigation }: Props) {
   };
 
   const moveTask = (taskId: number, toIndex: number) => {
-    LayoutAnimation.configureNext(LayoutAnimation.create(160, LayoutAnimation.Types.easeInEaseOut, LayoutAnimation.Properties.opacity));
     setTasks((current) => {
       const ordered = [...current].sort((a, b) => {
         if (a.sort_order !== b.sort_order) return a.sort_order - b.sort_order;
@@ -835,7 +842,6 @@ export default function HomeScreen({ navigation }: Props) {
       if (fromIndex === nextIndex) return current;
       const [moved] = ordered.splice(fromIndex, 1);
       ordered.splice(nextIndex, 0, moved);
-      dragState.current.changed = true;
       return ordered.map((task, index) => ({ ...task, sort_order: index }));
     });
   };
@@ -845,8 +851,11 @@ export default function HomeScreen({ navigation }: Props) {
     setSwipingId(null);
     swipeAnim.setValue(0);
     setActiveDragId(taskId);
-    dragState.current = { taskId, startIndex: index, currentIndex: index, changed: false, accSlots: 0 };
+    displayedTasksAtDragStart.current = displayedTasks;
+    dragState.current = { taskId, startIndex: index, currentIndex: index, changed: false };
+    currentDragYRef.current = 0;
     dragY.setValue(0);
+    shiftAnims.current.forEach((anim) => anim.setValue(0));
     Animated.spring(dragScale, {
       toValue: 1.04,
       useNativeDriver: true,
@@ -858,28 +867,56 @@ export default function HomeScreen({ navigation }: Props) {
   const updateDrag = (dy: number) => {
     const state = dragState.current;
     if (state.taskId == null) return;
-    // localDy is displacement relative to the current slot (not the start position)
-    const localDy = dy - state.accSlots * DRAG_SLOT;
-    if (localDy > DRAG_SLOT / 2 && state.currentIndex < tasksRef.current.length - 1) {
-      state.accSlots += 1;
-      state.currentIndex += 1;
-      state.changed = true;
-      moveTask(state.taskId, state.currentIndex);
-    } else if (localDy < -DRAG_SLOT / 2 && state.currentIndex > 0) {
-      state.accSlots -= 1;
-      state.currentIndex -= 1;
-      state.changed = true;
-      moveTask(state.taskId, state.currentIndex);
-    }
-    // Recalculate after possible slot change so dragY reflects updated accSlots
-    const finalDy = dy - state.accSlots * DRAG_SLOT;
-    dragY.setValue(Math.max(-DRAG_SLOT * 0.9, Math.min(DRAG_SLOT * 0.9, finalDy)));
+    currentDragYRef.current = dy;
+    dragY.setValue(dy);
+    const tasksAtStart = displayedTasksAtDragStart.current;
+    const newCurrentIndex = Math.max(0, Math.min(
+      tasksAtStart.length - 1,
+      state.startIndex + Math.round(dy / DRAG_SLOT),
+    ));
+    if (newCurrentIndex === state.currentIndex) return;
+    state.currentIndex = newCurrentIndex;
+    state.changed = true;
+    const dragStartIndex = state.startIndex;
+    tasksAtStart.forEach((task, i) => {
+      if (task.id === state.taskId) return;
+      let shift = 0;
+      if (newCurrentIndex > dragStartIndex && i > dragStartIndex && i <= newCurrentIndex) {
+        shift = -DRAG_SLOT;
+      } else if (newCurrentIndex < dragStartIndex && i >= newCurrentIndex && i < dragStartIndex) {
+        shift = DRAG_SLOT;
+      }
+      Animated.spring(getShiftAnim(task.id), {
+        toValue: shift,
+        useNativeDriver: true,
+        tension: 300,
+        friction: 20,
+      }).start();
+    });
   };
 
   const endDrag = () => {
-    if (dragState.current.changed) persistTaskOrder();
-    dragState.current = { taskId: null, startIndex: 0, currentIndex: 0, changed: false, accSlots: 0 };
+    const state = dragState.current;
+    const rawDy = currentDragYRef.current;
+    // Reset shift anims and apply list reorder in the same synchronous call so
+    // the native compositor sees them together in one frame (no intermediate pop).
+    shiftAnims.current.forEach((anim) => anim.setValue(0));
+    if (state.changed && state.taskId != null) {
+      const startTasks = displayedTasksAtDragStart.current;
+      const toIdx = Math.max(0, Math.min(startTasks.length - 1, state.currentIndex));
+      const ordered = [...startTasks];
+      const [moved] = ordered.splice(state.startIndex, 1);
+      ordered.splice(toIdx, 0, moved);
+      const newTasks = ordered.map((task, idx) => ({ ...task, sort_order: idx }));
+      setTasks(newTasks);
+      updateTaskSortOrders(db, newTasks.map((t) => t.id)).then(() => load());
+    }
+    // Adjust dragY so the card stays at its current visual position after the
+    // list repositions it, then spring it to 0 (its new resting place).
+    const adjustedDy = rawDy - (state.currentIndex - state.startIndex) * DRAG_SLOT;
+    dragState.current = { taskId: null, startIndex: 0, currentIndex: 0, changed: false };
     setActiveDragId(null);
+    dragY.setValue(adjustedDy);
     Animated.parallel([
       Animated.spring(dragY, { toValue: 0, useNativeDriver: true, tension: 220, friction: 14 }),
       Animated.spring(dragScale, { toValue: 1, useNativeDriver: true, tension: 220, friction: 14 }),
@@ -1348,6 +1385,9 @@ export default function HomeScreen({ navigation }: Props) {
                 shadowRadius: 10,
               }
             : null;
+          const shiftStyle = (activeDragId !== null && !isDragging && swipingId !== item.id)
+            ? { transform: [{ translateY: getShiftAnim(item.id) }] }
+            : null;
           const priority = priorityMeta(item.priority);
           return (
             <View style={s.swipeWrap}>
@@ -1359,6 +1399,7 @@ export default function HomeScreen({ navigation }: Props) {
                   s.taskCard,
                   { backgroundColor: priority.cardColor, borderColor: priority.borderColor },
                   isDone && s.taskCardDone,
+                  shiftStyle,
                   swipeStyle,
                   dragStyle,
                 ]}
