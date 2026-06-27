@@ -1450,7 +1450,7 @@ export default function HomeScreen({ navigation }: Props) {
       <Modal visible={showAdd} transparent animationType="slide" onRequestClose={closeAddSheet}>
         <TouchableOpacity style={s.sheetBg} activeOpacity={1} onPress={closeAddSheet}>
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-            <TouchableOpacity activeOpacity={1} onPress={() => {}}>
+            <View onStartShouldSetResponder={() => true}>
               <View style={[s.sheet, { maxHeight: screen.height * 0.85 }]}>
                 <View style={s.sheetHandle} />
                 <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}>
@@ -1515,7 +1515,7 @@ export default function HomeScreen({ navigation }: Props) {
                   <View style={{ height: 12 }} />
                 </ScrollView>
               </View>
-            </TouchableOpacity>
+            </View>
           </KeyboardAvoidingView>
         </TouchableOpacity>
       </Modal>
@@ -1524,7 +1524,7 @@ export default function HomeScreen({ navigation }: Props) {
       <Modal visible={!!detailTask} transparent animationType="slide" onRequestClose={() => setDetailTask(null)}>
         <TouchableOpacity style={s.sheetBg} activeOpacity={1} onPress={() => setDetailTask(null)}>
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-            <TouchableOpacity activeOpacity={1} onPress={() => {}}>
+            <View onStartShouldSetResponder={() => true}>
               <View style={[s.sheet, { maxHeight: screen.height * 0.85 }]}>
                 <View style={s.sheetHandle} />
                 {detailTask && (
@@ -1627,7 +1627,7 @@ export default function HomeScreen({ navigation }: Props) {
                   )}
                 </ScrollView>
               </View>
-            </TouchableOpacity>
+            </View>
           </KeyboardAvoidingView>
         </TouchableOpacity>
       </Modal>
