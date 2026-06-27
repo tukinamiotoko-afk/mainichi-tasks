@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, Modal,
   TextInput, StyleSheet, Alert, KeyboardAvoidingView,
@@ -23,19 +23,7 @@ import {
 } from '../constants/taskMeta';
 import { GRAD, GRAD_START, GRAD_END } from '../constants/theme';
 import TabBar from '../components/TabBar';
-
-const C = {
-  header:    '#2563eb',
-  body:      '#ffffff',
-  card:      '#ffffff',
-  border:    '#dbeafe',
-  primary:   '#2563eb',
-  onPrimary: '#ffffff',
-  onDark:    '#2d3748',
-  muted:     '#111827',
-  stone:     '#111827',
-  error:     '#e52020',
-};
+import { useTheme, ColorSet } from '../contexts/ThemeContext';
 
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'Home'> };
 
@@ -188,11 +176,216 @@ function PulseChip({ onPress, style, wrapStyle, children }: { onPress: () => voi
   );
 }
 
+const makeStyles = (C: ColorSet) => StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: C.body },
+
+  headerCard: { backgroundColor: C.primary, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 24 },
+  dateNavRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  dateNavBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
+  dateNavArrow: { color: '#ffffff', fontSize: 26, fontWeight: '800', marginTop: -2 },
+  dateNavCenter: { flex: 1, alignItems: 'center' },
+  dateText: { color: '#ffffff', fontSize: 22, fontWeight: '800' },
+  dateTodayHint: { color: 'rgba(255,255,255,0.75)', fontSize: 10, fontWeight: '700', marginTop: 2 },
+  headerLabel: { color: 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
+  progressRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 6 },
+  progressBg: { flex: 1, height: 8, backgroundColor: 'rgba(255,255,255,0.45)', borderRadius: 4, overflow: 'hidden' },
+  progressFill: { height: '100%', borderRadius: 2, overflow: 'hidden' },
+  progressGrad: { flex: 1 },
+  progressText: { color: '#ffffff', fontSize: 11, fontWeight: '700' },
+
+  list: { flex: 1, backgroundColor: C.body },
+  listWrap: { flex: 1, position: 'relative' },
+  panelOverlay: { position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: 16, paddingTop: 8, zIndex: 20 },
+  listHeader: { marginBottom: 4 },
+  sectionBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 10, paddingBottom: 4 },
+  sectionRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  metaLabel: { color: C.muted, fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
+  stone: { color: C.stone, fontSize: 11, fontWeight: '700' },
+  toggleRow: { flexDirection: 'row', gap: 6, flexShrink: 1 },
+  filterToggle: { backgroundColor: C.primarySoft, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 5 },
+  filterToggleActive: { backgroundColor: C.primary },
+  filterToggleText: { color: C.primary, fontSize: 11, fontWeight: '800' },
+  filterToggleTextActive: { color: C.onPrimary },
+  filterPanel: { backgroundColor: C.card, borderRadius: 12, borderWidth: 1, borderColor: C.border, padding: 12, marginTop: 8, gap: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 10, elevation: 8 },
+  filterLabel: { color: C.muted, fontSize: 10, fontWeight: '800', letterSpacing: 0.5, marginTop: 2 },
+  filterRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  fChip: { borderWidth: 1, borderColor: C.border, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 5 },
+  fChipActive: { backgroundColor: C.primary, borderColor: C.primary },
+  fChipText: { color: C.onDark, fontSize: 12, fontWeight: '700' },
+  fChipTextActive: { color: C.onPrimary },
+  filterHint: { color: C.muted, fontSize: 10, fontWeight: '600', marginTop: 4 },
+
+  swipeWrap: { borderRadius: 12 },
+  swipeDeleteBg: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    borderRadius: 12,
+    backgroundColor: '#1f2937',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  swipeDeleteText: { color: '#ffffff', fontSize: 14, fontWeight: '800', letterSpacing: 1 },
+  taskCard: {
+    flexDirection: 'row', alignItems: 'center', backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 12,
+    paddingHorizontal: 14, paddingVertical: 14, gap: 12,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2,
+  },
+  taskCardDone: { opacity: 0.6 },
+  checkBox: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
+  checkBoxDone: { backgroundColor: C.primary, borderColor: C.primary },
+  checkMark: { color: C.onPrimary, fontSize: 11, fontWeight: '700' },
+  taskBody: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  taskTextWrap: { flex: 1, gap: 4 },
+  taskTitle: { color: C.onDark, fontSize: 14, fontWeight: '500', lineHeight: 20 },
+  taskTitleDone: { color: C.muted, textDecorationLine: 'line-through' },
+  taskMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
+  priorityBadge: { borderRadius: 4, paddingHorizontal: 6, paddingVertical: 1 },
+  priorityBadgeText: { color: C.onPrimary, fontSize: 9, fontWeight: '800' },
+  scheduleTag: { color: C.stone, fontSize: 10, fontWeight: '700' },
+  freqTag: { color: C.muted, fontSize: 10, fontWeight: '700' },
+  doneBadge: { backgroundColor: '#fef3c7', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
+  doneBadgeText: { color: '#b45309', fontSize: 9, fontWeight: '700', letterSpacing: 0.5 },
+  tagBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: C.card, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
+  tagIcon: { fontSize: 17 },
+  tagIconEmpty: { opacity: 0.35 },
+
+  empty: { paddingVertical: 60, alignItems: 'center', gap: 8 },
+  emptyTitle: { color: C.stone, fontSize: 16, fontWeight: '700' },
+  emptyBody: { color: C.muted, fontSize: 13 },
+
+  fabWrap: { position: 'absolute', zIndex: 20 },
+  fab: { width: 52, height: 52, borderRadius: 26, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.25, shadowRadius: 6 },
+  fabText: { color: C.onPrimary, fontSize: 26, fontWeight: '400', lineHeight: 30 },
+
+  sheetBg: { flex: 1, backgroundColor: 'transparent', justifyContent: 'flex-end' },
+  sheet: { backgroundColor: C.sheetBg, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1.5, borderColor: C.sheetBorder, padding: 20, paddingTop: 12, gap: 8, maxHeight: '88%' },
+  sheetHandle: { width: 40, height: 4, backgroundColor: C.border, borderRadius: 2, alignSelf: 'center', marginBottom: 12 },
+  sheetDeleteBtn: { position: 'absolute', top: 10, right: 14, backgroundColor: '#fee2e2', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 6, zIndex: 10 },
+  sheetDeleteText: { color: '#dc2626', fontSize: 12, fontWeight: '800' },
+  sheetSection: { color: C.muted, fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
+  sheetTitleRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  sheetTitleInput: { flex: 1, borderWidth: 1, borderColor: C.border, borderRadius: 10, padding: 12, fontSize: 15, color: C.onDark, backgroundColor: C.body },
+  noteInput: { borderWidth: 1, borderColor: C.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9, fontSize: 13, color: C.onDark, backgroundColor: C.body },
+  sheetSaveBtn: { backgroundColor: C.primary, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 12, alignItems: 'center', justifyContent: 'center' },
+  sheetSaveBtnDisabled: { backgroundColor: C.border },
+  sheetSaveBtnText: { color: C.onPrimary, fontSize: 13, fontWeight: '700' },
+
+  // Schedule (time + notify)
+  scheduleCard: { backgroundColor: C.scheduleCardBg, borderRadius: 14, padding: 14, gap: 8 },
+  scheduleToggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 2 },
+  scheduleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  scheduleLeft: { gap: 2 },
+  scheduleRight: { alignItems: 'center', gap: 2 },
+  scheduleLabel: { color: C.stone, fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
+  scheduleTime: { color: C.onDark, fontSize: 30, fontWeight: '800' },
+  scheduleTimeEmpty: { color: C.muted, fontSize: 20, fontWeight: '700' },
+  clearTimeBtn: { alignSelf: 'flex-start' },
+  clearTimeText: { color: C.muted, fontSize: 11, fontWeight: '700' },
+  scheduleHint: { color: C.error, fontSize: 11, fontWeight: '600' },
+  notifyTypeLabel: { color: C.muted, fontSize: 11, fontWeight: '700', marginTop: 4 },
+  notifyTypeRow: { flexDirection: 'row', gap: 8, marginTop: 2 },
+  notifyTypeChip: { flex: 1, borderWidth: 1, borderColor: C.border, borderRadius: 10, paddingVertical: 8, alignItems: 'center', backgroundColor: C.card },
+  notifyTypeChipActive: { backgroundColor: C.primary, borderColor: C.primary },
+  notifyTypeText: { color: C.onDark, fontSize: 12, fontWeight: '700' },
+  notifyTypeTextActive: { color: C.onPrimary },
+
+  // Icon
+  metaSelectBtn: { borderWidth: 1, borderColor: C.border, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 11, backgroundColor: C.card, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  metaSelectLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  metaSelectIcon: { width: 28, textAlign: 'center', fontSize: 20 },
+  metaSelectIconEmpty: { opacity: 0.35 },
+  metaSelectText: { color: C.onDark, fontSize: 13, fontWeight: '700' },
+  metaSelectArrow: { color: C.muted, fontSize: 11, fontWeight: '800' },
+  prioritySwatch: { width: 28, height: 20, borderRadius: 7, borderWidth: 1 },
+  iconGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingVertical: 6 },
+  iconChip: { width: 44, height: 44, borderRadius: 12, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
+  iconChipActive: { backgroundColor: C.iconChipActiveBg, borderColor: C.primary },
+  iconEmoji: { fontSize: 22 },
+  iconNone: { color: C.muted, fontSize: 11, fontWeight: '700' },
+
+  // Priority / generic chips
+  typeRow: { flexDirection: 'row', gap: 8 },
+  typeChip: { flex: 1, borderWidth: 1, borderColor: C.border, borderRadius: 20, paddingVertical: 8, alignItems: 'center' },
+  typeChipText: { color: C.muted, fontSize: 12, fontWeight: '700' },
+  typeChipTextActive: { color: C.onPrimary },
+
+  // Frequency
+  freqPanel: { gap: 8, marginTop: 8 },
+  freqTypeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  freqTypeChip: { borderWidth: 1, borderColor: C.border, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 8 },
+  freqTypeChipActive: { backgroundColor: C.primary, borderColor: C.primary },
+  freqTypeText: { color: C.muted, fontSize: 12, fontWeight: '700' },
+  freqTypeTextActive: { color: C.onPrimary },
+  weekdayRow: { flexDirection: 'row', gap: 6, marginTop: 8 },
+  dayChip: { flex: 1, height: 38, borderRadius: 10, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
+  dayChipActive: { backgroundColor: C.primary, borderColor: C.primary },
+  dayChipText: { color: C.onDark, fontSize: 13, fontWeight: '700' },
+  dayChipTextActive: { color: C.onPrimary },
+  daySun: { },
+  daySat: { },
+  weekChoiceRow: { flexDirection: 'row', gap: 6, marginTop: 8 },
+  weekChip: { flex: 1, borderRadius: 10, borderWidth: 1, borderColor: C.border, paddingVertical: 8, alignItems: 'center' },
+  weekChipActive: { backgroundColor: C.primary, borderColor: C.primary },
+  weekChipText: { color: C.onDark, fontSize: 12, fontWeight: '700' },
+  weekChipTextActive: { color: C.onPrimary },
+  monthDayRow: { gap: 6, paddingVertical: 8 },
+  monthDayChip: { width: 40, height: 40, borderRadius: 10, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
+  monthDayChipActive: { backgroundColor: C.primary, borderColor: C.primary },
+  monthDayText: { color: C.onDark, fontSize: 13, fontWeight: '700' },
+  monthDayTextActive: { color: C.onPrimary },
+
+  calHint: { fontSize: 12, color: C.muted, marginTop: 6, marginBottom: 2 },
+  freqModalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end', paddingHorizontal: 12 },
+  freqModalCard: {
+    backgroundColor: C.freqCardBg, borderRadius: 24, paddingHorizontal: 20, paddingTop: 8, paddingBottom: 16,
+    borderWidth: 2, borderColor: C.freqCardBorder,
+    elevation: 16, shadowColor: '#1e3a8a', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 20,
+  },
+  freqModalHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
+  freqModalTitle: { fontSize: 16, fontWeight: '800', color: C.muted },
+  freqModalDone: { fontSize: 15, fontWeight: '800', color: C.primary },
+  cal: { marginTop: 4, borderWidth: 1, borderColor: C.border, borderRadius: 14, padding: 10, backgroundColor: C.card },
+  calHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 8, marginBottom: 8 },
+  calNav: { fontSize: 26, color: C.primary, fontWeight: '700', width: 32, textAlign: 'center' },
+  calTitle: { fontSize: 15, fontWeight: '800', color: C.muted },
+  calWeekRow: { flexDirection: 'row' },
+  calWeekCell: { flex: 1, textAlign: 'center', fontSize: 11, fontWeight: '700', color: C.muted, paddingBottom: 4 },
+  calGrid: { flexDirection: 'row', flexWrap: 'wrap' },
+  calCell: { width: `${100 / 7}%`, aspectRatio: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 2 },
+  calDay: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  calDayActive: { backgroundColor: C.primary },
+  calDayText: { fontSize: 13, fontWeight: '700', color: C.onDark },
+  calDayTextActive: { color: C.onPrimary },
+  calSun: { color: '#ef4444' },
+  calSat: { color: '#3b82f6' },
+
+  timeModalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center', padding: 32 },
+  timeModalCard: { width: '100%', backgroundColor: C.card, borderRadius: 18, padding: 20, gap: 12, alignItems: 'center' },
+  timeModalTitle: { color: C.onDark, fontSize: 15, fontWeight: '800' },
+  timeInputRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  timeInput: { width: 76, borderWidth: 1, borderColor: C.border, borderRadius: 12, paddingVertical: 10, fontSize: 30, fontWeight: '800', color: C.onDark, textAlign: 'center', backgroundColor: C.body },
+  timeColon: { fontSize: 30, fontWeight: '800', color: C.onDark },
+  timeHint: { color: C.muted, fontSize: 11, fontWeight: '600' },
+  timeBtnRow: { flexDirection: 'row', gap: 10, alignSelf: 'stretch', marginTop: 4 },
+  timeCancelBtn: { flex: 1, borderWidth: 1, borderColor: C.border, borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
+  timeCancelText: { color: C.stone, fontSize: 14, fontWeight: '700' },
+  timeConfirmBtnWrap: { flex: 1 },
+  timeConfirmBtn: { borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
+  timeConfirmText: { color: C.onPrimary, fontSize: 14, fontWeight: '700' },
+
+  thumbOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
+  thumbEmoji: { fontSize: 80 },
+});
+
 // Frequency type chip row. Each chip bounces on tap, and the "任意" chip also
 // bounces when it becomes active via the calendar auto-switch.
-function FreqTypeChips({ freqType, onSetType }: {
+function FreqTypeChips({ freqType, onSetType, s }: {
   freqType: FreqType;
   onSetType: (t: FreqType) => void;
+  s: ReturnType<typeof makeStyles>;
 }) {
   const scales = useRef<Record<string, Animated.Value>>({}).current;
   const getScale = (k: string) => {
@@ -231,10 +424,11 @@ function FreqTypeChips({ freqType, onSetType }: {
 // Month calendar that previews which days a task's recurrence falls on, and
 // lets the user tap a day to configure the rule (set the once-date, toggle a
 // weekday, choose the monthly day, or pick the nth-weekday).
-function FreqCalendar({ freq, onceDate, onSelect }: {
+function FreqCalendar({ freq, onceDate, onSelect, s }: {
   freq: TaskFreq;
   onceDate: string | null;
   onSelect: (ref: Date, ds: string) => void;
+  s: ReturnType<typeof makeStyles>;
 }) {
   const isOnce = freq.freq_type === 'once';
   const base = isOnce && onceDate ? new Date(`${onceDate}T00:00:00`) : new Date();
@@ -294,6 +488,8 @@ function FreqCalendar({ freq, onceDate, onSelect }: {
 export default function HomeScreen({ navigation }: Props) {
   const db = useSQLiteContext();
   const insets = useSafeAreaInsets();
+  const { C } = useTheme();
+  const s = useMemo(() => makeStyles(C), [C]);
   const screen = Dimensions.get('window');
   const [tasks, setTasks] = useState<Task[]>([]);
   const [tagRight, setTagRight] = useState(false);
@@ -869,7 +1065,7 @@ export default function HomeScreen({ navigation }: Props) {
             </View>
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: 4 }}>
               <View style={s.freqPanel}>
-                <FreqTypeChips freqType={freqType} onSetType={on.setType} />
+                <FreqTypeChips freqType={freqType} onSetType={on.setType} s={s} />
 
                 {freqType === 'weekly' && (
                   <View style={s.weekdayRow}>
@@ -942,6 +1138,7 @@ export default function HomeScreen({ navigation }: Props) {
                   freq={{ freq_type: freqType, freq_days: daysToCsv(days), freq_week: week, freq_weekday: weekday, freq_day: day, once_date: onceDate, freq_dates: freqDates }}
                   onceDate={onceDate}
                   onSelect={onSelectDate}
+                  s={s}
                 />
               </View>
             </ScrollView>
@@ -1480,207 +1677,3 @@ export default function HomeScreen({ navigation }: Props) {
     </View>
   );
 }
-
-const s = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: C.body },
-
-  headerCard: { backgroundColor: C.header, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 24 },
-  dateNavRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  dateNavBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
-  dateNavArrow: { color: '#ffffff', fontSize: 26, fontWeight: '800', marginTop: -2 },
-  dateNavCenter: { flex: 1, alignItems: 'center' },
-  dateText: { color: '#ffffff', fontSize: 22, fontWeight: '800' },
-  dateTodayHint: { color: 'rgba(255,255,255,0.75)', fontSize: 10, fontWeight: '700', marginTop: 2 },
-  headerLabel: { color: 'rgba(255,255,255,0.6)', fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
-  progressRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 6 },
-  progressBg: { flex: 1, height: 8, backgroundColor: 'rgba(255,255,255,0.45)', borderRadius: 4, overflow: 'hidden' },
-  progressFill: { height: '100%', borderRadius: 2, overflow: 'hidden' },
-  progressGrad: { flex: 1 },
-  progressText: { color: '#ffffff', fontSize: 11, fontWeight: '700' },
-
-  list: { flex: 1, backgroundColor: C.body },
-  listWrap: { flex: 1, position: 'relative' },
-  panelOverlay: { position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: 16, paddingTop: 8, zIndex: 20 },
-  listHeader: { marginBottom: 4 },
-  sectionBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 10, paddingBottom: 4 },
-  sectionRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  metaLabel: { color: C.muted, fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
-  stone: { color: C.stone, fontSize: 11, fontWeight: '700' },
-  toggleRow: { flexDirection: 'row', gap: 6, flexShrink: 1 },
-  filterToggle: { backgroundColor: '#eff6ff', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 5 },
-  filterToggleActive: { backgroundColor: C.primary },
-  filterToggleText: { color: C.primary, fontSize: 11, fontWeight: '800' },
-  filterToggleTextActive: { color: C.onPrimary },
-  filterPanel: { backgroundColor: C.card, borderRadius: 12, borderWidth: 1, borderColor: C.border, padding: 12, marginTop: 8, gap: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 10, elevation: 8 },
-  filterLabel: { color: C.muted, fontSize: 10, fontWeight: '800', letterSpacing: 0.5, marginTop: 2 },
-  filterRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  fChip: { borderWidth: 1, borderColor: C.border, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 5 },
-  fChipActive: { backgroundColor: C.primary, borderColor: C.primary },
-  fChipText: { color: C.onDark, fontSize: 12, fontWeight: '700' },
-  fChipTextActive: { color: C.onPrimary },
-  filterHint: { color: C.muted, fontSize: 10, fontWeight: '600', marginTop: 4 },
-
-  swipeWrap: { borderRadius: 12 },
-  swipeDeleteBg: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: 0,
-    right: 0,
-    borderRadius: 12,
-    backgroundColor: '#1f2937',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  swipeDeleteText: { color: '#ffffff', fontSize: 14, fontWeight: '800', letterSpacing: 1 },
-  taskCard: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 12,
-    paddingHorizontal: 14, paddingVertical: 14, gap: 12,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2,
-  },
-  taskCardDone: { opacity: 0.6 },
-  checkBox: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
-  checkBoxDone: { backgroundColor: C.primary, borderColor: C.primary },
-  checkMark: { color: C.onPrimary, fontSize: 11, fontWeight: '700' },
-  taskBody: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  taskTextWrap: { flex: 1, gap: 4 },
-  taskTitle: { color: C.onDark, fontSize: 14, fontWeight: '500', lineHeight: 20 },
-  taskTitleDone: { color: C.muted, textDecorationLine: 'line-through' },
-  taskMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
-  priorityBadge: { borderRadius: 4, paddingHorizontal: 6, paddingVertical: 1 },
-  priorityBadgeText: { color: C.onPrimary, fontSize: 9, fontWeight: '800' },
-  scheduleTag: { color: C.stone, fontSize: 10, fontWeight: '700' },
-  freqTag: { color: C.muted, fontSize: 10, fontWeight: '700' },
-  doneBadge: { backgroundColor: '#fef3c7', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
-  doneBadgeText: { color: '#b45309', fontSize: 9, fontWeight: '700', letterSpacing: 0.5 },
-  tagBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e5e7eb', alignItems: 'center', justifyContent: 'center' },
-  tagIcon: { fontSize: 17 },
-  tagIconEmpty: { opacity: 0.35 },
-
-  empty: { paddingVertical: 60, alignItems: 'center', gap: 8 },
-  emptyTitle: { color: C.stone, fontSize: 16, fontWeight: '700' },
-  emptyBody: { color: C.muted, fontSize: 13 },
-
-  fabWrap: { position: 'absolute', zIndex: 20 },
-  fab: { width: 52, height: 52, borderRadius: 26, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.25, shadowRadius: 6 },
-  fabText: { color: C.onPrimary, fontSize: 26, fontWeight: '400', lineHeight: 30 },
-
-  sheetBg: { flex: 1, backgroundColor: 'transparent', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: '#eff4ff', borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1.5, borderColor: '#93b4f5', padding: 20, paddingTop: 12, gap: 8, maxHeight: '88%' },
-  sheetHandle: { width: 40, height: 4, backgroundColor: C.border, borderRadius: 2, alignSelf: 'center', marginBottom: 12 },
-  sheetDeleteBtn: { position: 'absolute', top: 10, right: 14, backgroundColor: '#fee2e2', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 6, zIndex: 10 },
-  sheetDeleteText: { color: '#dc2626', fontSize: 12, fontWeight: '800' },
-  sheetSection: { color: C.muted, fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
-  sheetTitleRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
-  sheetTitleInput: { flex: 1, borderWidth: 1, borderColor: C.border, borderRadius: 10, padding: 12, fontSize: 15, color: C.onDark, backgroundColor: C.body },
-  noteInput: { borderWidth: 1, borderColor: C.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9, fontSize: 13, color: C.onDark, backgroundColor: C.body },
-  sheetSaveBtn: { backgroundColor: C.primary, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 12, alignItems: 'center', justifyContent: 'center' },
-  sheetSaveBtnDisabled: { backgroundColor: C.border },
-  sheetSaveBtnText: { color: C.onPrimary, fontSize: 13, fontWeight: '700' },
-
-  // Schedule (time + notify)
-  scheduleCard: { backgroundColor: '#eff6ff', borderRadius: 14, padding: 14, gap: 8 },
-  scheduleToggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 2 },
-  scheduleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  scheduleLeft: { gap: 2 },
-  scheduleRight: { alignItems: 'center', gap: 2 },
-  scheduleLabel: { color: C.stone, fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
-  scheduleTime: { color: C.onDark, fontSize: 30, fontWeight: '800' },
-  scheduleTimeEmpty: { color: C.muted, fontSize: 20, fontWeight: '700' },
-  clearTimeBtn: { alignSelf: 'flex-start' },
-  clearTimeText: { color: C.muted, fontSize: 11, fontWeight: '700' },
-  scheduleHint: { color: C.error, fontSize: 11, fontWeight: '600' },
-  notifyTypeLabel: { color: C.muted, fontSize: 11, fontWeight: '700', marginTop: 4 },
-  notifyTypeRow: { flexDirection: 'row', gap: 8, marginTop: 2 },
-  notifyTypeChip: { flex: 1, borderWidth: 1, borderColor: C.border, borderRadius: 10, paddingVertical: 8, alignItems: 'center', backgroundColor: '#ffffff' },
-  notifyTypeChipActive: { backgroundColor: C.primary, borderColor: C.primary },
-  notifyTypeText: { color: C.onDark, fontSize: 12, fontWeight: '700' },
-  notifyTypeTextActive: { color: C.onPrimary },
-
-  // Icon
-  metaSelectBtn: { borderWidth: 1, borderColor: C.border, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 11, backgroundColor: '#ffffff', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
-  metaSelectLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  metaSelectIcon: { width: 28, textAlign: 'center', fontSize: 20 },
-  metaSelectIconEmpty: { opacity: 0.35 },
-  metaSelectText: { color: C.onDark, fontSize: 13, fontWeight: '700' },
-  metaSelectArrow: { color: C.muted, fontSize: 11, fontWeight: '800' },
-  prioritySwatch: { width: 28, height: 20, borderRadius: 7, borderWidth: 1 },
-  iconGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingVertical: 6 },
-  iconChip: { width: 44, height: 44, borderRadius: 12, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
-  iconChipActive: { backgroundColor: '#eff6ff', borderColor: C.primary },
-  iconEmoji: { fontSize: 22 },
-  iconNone: { color: C.muted, fontSize: 11, fontWeight: '700' },
-
-  // Priority / generic chips
-  typeRow: { flexDirection: 'row', gap: 8 },
-  typeChip: { flex: 1, borderWidth: 1, borderColor: C.border, borderRadius: 20, paddingVertical: 8, alignItems: 'center' },
-  typeChipText: { color: C.muted, fontSize: 12, fontWeight: '700' },
-  typeChipTextActive: { color: C.onPrimary },
-
-  // Frequency
-  freqPanel: { gap: 8, marginTop: 8 },
-  freqTypeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  freqTypeChip: { borderWidth: 1, borderColor: C.border, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 8 },
-  freqTypeChipActive: { backgroundColor: C.primary, borderColor: C.primary },
-  freqTypeText: { color: C.muted, fontSize: 12, fontWeight: '700' },
-  freqTypeTextActive: { color: C.onPrimary },
-  weekdayRow: { flexDirection: 'row', gap: 6, marginTop: 8 },
-  dayChip: { flex: 1, height: 38, borderRadius: 10, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
-  dayChipActive: { backgroundColor: C.primary, borderColor: C.primary },
-  dayChipText: { color: C.onDark, fontSize: 13, fontWeight: '700' },
-  dayChipTextActive: { color: C.onPrimary },
-  daySun: { },
-  daySat: { },
-  weekChoiceRow: { flexDirection: 'row', gap: 6, marginTop: 8 },
-  weekChip: { flex: 1, borderRadius: 10, borderWidth: 1, borderColor: C.border, paddingVertical: 8, alignItems: 'center' },
-  weekChipActive: { backgroundColor: C.primary, borderColor: C.primary },
-  weekChipText: { color: C.onDark, fontSize: 12, fontWeight: '700' },
-  weekChipTextActive: { color: C.onPrimary },
-  monthDayRow: { gap: 6, paddingVertical: 8 },
-  monthDayChip: { width: 40, height: 40, borderRadius: 10, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
-  monthDayChipActive: { backgroundColor: C.primary, borderColor: C.primary },
-  monthDayText: { color: C.onDark, fontSize: 13, fontWeight: '700' },
-  monthDayTextActive: { color: C.onPrimary },
-
-  calHint: { fontSize: 12, color: '#64748b', marginTop: 6, marginBottom: 2 },
-  freqModalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end', paddingHorizontal: 12 },
-  freqModalCard: {
-    backgroundColor: '#e8f0fe', borderRadius: 24, paddingHorizontal: 20, paddingTop: 8, paddingBottom: 16,
-    borderWidth: 2, borderColor: '#93b4f5',
-    elevation: 16, shadowColor: '#1e3a8a', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.3, shadowRadius: 20,
-  },
-  freqModalHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
-  freqModalTitle: { fontSize: 16, fontWeight: '800', color: C.muted },
-  freqModalDone: { fontSize: 15, fontWeight: '800', color: C.primary },
-  cal: { marginTop: 4, borderWidth: 1, borderColor: C.border, borderRadius: 14, padding: 10, backgroundColor: '#f8fafc' },
-  calHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 8, marginBottom: 8 },
-  calNav: { fontSize: 26, color: C.primary, fontWeight: '700', width: 32, textAlign: 'center' },
-  calTitle: { fontSize: 15, fontWeight: '800', color: C.muted },
-  calWeekRow: { flexDirection: 'row' },
-  calWeekCell: { flex: 1, textAlign: 'center', fontSize: 11, fontWeight: '700', color: '#94a3b8', paddingBottom: 4 },
-  calGrid: { flexDirection: 'row', flexWrap: 'wrap' },
-  calCell: { width: `${100 / 7}%`, aspectRatio: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 2 },
-  calDay: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
-  calDayActive: { backgroundColor: C.primary },
-  calDayText: { fontSize: 13, fontWeight: '700', color: C.onDark },
-  calDayTextActive: { color: C.onPrimary },
-  calSun: { color: '#ef4444' },
-  calSat: { color: '#3b82f6' },
-
-  timeModalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center', padding: 32 },
-  timeModalCard: { width: '100%', backgroundColor: C.card, borderRadius: 18, padding: 20, gap: 12, alignItems: 'center' },
-  timeModalTitle: { color: C.onDark, fontSize: 15, fontWeight: '800' },
-  timeInputRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  timeInput: { width: 76, borderWidth: 1, borderColor: C.border, borderRadius: 12, paddingVertical: 10, fontSize: 30, fontWeight: '800', color: C.onDark, textAlign: 'center', backgroundColor: C.body },
-  timeColon: { fontSize: 30, fontWeight: '800', color: C.onDark },
-  timeHint: { color: C.muted, fontSize: 11, fontWeight: '600' },
-  timeBtnRow: { flexDirection: 'row', gap: 10, alignSelf: 'stretch', marginTop: 4 },
-  timeCancelBtn: { flex: 1, borderWidth: 1, borderColor: C.border, borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
-  timeCancelText: { color: C.stone, fontSize: 14, fontWeight: '700' },
-  timeConfirmBtnWrap: { flex: 1 },
-  timeConfirmBtn: { borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
-  timeConfirmText: { color: C.onPrimary, fontSize: 14, fontWeight: '700' },
-
-  thumbOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
-  thumbEmoji: { fontSize: 80 },
-});

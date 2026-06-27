@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, Platform, StatusBar, ScrollView, Dimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSQLiteContext } from 'expo-sqlite';
@@ -14,20 +14,7 @@ import {
 } from '../db/database';
 import { GRAD, GRAD_START, GRAD_END } from '../constants/theme';
 import TabBar from '../components/TabBar';
-
-const C = {
-  header:    '#2563eb',
-  body:      '#f4f8ff',
-  card:      '#ffffff',
-  border:    '#dbeafe',
-  primary:   '#2563eb',
-  onPrimary: '#ffffff',
-  onDark:    '#2d3748',
-  muted:     '#111827',
-  stone:     '#111827',
-  warning:   '#df6500',
-  cellEmpty: '#eef4ff',
-};
+import { useTheme, ColorSet } from '../contexts/ThemeContext';
 
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
 const PAGE_PAD = 12;
@@ -43,9 +30,79 @@ function toDateString(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+const makeStyles = (C: ColorSet) => StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: C.body },
+  headerCard: { backgroundColor: C.primary, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16, gap: 12 },
+
+  segRow: { flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 10, padding: 3 },
+  segChip: { flex: 1, paddingVertical: 7, borderRadius: 8, alignItems: 'center' },
+  segChipActive: { backgroundColor: '#ffffff' },
+  segText: { color: '#ffffff', fontSize: 13, fontWeight: '800' },
+  segTextActive: { color: '#2563eb' },
+
+  chipRow: { flexDirection: 'row', gap: 8 },
+  chip: { borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6 },
+  chipActive: { backgroundColor: '#ffffff', borderColor: '#ffffff' },
+  chipText: { color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '700' },
+  chipTextActive: { color: '#2563eb' },
+
+  monthNav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  navBtn: { padding: 6 },
+  navBtnText: { color: '#ffffff', fontSize: 26, fontWeight: '300' },
+  monthLabel: { color: '#ffffff', fontSize: 17, fontWeight: '700' },
+
+  customBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.card, paddingHorizontal: 16, paddingVertical: 10, gap: 6, borderBottomWidth: 1, borderBottomColor: C.border },
+  customLabel: { color: C.stone, fontSize: 11, fontWeight: '700' },
+  dateBtn: { borderWidth: 1, borderColor: C.border, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 5 },
+  dateBtnText: { color: C.onDark, fontSize: 11, fontWeight: '700' },
+  customTilde: { color: C.muted, fontSize: 12 },
+  applyBtn: { backgroundColor: C.primary, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 5 },
+  applyBtnText: { color: C.onPrimary, fontSize: 11, fontWeight: '700' },
+  metaLabel: { color: C.muted, fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
+  list: { flex: 1, backgroundColor: C.body },
+  rateCard: { backgroundColor: C.card, borderRadius: 16, padding: 16, gap: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 6, elevation: 3 },
+  rateHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  rateTitle: { flex: 1, color: C.onDark, fontSize: 14, fontWeight: '600' },
+  rateRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  rateDays: { color: C.muted, fontSize: 11, fontWeight: '700' },
+  rateBadge: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
+  ratePct: { color: C.onPrimary, fontSize: 11, fontWeight: '700' },
+  barBg: { height: 4, backgroundColor: C.border, borderRadius: 2, overflow: 'hidden' },
+  barFill: { height: '100%' },
+  empty: { flex: 1, backgroundColor: C.body, alignItems: 'center', justifyContent: 'center' },
+  emptyText: { color: C.muted, fontSize: 14, fontWeight: '600' },
+
+  calBody: { flex: 1, backgroundColor: C.body },
+  gridPage: { padding: PAGE_PAD, flexDirection: 'row', flexWrap: 'wrap', gap: GRID_GAP },
+  calCard: {
+    backgroundColor: C.card, borderRadius: 14, padding: 10, gap: 6,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
+  },
+  calHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 },
+  calTitle: { flex: 1, color: C.onDark, fontSize: 13, fontWeight: '700' },
+  countBadge: { backgroundColor: C.primary, borderRadius: 9, paddingHorizontal: 7, paddingVertical: 2, minWidth: 22, alignItems: 'center' },
+  countText: { color: C.onPrimary, fontSize: 11, fontWeight: '800' },
+  weekRow: { flexDirection: 'row' },
+  weekLabel: { textAlign: 'center', color: C.muted, fontWeight: '700' },
+  grid: { flexDirection: 'row', flexWrap: 'wrap' },
+  cell: { width: '14.28%', alignItems: 'center', paddingVertical: 1.5, paddingHorizontal: 1 },
+  dayBox: { width: '100%', aspectRatio: 1, borderRadius: 6, backgroundColor: C.cellEmpty, alignItems: 'center', justifyContent: 'center' },
+  dayBoxDone: { backgroundColor: C.primary },
+  dayBoxToday: { borderWidth: 1.5, borderColor: C.primary },
+  dayNum: { fontWeight: '600', color: C.onDark },
+  dayNumDone: { color: C.onPrimary, fontWeight: '800' },
+  sun: { color: '#e53e3e' },
+  sat: { color: C.onDark },
+  calEmpty: { paddingVertical: 60, alignItems: 'center', gap: 8 },
+  calEmptyTitle: { color: C.stone, fontSize: 16, fontWeight: '700' },
+  calEmptyBody: { color: C.muted, fontSize: 13, textAlign: 'center', paddingHorizontal: 24 },
+});
+
 export default function StatsScreen({ navigation }: Props) {
   const db = useSQLiteContext();
   const insets = useSafeAreaInsets();
+  const { C } = useTheme();
+  const s = useMemo(() => makeStyles(C), [C]);
   const today = getToday();
 
   const [mode, setMode] = useState<Mode>('rate');
@@ -323,76 +380,3 @@ export default function StatsScreen({ navigation }: Props) {
     </View>
   );
 }
-
-const s = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: C.body },
-  headerCard: { backgroundColor: C.header, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16, gap: 12 },
-
-  // segmented control (実行率 / カレンダー)
-  segRow: { flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 10, padding: 3 },
-  segChip: { flex: 1, paddingVertical: 7, borderRadius: 8, alignItems: 'center' },
-  segChipActive: { backgroundColor: '#ffffff' },
-  segText: { color: '#ffffff', fontSize: 13, fontWeight: '800' },
-  segTextActive: { color: C.header },
-
-  // shared chips (period / freq / columns)
-  chipRow: { flexDirection: 'row', gap: 8 },
-  chip: { borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6 },
-  chipActive: { backgroundColor: '#ffffff', borderColor: '#ffffff' },
-  chipText: { color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '700' },
-  chipTextActive: { color: C.header },
-
-  // calendar month nav
-  monthNav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  navBtn: { padding: 6 },
-  navBtnText: { color: '#ffffff', fontSize: 26, fontWeight: '300' },
-  monthLabel: { color: '#ffffff', fontSize: 17, fontWeight: '700' },
-
-  // rate list
-  customBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.card, paddingHorizontal: 16, paddingVertical: 10, gap: 6, borderBottomWidth: 1, borderBottomColor: C.border },
-  customLabel: { color: C.stone, fontSize: 11, fontWeight: '700' },
-  dateBtn: { borderWidth: 1, borderColor: C.border, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 5 },
-  dateBtnText: { color: C.onDark, fontSize: 11, fontWeight: '700' },
-  customTilde: { color: C.muted, fontSize: 12 },
-  applyBtn: { backgroundColor: C.primary, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 5 },
-  applyBtnText: { color: C.onPrimary, fontSize: 11, fontWeight: '700' },
-  metaLabel: { color: C.muted, fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
-  list: { flex: 1, backgroundColor: C.body },
-  rateCard: { backgroundColor: C.card, borderRadius: 16, padding: 16, gap: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 6, elevation: 3 },
-  rateHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  rateTitle: { flex: 1, color: C.onDark, fontSize: 14, fontWeight: '600' },
-  rateRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  rateDays: { color: C.muted, fontSize: 11, fontWeight: '700' },
-  rateBadge: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
-  ratePct: { color: C.onPrimary, fontSize: 11, fontWeight: '700' },
-  barBg: { height: 4, backgroundColor: C.border, borderRadius: 2, overflow: 'hidden' },
-  barFill: { height: '100%' },
-  empty: { flex: 1, backgroundColor: C.body, alignItems: 'center', justifyContent: 'center' },
-  emptyText: { color: C.muted, fontSize: 14, fontWeight: '600' },
-
-  // calendar grid
-  calBody: { flex: 1, backgroundColor: C.body },
-  gridPage: { padding: PAGE_PAD, flexDirection: 'row', flexWrap: 'wrap', gap: GRID_GAP },
-  calCard: {
-    backgroundColor: C.card, borderRadius: 14, padding: 10, gap: 6,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
-  },
-  calHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 },
-  calTitle: { flex: 1, color: C.onDark, fontSize: 13, fontWeight: '700' },
-  countBadge: { backgroundColor: C.primary, borderRadius: 9, paddingHorizontal: 7, paddingVertical: 2, minWidth: 22, alignItems: 'center' },
-  countText: { color: C.onPrimary, fontSize: 11, fontWeight: '800' },
-  weekRow: { flexDirection: 'row' },
-  weekLabel: { textAlign: 'center', color: C.muted, fontWeight: '700' },
-  grid: { flexDirection: 'row', flexWrap: 'wrap' },
-  cell: { width: '14.28%', alignItems: 'center', paddingVertical: 1.5, paddingHorizontal: 1 },
-  dayBox: { width: '100%', aspectRatio: 1, borderRadius: 6, backgroundColor: C.cellEmpty, alignItems: 'center', justifyContent: 'center' },
-  dayBoxDone: { backgroundColor: C.primary },
-  dayBoxToday: { borderWidth: 1.5, borderColor: C.primary },
-  dayNum: { fontWeight: '600', color: C.onDark },
-  dayNumDone: { color: C.onPrimary, fontWeight: '800' },
-  sun: { color: '#e53e3e' },
-  sat: { color: C.onDark },
-  calEmpty: { paddingVertical: 60, alignItems: 'center', gap: 8 },
-  calEmptyTitle: { color: C.stone, fontSize: 16, fontWeight: '700' },
-  calEmptyBody: { color: C.muted, fontSize: 13, textAlign: 'center', paddingHorizontal: 24 },
-});

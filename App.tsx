@@ -11,6 +11,7 @@ import NotificationScreen from './src/screens/NotificationScreen';
 import TimerScreen from './src/screens/TimerScreen';
 import ScheduleScreen from './src/screens/ScheduleScreen';
 import { migrateDb } from './src/db/database';
+import { ThemeProvider } from './src/contexts/ThemeContext';
 
 // Show banners/sounds even when the app is in the foreground.
 Notifications.setNotificationHandler({
@@ -33,6 +34,21 @@ export type RootStackParamList = {
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
+function AppNavigation() {
+  return (
+    <NavigationContainer>
+      <StatusBar style="light" />
+      <Stack.Navigator screenOptions={{ headerShown: false, animation: 'none' }}>
+        <Stack.Screen name="Home" component={HomeScreen} />
+        <Stack.Screen name="Stats" component={StatsScreen} />
+        <Stack.Screen name="Notifications" component={NotificationScreen} />
+        <Stack.Screen name="Timer" component={TimerScreen} />
+        <Stack.Screen name="Schedule" component={ScheduleScreen} />
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+}
+
 export default function App() {
   useEffect(() => {
     if (Platform.OS === 'android') {
@@ -51,16 +67,9 @@ export default function App() {
 
   return (
     <SQLiteProvider databaseName="daily_tasks.db" onInit={migrateDb}>
-      <NavigationContainer>
-        <StatusBar style="light" />
-        <Stack.Navigator screenOptions={{ headerShown: false, animation: 'none' }}>
-          <Stack.Screen name="Home" component={HomeScreen} />
-          <Stack.Screen name="Stats" component={StatsScreen} />
-          <Stack.Screen name="Notifications" component={NotificationScreen} />
-          <Stack.Screen name="Timer" component={TimerScreen} />
-          <Stack.Screen name="Schedule" component={ScheduleScreen} />
-        </Stack.Navigator>
-      </NavigationContainer>
+      <ThemeProvider>
+        <AppNavigation />
+      </ThemeProvider>
     </SQLiteProvider>
   );
 }

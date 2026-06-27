@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, StatusBar } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSQLiteContext } from 'expo-sqlite';
@@ -10,52 +10,108 @@ import { Task, getToday, getTasks, getCompletedTaskIds, markComplete, markIncomp
 import { isDueToday, WEEKDAYS } from '../constants/taskMeta';
 import { GRAD, GRAD_START, GRAD_END } from '../constants/theme';
 import TabBar from '../components/TabBar';
-
-const C = {
-  header:     '#1d4ed8',
-  body:       '#ffffff',
-  grid:       '#d1d5db',
-  headerCell: '#f1f5f9',
-  primary:    '#2563eb',
-  primarySoft:'#dbeafe',
-  onDark:     '#1f2937',
-  muted:      '#6b7280',
-  ink:        '#111827',
-  success:    '#16a34a',
-  successBg:  '#dcfce7',
-  line:       '#64748b',
-  termBg:     '#dbeafe',
-  termBorder: '#2563eb',
-  termText:   '#1e3a8a',
-  procText:   '#1e3a8a',
-  diaBg:      '#bbf7d0',
-  diaBorder:  '#16a34a',
-  diaText:    '#14532d',
-  doneBg:     '#16a34a',
-  doneBorder: '#15803d',
-};
+import { useTheme, ColorSet } from '../contexts/ThemeContext';
 
 // Day runs 5:00 → 4:00 next morning, like a printed timetable.
 const HOURS: number[] = [...Array.from({ length: 19 }, (_, i) => i + 5), 0, 1, 2, 3, 4];
 const hourLabel = (h: number) => `${h}:00`;
-const bucketHour = (h: number) => h; // every hour now has its own row
+const bucketHour = (h: number) => h;
 
 type Mode = 'schedule' | 'flow';
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'Schedule'> };
 
-// vertical line + downward arrowhead (flow connectors)
-function Down({ color = C.line, h = 22 }: { color?: string; h?: number }) {
+// Static styles for Down (no theme colors needed)
+const downStyles = StyleSheet.create({
+  down: { alignItems: 'center', justifyContent: 'center' },
+  downLine: { width: 2 },
+  arrowHead: { width: 0, height: 0, borderLeftWidth: 6, borderRightWidth: 6, borderTopWidth: 9, borderLeftColor: 'transparent', borderRightColor: 'transparent', marginTop: -1 },
+});
+
+function Down({ color = '#64748b', h = 22 }: { color?: string; h?: number }) {
   return (
-    <View style={s.down} pointerEvents="none">
-      <View style={[s.downLine, { height: h, backgroundColor: color }]} />
-      <View style={[s.arrowHead, { borderTopColor: color }]} />
+    <View style={downStyles.down} pointerEvents="none">
+      <View style={[downStyles.downLine, { height: h, backgroundColor: color }]} />
+      <View style={[downStyles.arrowHead, { borderTopColor: color }]} />
     </View>
   );
 }
 
+const makeStyles = (C: ColorSet) => StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: C.body },
+  headerCard: { backgroundColor: C.primary, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16, gap: 10 },
+  segRow: { flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 10, padding: 3 },
+  segChip: { flex: 1, paddingVertical: 7, borderRadius: 8, alignItems: 'center' },
+  segChipActive: { backgroundColor: '#ffffff' },
+  segText: { color: '#ffffff', fontSize: 13, fontWeight: '800' },
+  segTextActive: { color: '#2563eb' },
+  headerSub: { color: 'rgba(255,255,255,0.9)', fontSize: 12, fontWeight: '700' },
+
+  bodyView: { flex: 1, backgroundColor: C.body },
+
+  // ── schedule table ──
+  table: { borderWidth: 1, borderColor: C.grid, borderRadius: 8, overflow: 'hidden', backgroundColor: C.card },
+  row: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: C.grid, minHeight: 44 },
+  rowLast: { borderBottomWidth: 0 },
+  headRow: { backgroundColor: C.headerCell },
+  timeCell: { width: 64, alignItems: 'center', justifyContent: 'center', paddingVertical: 6, borderRightWidth: 1, borderRightColor: C.grid },
+  timeCellNow: { backgroundColor: C.primarySoft },
+  contentCell: { flex: 1, paddingHorizontal: 6, paddingVertical: 5, justifyContent: 'center', gap: 4 },
+  headCell: { paddingVertical: 8 },
+  headText: { color: C.onDark, fontSize: 13, fontWeight: '800' },
+  timeText: { color: C.onDark, fontSize: 13, fontWeight: '700' },
+  timeTextNow: { color: C.primary, fontWeight: '800' },
+  taskPill: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: C.primarySoft, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 6 },
+  taskPillDone: { backgroundColor: C.successBg },
+  pillTime: { color: C.primary, fontSize: 11, fontWeight: '800' },
+  pillTimeDone: { color: C.success },
+  pillTitle: { flex: 1, color: C.onDark, fontSize: 13, fontWeight: '700' },
+  pillTitleDone: { color: C.muted, textDecorationLine: 'line-through' },
+  pillCheck: { color: C.success, fontSize: 13, fontWeight: '900' },
+  untimedBox: { marginTop: 14, gap: 6 },
+  untimedLabel: { color: C.muted, fontSize: 12, fontWeight: '800', marginBottom: 2 },
+
+  // ── flow chart ──
+  flowContent: { padding: 16, paddingBottom: 40, alignItems: 'center' },
+  terminator: { backgroundColor: C.termBg, borderWidth: 1.5, borderColor: C.termBorder, borderRadius: 22, paddingHorizontal: 30, paddingVertical: 10 },
+  terminatorText: { color: C.termText, fontSize: 14, fontWeight: '800', letterSpacing: 1 },
+  terminatorEndText: { color: '#ffffff' },
+  terminatorDone: { backgroundColor: C.doneBg, borderColor: C.doneBorder },
+  stepWrap: { alignItems: 'center', width: '100%' },
+  process: { flexDirection: 'row', alignItems: 'center', gap: 10, width: '82%', backgroundColor: C.termBg, borderWidth: 1.5, borderColor: C.termBorder, borderRadius: 4, paddingHorizontal: 12, paddingVertical: 12 },
+  processDone: { backgroundColor: C.successBg, borderColor: C.doneBorder },
+  stepNo: { width: 22, height: 22, borderRadius: 4, backgroundColor: C.termBorder, alignItems: 'center', justifyContent: 'center' },
+  stepNoDone: { backgroundColor: C.doneBg },
+  stepNoText: { color: '#ffffff', fontSize: 12, fontWeight: '800' },
+  processText: { flex: 1, color: C.procText, fontSize: 13, fontWeight: '700' },
+  processTextDone: { color: '#166534', textDecorationLine: 'line-through' },
+  processCheck: { color: C.doneBg, fontSize: 14, fontWeight: '900' },
+  diamond: { width: 96, height: 96, borderRadius: 8, borderWidth: 1.5, borderColor: C.diaBorder, backgroundColor: C.diaBg, alignItems: 'center', justifyContent: 'center', transform: [{ rotate: '45deg' }] },
+  diamondDone: { backgroundColor: '#86efac' },
+  diamondInner: { width: 140, alignItems: 'center', transform: [{ rotate: '-45deg' }] },
+  diamondText: { color: C.diaText, fontSize: 13, fontWeight: '800', textAlign: 'center' },
+  diamondTextDone: { color: '#14532d' },
+  branchRow: { flexDirection: 'row', width: '100%', marginTop: 2 },
+  branchCol: { flex: 1, alignItems: 'center' },
+  branchLabel: { fontSize: 12, fontWeight: '800', marginBottom: -2 },
+  outBox: { backgroundColor: C.termBg, borderWidth: 1.5, borderColor: C.termBorder, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 8, minWidth: 92, alignItems: 'center' },
+  outBoxDone: { backgroundColor: C.doneBg, borderColor: C.doneBorder },
+  outBoxNo: { backgroundColor: '#fef3c7', borderColor: '#d97706' },
+  outText: { color: C.termText, fontSize: 13, fontWeight: '800' },
+  outTextDone: { color: '#ffffff' },
+  outNoText: { color: '#92400e', fontSize: 13, fontWeight: '800' },
+  mergeRailWrap: { width: '50%', alignItems: 'center', marginTop: 14 },
+  mergeRail: { width: '100%', height: 2, backgroundColor: C.line },
+
+  empty: { paddingVertical: 60, alignItems: 'center', gap: 8 },
+  emptyTitle: { color: C.ink, fontSize: 16, fontWeight: '700' },
+  emptyBody: { color: C.muted, fontSize: 13, textAlign: 'center', paddingHorizontal: 24 },
+});
+
 export default function ScheduleScreen({ navigation }: Props) {
   const db = useSQLiteContext();
   const insets = useSafeAreaInsets();
+  const { C } = useTheme();
+  const s = useMemo(() => makeStyles(C), [C]);
   const today = getToday();
   const now = new Date();
   const dateLabel = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')} (${WEEKDAYS[now.getDay()]})`;
@@ -234,77 +290,3 @@ export default function ScheduleScreen({ navigation }: Props) {
     </View>
   );
 }
-
-const s = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: C.body },
-  headerCard: { backgroundColor: C.header, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16, gap: 10 },
-  segRow: { flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 10, padding: 3 },
-  segChip: { flex: 1, paddingVertical: 7, borderRadius: 8, alignItems: 'center' },
-  segChipActive: { backgroundColor: '#ffffff' },
-  segText: { color: '#ffffff', fontSize: 13, fontWeight: '800' },
-  segTextActive: { color: C.header },
-  headerSub: { color: 'rgba(255,255,255,0.9)', fontSize: 12, fontWeight: '700' },
-
-  bodyView: { flex: 1, backgroundColor: C.body },
-
-  // ── schedule table ──
-  table: { borderWidth: 1, borderColor: C.grid, borderRadius: 8, overflow: 'hidden', backgroundColor: '#ffffff' },
-  row: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: C.grid, minHeight: 44 },
-  rowLast: { borderBottomWidth: 0 },
-  headRow: { backgroundColor: C.headerCell },
-  timeCell: { width: 64, alignItems: 'center', justifyContent: 'center', paddingVertical: 6, borderRightWidth: 1, borderRightColor: C.grid },
-  timeCellNow: { backgroundColor: C.primarySoft },
-  contentCell: { flex: 1, paddingHorizontal: 6, paddingVertical: 5, justifyContent: 'center', gap: 4 },
-  headCell: { paddingVertical: 8 },
-  headText: { color: C.onDark, fontSize: 13, fontWeight: '800' },
-  timeText: { color: C.onDark, fontSize: 13, fontWeight: '700' },
-  timeTextNow: { color: C.primary, fontWeight: '800' },
-  taskPill: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: C.primarySoft, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 6 },
-  taskPillDone: { backgroundColor: C.successBg },
-  pillTime: { color: C.primary, fontSize: 11, fontWeight: '800' },
-  pillTimeDone: { color: C.success },
-  pillTitle: { flex: 1, color: C.onDark, fontSize: 13, fontWeight: '700' },
-  pillTitleDone: { color: C.muted, textDecorationLine: 'line-through' },
-  pillCheck: { color: C.success, fontSize: 13, fontWeight: '900' },
-  untimedBox: { marginTop: 14, gap: 6 },
-  untimedLabel: { color: C.muted, fontSize: 12, fontWeight: '800', marginBottom: 2 },
-
-  // ── flow chart ──
-  flowContent: { padding: 16, paddingBottom: 40, alignItems: 'center' },
-  down: { alignItems: 'center', justifyContent: 'center' },
-  downLine: { width: 2 },
-  arrowHead: { width: 0, height: 0, borderLeftWidth: 6, borderRightWidth: 6, borderTopWidth: 9, borderLeftColor: 'transparent', borderRightColor: 'transparent', marginTop: -1 },
-  terminator: { backgroundColor: C.termBg, borderWidth: 1.5, borderColor: C.termBorder, borderRadius: 22, paddingHorizontal: 30, paddingVertical: 10 },
-  terminatorText: { color: C.termText, fontSize: 14, fontWeight: '800', letterSpacing: 1 },
-  terminatorEndText: { color: '#ffffff' },
-  terminatorDone: { backgroundColor: C.doneBg, borderColor: C.doneBorder },
-  stepWrap: { alignItems: 'center', width: '100%' },
-  process: { flexDirection: 'row', alignItems: 'center', gap: 10, width: '82%', backgroundColor: C.termBg, borderWidth: 1.5, borderColor: C.termBorder, borderRadius: 4, paddingHorizontal: 12, paddingVertical: 12 },
-  processDone: { backgroundColor: '#dcfce7', borderColor: C.doneBorder },
-  stepNo: { width: 22, height: 22, borderRadius: 4, backgroundColor: C.termBorder, alignItems: 'center', justifyContent: 'center' },
-  stepNoDone: { backgroundColor: C.doneBg },
-  stepNoText: { color: '#ffffff', fontSize: 12, fontWeight: '800' },
-  processText: { flex: 1, color: C.procText, fontSize: 13, fontWeight: '700' },
-  processTextDone: { color: '#166534', textDecorationLine: 'line-through' },
-  processCheck: { color: C.doneBg, fontSize: 14, fontWeight: '900' },
-  diamond: { width: 96, height: 96, borderRadius: 8, borderWidth: 1.5, borderColor: C.diaBorder, backgroundColor: C.diaBg, alignItems: 'center', justifyContent: 'center', transform: [{ rotate: '45deg' }] },
-  diamondDone: { backgroundColor: '#86efac' },
-  diamondInner: { width: 140, alignItems: 'center', transform: [{ rotate: '-45deg' }] },
-  diamondText: { color: C.diaText, fontSize: 13, fontWeight: '800', textAlign: 'center' },
-  diamondTextDone: { color: '#14532d' },
-  branchRow: { flexDirection: 'row', width: '100%', marginTop: 2 },
-  branchCol: { flex: 1, alignItems: 'center' },
-  branchLabel: { fontSize: 12, fontWeight: '800', marginBottom: -2 },
-  outBox: { backgroundColor: C.termBg, borderWidth: 1.5, borderColor: C.termBorder, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 8, minWidth: 92, alignItems: 'center' },
-  outBoxDone: { backgroundColor: C.doneBg, borderColor: C.doneBorder },
-  outBoxNo: { backgroundColor: '#fef3c7', borderColor: '#d97706' },
-  outText: { color: C.termText, fontSize: 13, fontWeight: '800' },
-  outTextDone: { color: '#ffffff' },
-  outNoText: { color: '#92400e', fontSize: 13, fontWeight: '800' },
-  mergeRailWrap: { width: '50%', alignItems: 'center', marginTop: 14 },
-  mergeRail: { width: '100%', height: 2, backgroundColor: C.line },
-
-  empty: { paddingVertical: 60, alignItems: 'center', gap: 8 },
-  emptyTitle: { color: C.ink, fontSize: 16, fontWeight: '700' },
-  emptyBody: { color: C.muted, fontSize: 13, textAlign: 'center', paddingHorizontal: 24 },
-});
