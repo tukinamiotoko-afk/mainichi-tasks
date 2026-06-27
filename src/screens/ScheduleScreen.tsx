@@ -119,10 +119,10 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   emptyBody: { color: C.muted, fontSize: 13, textAlign: 'center', paddingHorizontal: 24 },
 
   // ── project selector ──
-  projRow: { flexDirection: 'row', paddingHorizontal: 12, paddingVertical: 10, gap: 8 },
-  projChip: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 16, backgroundColor: C.card, borderWidth: 1.5, borderColor: C.grid },
+  projRow: { flexDirection: 'row', paddingHorizontal: 12, paddingVertical: 8, gap: 6 },
+  projChip: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12, backgroundColor: C.card, borderWidth: 1.5, borderColor: C.grid },
   projChipActive: { backgroundColor: C.primary, borderColor: C.primary },
-  projChipText: { color: C.ink, fontSize: 13, fontWeight: '700' },
+  projChipText: { color: C.ink, fontSize: 12, fontWeight: '700' },
   projChipTextActive: { color: '#ffffff' },
   projAddChip: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 16, backgroundColor: 'transparent', borderWidth: 1.5, borderColor: C.muted, borderStyle: 'dashed' },
   projAddText: { color: C.muted, fontSize: 18, fontWeight: '400', lineHeight: 20 },
