@@ -275,7 +275,9 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
 
   // Schedule (time + notify)
   scheduleCard: { backgroundColor: C.scheduleCardBg, borderRadius: 14, padding: 14, gap: 8 },
-  scheduleToggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 2 },
+  scheduleTopRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  scheduleTimeBtn: { flex: 1 },
+  scheduleToggleTop: { alignItems: 'center', gap: 2, paddingTop: 1 },
   scheduleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   scheduleLeft: { gap: 2 },
   scheduleRight: { alignItems: 'center', gap: 2 },
@@ -987,20 +989,22 @@ export default function HomeScreen({ navigation }: Props) {
     onSetNotifyType: (t: 'push' | 'alarm') => void,
   ) => (
     <View style={s.scheduleCard}>
-      <TouchableOpacity style={s.metaSelectBtn} onPress={onPick} activeOpacity={0.8}>
-        <View style={s.metaSelectLeft}>
-          <Text style={s.metaSelectText}>予定の時間：{time ?? '未設定'}</Text>
+      <View style={s.scheduleTopRow}>
+        <TouchableOpacity style={[s.metaSelectBtn, s.scheduleTimeBtn]} onPress={onPick} activeOpacity={0.8}>
+          <View style={s.metaSelectLeft}>
+            <Text style={s.metaSelectText}>予定の時間：{time ?? '未設定'}</Text>
+          </View>
+          <Text style={s.metaSelectArrow}>›</Text>
+        </TouchableOpacity>
+        <View style={s.scheduleToggleTop}>
+          <Text style={s.scheduleLabel}>通知する</Text>
+          <Switch
+            value={notify}
+            onValueChange={onToggleNotify}
+            trackColor={{ true: C.primary, false: C.border }}
+            thumbColor="#ffffff"
+          />
         </View>
-        <Text style={s.metaSelectArrow}>›</Text>
-      </TouchableOpacity>
-      <View style={s.scheduleToggleRow}>
-        <Text style={s.scheduleLabel}>通知する</Text>
-        <Switch
-          value={notify}
-          onValueChange={onToggleNotify}
-          trackColor={{ true: C.primary, false: C.border }}
-          thumbColor="#ffffff"
-        />
       </View>
       {time && (
         <TouchableOpacity onPress={onClear} style={s.clearTimeBtn}>
