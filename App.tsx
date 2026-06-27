@@ -10,6 +10,7 @@ import StatsScreen from './src/screens/StatsScreen';
 import NotificationScreen from './src/screens/NotificationScreen';
 import TimerScreen from './src/screens/TimerScreen';
 import ScheduleScreen from './src/screens/ScheduleScreen';
+import FlowScreen from './src/screens/FlowScreen';
 import { migrateDb } from './src/db/database';
 import { ThemeProvider } from './src/contexts/ThemeContext';
 
@@ -30,6 +31,7 @@ export type RootStackParamList = {
   Notifications: undefined;
   Timer: undefined;
   Schedule: undefined;
+  Flow: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -44,6 +46,7 @@ function AppNavigation() {
         <Stack.Screen name="Notifications" component={NotificationScreen} />
         <Stack.Screen name="Timer" component={TimerScreen} />
         <Stack.Screen name="Schedule" component={ScheduleScreen} />
+        <Stack.Screen name="Flow" component={FlowScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

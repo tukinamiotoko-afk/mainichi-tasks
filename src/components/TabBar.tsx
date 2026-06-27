@@ -8,6 +8,7 @@ import { useTheme, ColorSet } from '../contexts/ThemeContext';
 const TABS = [
   { name: 'Home', label: 'タスク', icon: '📋' },
   { name: 'Schedule', label: '予定', icon: '📅' },
+  { name: 'Flow', label: 'フロー', icon: '📌' },
   { name: 'Timer', label: 'タイマー', icon: '⏱️' },
   { name: 'Stats', label: '統計', icon: '📊' },
   { name: 'Notifications', label: '設定', icon: '⚙️' },
