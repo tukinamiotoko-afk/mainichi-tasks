@@ -1448,10 +1448,10 @@ export default function HomeScreen({ navigation }: Props) {
 
       {/* Add task bottom sheet */}
       <Modal visible={showAdd} transparent animationType="slide" onRequestClose={closeAddSheet}>
-        <TouchableOpacity style={s.sheetBg} activeOpacity={1} onPress={closeAddSheet}>
+        <View style={{ flex: 1 }}>
+          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={closeAddSheet} />
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-            <View onStartShouldSetResponder={() => true}>
-              <View style={[s.sheet, { maxHeight: screen.height * 0.85 }]}>
+            <View style={[s.sheet, { maxHeight: screen.height * 0.85 }]}>
                 <View style={s.sheetHandle} />
                 <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}>
 
@@ -1514,18 +1514,17 @@ export default function HomeScreen({ navigation }: Props) {
 
                   <View style={{ height: 12 }} />
                 </ScrollView>
-              </View>
             </View>
           </KeyboardAvoidingView>
-        </TouchableOpacity>
+        </View>
       </Modal>
 
       {/* Task detail bottom sheet */}
       <Modal visible={!!detailTask} transparent animationType="slide" onRequestClose={() => setDetailTask(null)}>
-        <TouchableOpacity style={s.sheetBg} activeOpacity={1} onPress={() => setDetailTask(null)}>
+        <View style={{ flex: 1 }}>
+          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setDetailTask(null)} />
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-            <View onStartShouldSetResponder={() => true}>
-              <View style={[s.sheet, { maxHeight: screen.height * 0.85 }]}>
+            <View style={[s.sheet, { maxHeight: screen.height * 0.85 }]}>
                 <View style={s.sheetHandle} />
                 {detailTask && (
                   <TouchableOpacity style={s.sheetDeleteBtn} onPress={() => handleDelete(detailTask)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -1626,10 +1625,9 @@ export default function HomeScreen({ navigation }: Props) {
                     </>
                   )}
                 </ScrollView>
-              </View>
             </View>
           </KeyboardAvoidingView>
-        </TouchableOpacity>
+        </View>
       </Modal>
 
       {/* Shared time editor (numeric) */}
