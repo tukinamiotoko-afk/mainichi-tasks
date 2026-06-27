@@ -8,16 +8,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { RootStackParamList } from '../../App';
 import {
   Task,
-  TimeLog,
   addTimeLog,
-  deleteTimeLog,
-  countTimeLogsForTaskDate,
   getTasks,
-  getTimeLogsForDate,
   getToday,
-  getTotalTimeForDate,
   markComplete,
-  markIncomplete,
 } from '../db/database';
 import { GRAD, GRAD_START, GRAD_END } from '../constants/theme';
 import TabBar from '../components/TabBar';
@@ -31,7 +25,7 @@ type TimerItem = {
   startedAtMs: number | null;
   startedAtIso: string | null;
 };
-const TIMER_TARGET_SECONDS = 25 * 60;
+const TIMER_PRESETS = [5, 10, 15, 25, 30, 60];
 
 const makeStyles = (C: ColorSet) => StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: C.body },
@@ -43,6 +37,11 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   modeText: { color: C.onDark, fontSize: 13, fontWeight: '900' },
   modeTextActive: { color: C.onPrimary },
   modeSub: { color: C.muted, fontSize: 11, fontWeight: '800', textAlign: 'center' },
+  presetRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  presetChip: { borderWidth: 1, borderColor: C.border, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7, backgroundColor: C.card },
+  presetChipActive: { backgroundColor: C.primary, borderColor: C.primary },
+  presetText: { color: C.onDark, fontSize: 12, fontWeight: '900' },
+  presetTextActive: { color: C.onPrimary },
   addBtnWrap: { flex: 1 },
   addBtn: { borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
   addBtnText: { color: C.onPrimary, fontSize: 14, fontWeight: '900' },
@@ -68,14 +67,6 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   emptyBox: { backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 12, padding: 20, alignItems: 'center', gap: 6 },
   emptyTitle: { color: C.stone, fontSize: 15, fontWeight: '900' },
   emptyBody: { color: C.muted, fontSize: 12, fontWeight: '700', textAlign: 'center' },
-  logCard: { backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 10, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  logMain: { flex: 1, gap: 3 },
-  logDate: { color: C.stone, fontSize: 11, fontWeight: '800' },
-  logTitle: { color: C.onDark, fontSize: 14, fontWeight: '800' },
-  logTime: { color: C.muted, fontSize: 11, fontWeight: '700' },
-  logDuration: { color: C.onDark, fontSize: 15, fontWeight: '900' },
-  deleteLogBtn: { backgroundColor: '#fee2e2', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7 },
-  deleteLogText: { color: '#dc2626', fontSize: 11, fontWeight: '900' },
   modalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' },
   modalBackdrop: { ...StyleSheet.absoluteFillObject },
   pickerSheet: { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: C.card, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 18, gap: 12 },
@@ -97,24 +88,14 @@ function formatDuration(totalSeconds: number, alwaysHours = false): string {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-function formatClock(iso: string): string {
-  const d = new Date(iso);
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-}
-
-function formatDate(value: string): string {
-  const [year, month, day] = value.slice(0, 10).split('-');
-  return `${year}/${month}/${day}`;
-}
-
 function timerSeconds(item: TimerItem, now: number): number {
   if (!item.startedAtMs) return item.baseSeconds;
   return item.baseSeconds + Math.floor((now - item.startedAtMs) / 1000);
 }
 
-function displayTimerSeconds(item: TimerItem, now: number, mode: TimerMode): number {
+function displayTimerSeconds(item: TimerItem, now: number, mode: TimerMode, targetSeconds: number): number {
   const elapsed = timerSeconds(item, now);
-  return mode === 'timer' ? Math.max(TIMER_TARGET_SECONDS - elapsed, 0) : elapsed;
+  return mode === 'timer' ? Math.max(targetSeconds - elapsed, 0) : elapsed;
 }
 
 export default function TimerScreen({ navigation }: Props) {
@@ -127,9 +108,8 @@ export default function TimerScreen({ navigation }: Props) {
 
   const [tasks, setTasks] = useState<Task[]>([]);
   const [timers, setTimers] = useState<TimerItem[]>([]);
-  const [logs, setLogs] = useState<TimeLog[]>([]);
-  const [totalSeconds, setTotalSeconds] = useState(0);
   const [mode, setMode] = useState<TimerMode>('stopwatch');
+  const [targetSeconds, setTargetSeconds] = useState(25 * 60);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [now, setNow] = useState(Date.now());
   const savingRef = useRef<Set<number>>(new Set());
@@ -137,16 +117,10 @@ export default function TimerScreen({ navigation }: Props) {
   const runningCount = timers.filter((item) => item.startedAtMs).length;
 
   const load = useCallback(async () => {
-    const [loadedTasks, loadedLogs, loadedTotal] = await Promise.all([
-      getTasks(db),
-      getTimeLogsForDate(db, today),
-      getTotalTimeForDate(db, today),
-    ]);
+    const loadedTasks = await getTasks(db);
     setTasks(loadedTasks);
-    setLogs(loadedLogs);
-    setTotalSeconds(loadedTotal);
     setTimers((current) => current.filter((item) => loadedTasks.some((task) => task.id === item.task.id)));
-  }, [db, today]);
+  }, [db]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
@@ -196,7 +170,7 @@ export default function TimerScreen({ navigation }: Props) {
     if (!timer || savingRef.current.has(taskId)) return;
     const endedAtMs = Date.now();
     const elapsed = timerSeconds(timer, endedAtMs);
-    const duration = mode === 'timer' ? Math.min(elapsed, TIMER_TARGET_SECONDS) : elapsed;
+    const duration = mode === 'timer' ? Math.min(elapsed, targetSeconds) : elapsed;
     if (duration <= 0) return;
     savingRef.current.add(taskId);
     const endedAt = new Date(endedAtMs).toISOString();
@@ -213,51 +187,11 @@ export default function TimerScreen({ navigation }: Props) {
   useEffect(() => {
     if (mode !== 'timer') return;
     timers.forEach((item) => {
-      if (item.startedAtMs && timerSeconds(item, now) >= TIMER_TARGET_SECONDS) {
+      if (item.startedAtMs && timerSeconds(item, now) >= targetSeconds) {
         saveTimer(item.task.id);
       }
     });
-  }, [mode, now, timers]);
-
-  const handleDeleteLog = (log: TimeLog) => {
-    Alert.alert('履歴を削除', `${formatDate(log.date)} ${log.title} の ${formatDuration(log.duration_seconds, true)} を削除しますか？`, [
-      { text: 'キャンセル', style: 'cancel' },
-      {
-        text: '削除',
-        style: 'destructive',
-        onPress: async () => {
-          await deleteTimeLog(db, log.id);
-          const remaining = await countTimeLogsForTaskDate(db, log.task_id, log.date);
-          if (remaining === 0) await markIncomplete(db, log.task_id, log.date);
-          await load();
-        },
-      },
-    ]);
-  };
-
-  const renderHistory = () => (
-    <>
-      <Text style={s.sectionTitle}>履歴</Text>
-      {logs.length === 0 ? (
-        <View style={s.emptyBox}>
-          <Text style={s.emptyTitle}>まだ履歴がありません</Text>
-          <Text style={s.emptyBody}>保存するとここに残ります</Text>
-        </View>
-      ) : logs.map((item) => (
-        <View key={item.id} style={s.logCard}>
-          <View style={s.logMain}>
-            <Text style={s.logDate}>{formatDate(item.date)}</Text>
-            <Text style={s.logTitle} numberOfLines={1}>{item.title}</Text>
-            <Text style={s.logTime}>{formatClock(item.started_at)} - {formatClock(item.ended_at)}</Text>
-          </View>
-          <Text style={s.logDuration}>{formatDuration(item.duration_seconds, true)}</Text>
-          <TouchableOpacity style={s.deleteLogBtn} onPress={() => handleDeleteLog(item)}>
-            <Text style={s.deleteLogText}>削除</Text>
-          </TouchableOpacity>
-        </View>
-      ))}
-    </>
-  );
+  }, [mode, now, timers, targetSeconds]);
 
   return (
     <View style={s.safeArea}>
@@ -280,9 +214,25 @@ export default function TimerScreen({ navigation }: Props) {
           </TouchableOpacity>
         </View>
         <Text style={s.modeSub}>
-          今日の保存済み {formatDuration(totalSeconds, true)} ・ 動作中 {runningCount}件
-          {mode === 'timer' ? ` ・ ${formatDuration(TIMER_TARGET_SECONDS, true)}で停止` : ''}
+          動作中 {runningCount}件{mode === 'timer' ? ` ・ ${formatDuration(targetSeconds, true)}で停止` : ''}
         </Text>
+        {mode === 'timer' && (
+          <View style={s.presetRow}>
+            {TIMER_PRESETS.map((minutes) => {
+              const seconds = minutes * 60;
+              return (
+                <TouchableOpacity
+                  key={minutes}
+                  style={[s.presetChip, targetSeconds === seconds && s.presetChipActive]}
+                  onPress={() => setTargetSeconds(seconds)}
+                  activeOpacity={0.85}
+                >
+                  <Text style={[s.presetText, targetSeconds === seconds && s.presetTextActive]}>{minutes}分</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
 
         <TouchableOpacity style={s.addBtnWrap} onPress={() => setPickerOpen(true)} activeOpacity={0.86}>
           <LinearGradient colors={grad.brand} start={GRAD_START} end={GRAD_END} style={s.addBtn}>
@@ -298,7 +248,7 @@ export default function TimerScreen({ navigation }: Props) {
           </View>
         ) : timers.map((item) => {
           const seconds = timerSeconds(item, now);
-          const shownSeconds = displayTimerSeconds(item, now, mode);
+          const shownSeconds = displayTimerSeconds(item, now, mode, targetSeconds);
           const running = !!item.startedAtMs;
           return (
             <View key={item.task.id} style={s.timerCard}>
@@ -331,8 +281,6 @@ export default function TimerScreen({ navigation }: Props) {
             </View>
           );
         })}
-
-        {renderHistory()}
       </ScrollView>
 
       <Modal visible={pickerOpen} transparent animationType="slide" onRequestClose={() => setPickerOpen(false)} statusBarTranslucent>
