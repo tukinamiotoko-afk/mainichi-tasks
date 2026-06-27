@@ -366,9 +366,6 @@ export default function ScheduleScreen({ navigation }: Props) {
             </TouchableOpacity>
           ))}
         </View>
-        {mode === 'flow' && selectedProjectId === null && (
-          <Text style={s.flowMeta}>{doneCount}/{due.length} 完了</Text>
-        )}
       </LinearGradient>
 
       {mode === 'schedule' ? (
