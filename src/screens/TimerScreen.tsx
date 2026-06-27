@@ -116,7 +116,7 @@ export default function TimerScreen({ navigation }: Props) {
   const { C, grad } = useTheme();
   const s = useMemo(() => makeStyles(C), [C]);
   const today = getToday();
-  const sheetHeight = Math.max(360, Dimensions.get('window').height - insets.top - 12);
+  const sheetHeight = Math.max(360, Math.round(Dimensions.get('window').height * 0.82));
 
   const [tasks, setTasks] = useState<Task[]>([]);
   const [timers, setTimers] = useState<TimerItem[]>([]);
