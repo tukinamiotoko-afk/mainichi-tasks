@@ -498,6 +498,7 @@ export default function HomeScreen({ navigation }: Props) {
   const [completedIds, setCompletedIds] = useState<Set<number>>(new Set());
   const [showThumb, setShowThumb] = useState(false);
   const thumbAnim = useRef(new Animated.Value(0)).current;
+  const thumbOpacity = useRef(new Animated.Value(0)).current;
   const progressAnim = useRef(new Animated.Value(0)).current;
   const bloomAnim = useRef(new Animated.Value(0)).current;
   const fabPosition = useRef({ x: Math.max(screen.width - 72, 20), y: Math.max(screen.height - insets.bottom - 132, 120) });
@@ -596,14 +597,23 @@ export default function HomeScreen({ navigation }: Props) {
   const triggerCelebration = () => {
     setShowThumb(true);
     thumbAnim.setValue(0);
+    thumbOpacity.setValue(0);
     bloomAnim.setValue(0);
     Animated.parallel([
       Animated.timing(bloomAnim, { toValue: 1, duration: 700, useNativeDriver: true }),
       Animated.sequence([
-        Animated.delay(80),
-        Animated.spring(thumbAnim, { toValue: 1, useNativeDriver: true, tension: 90, friction: 12 }),
-        Animated.delay(900),
-        Animated.timing(thumbAnim, { toValue: 0, duration: 400, useNativeDriver: true }),
+        Animated.delay(40),
+        Animated.timing(thumbAnim, { toValue: 0.14, duration: 80, useNativeDriver: true }),
+        Animated.timing(thumbAnim, { toValue: 0.28, duration: 90, useNativeDriver: true }),
+        Animated.timing(thumbAnim, { toValue: 0.44, duration: 90, useNativeDriver: true }),
+        Animated.timing(thumbAnim, { toValue: 0.6, duration: 90, useNativeDriver: true }),
+        Animated.timing(thumbAnim, { toValue: 0.78, duration: 110, useNativeDriver: true }),
+        Animated.timing(thumbAnim, { toValue: 1, duration: 140, useNativeDriver: true }),
+      ]),
+      Animated.sequence([
+        Animated.timing(thumbOpacity, { toValue: 1, duration: 120, useNativeDriver: true }),
+        Animated.delay(1200),
+        Animated.timing(thumbOpacity, { toValue: 0, duration: 260, useNativeDriver: true }),
       ]),
     ]).start(() => setShowThumb(false));
   };
@@ -1460,10 +1470,33 @@ export default function HomeScreen({ navigation }: Props) {
           <Animated.View style={{
             alignItems: 'center',
             gap: 8,
-            opacity: thumbAnim,
-            transform: [{ scale: thumbAnim.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1] }) }],
+            opacity: thumbOpacity,
           }}>
-            <Text style={s.thumbEmoji}>👍</Text>
+            <Animated.Text style={[
+              s.thumbEmoji,
+              {
+                transform: [
+                  {
+                    translateY: thumbAnim.interpolate({
+                      inputRange: [0, 0.14, 0.28, 0.44, 0.6, 0.78, 1],
+                      outputRange: [26, -24, 6, -18, 4, -10, 0],
+                    }),
+                  },
+                  {
+                    rotate: thumbAnim.interpolate({
+                      inputRange: [0, 0.14, 0.28, 0.44, 0.6, 0.78, 1],
+                      outputRange: ['0deg', '-14deg', '9deg', '12deg', '-8deg', '5deg', '0deg'],
+                    }),
+                  },
+                  {
+                    scale: thumbAnim.interpolate({
+                      inputRange: [0, 0.14, 0.28, 0.44, 0.6, 0.78, 1],
+                      outputRange: [0.55, 1.38, 0.9, 1.24, 0.95, 1.12, 1],
+                    }),
+                  },
+                ],
+              },
+            ]}>👍</Animated.Text>
             <Text style={s.celebrateText}>達成しました！</Text>
           </Animated.View>
         </View>
