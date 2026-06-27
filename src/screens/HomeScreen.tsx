@@ -972,7 +972,7 @@ export default function HomeScreen({ navigation }: Props) {
     <View style={s.scheduleCard}>
       <TouchableOpacity style={s.metaSelectBtn} onPress={onPick} activeOpacity={0.8}>
         <View style={s.metaSelectLeft}>
-          <Text style={s.metaSelectText}>通知の時間：{time ?? '未設定'}</Text>
+          <Text style={s.metaSelectText}>予定の時間：{time ?? '未設定'}</Text>
         </View>
         <Text style={s.metaSelectArrow}>›</Text>
       </TouchableOpacity>

@@ -12,6 +12,8 @@ import { GRAD_START, GRAD_END } from '../constants/theme';
 import TabBar from '../components/TabBar';
 import { useTheme, ColorSet } from '../contexts/ThemeContext';
 
+const pad = (n: number) => String(n).padStart(2, '0');
+
 // Day runs 5:00 → 4:00 next morning, like a printed timetable.
 const HOURS: number[] = [...Array.from({ length: 19 }, (_, i) => i + 5), 0, 1, 2, 3, 4];
 const hourLabel = (h: number) => `${h}:00`;
@@ -20,7 +22,6 @@ const bucketHour = (h: number) => h;
 type Mode = 'schedule' | 'flow';
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'Schedule'> };
 
-// Static styles for Down (no theme colors needed)
 const downStyles = StyleSheet.create({
   down: { alignItems: 'center', justifyContent: 'center' },
   downLine: { width: 2 },
@@ -39,12 +40,18 @@ function Down({ color = '#64748b', h = 22 }: { color?: string; h?: number }) {
 const makeStyles = (C: ColorSet) => StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: C.body },
   headerCard: { backgroundColor: C.primary, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16, gap: 10 },
+  dateNavRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  dateNavBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
+  dateNavArrow: { color: '#ffffff', fontSize: 24, fontWeight: '800', marginTop: -2 },
+  dateNavCenter: { flex: 1, alignItems: 'center' },
+  dateText: { color: '#ffffff', fontSize: 15, fontWeight: '800' },
+  dateTodayHint: { color: 'rgba(255,255,255,0.75)', fontSize: 10, fontWeight: '700', marginTop: 1 },
   segRow: { flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 10, padding: 3 },
   segChip: { flex: 1, paddingVertical: 7, borderRadius: 8, alignItems: 'center' },
   segChipActive: { backgroundColor: '#ffffff' },
   segText: { color: '#ffffff', fontSize: 13, fontWeight: '800' },
   segTextActive: { color: '#2563eb' },
-  headerSub: { color: 'rgba(255,255,255,0.9)', fontSize: 12, fontWeight: '700' },
+  flowMeta: { color: 'rgba(255,255,255,0.9)', fontSize: 12, fontWeight: '700' },
 
   bodyView: { flex: 1, backgroundColor: C.body },
 
@@ -114,35 +121,45 @@ export default function ScheduleScreen({ navigation }: Props) {
   const s = useMemo(() => makeStyles(C), [C]);
   const today = getToday();
   const now = new Date();
-  const dateLabel = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')} (${WEEKDAYS[now.getDay()]})`;
   const nowHour = now.getHours();
 
+  const [selectedDate, setSelectedDate] = useState(today);
   const [mode, setMode] = useState<Mode>('schedule');
   const [tasks, setTasks] = useState<Task[]>([]);
   const [completedIds, setCompletedIds] = useState<Set<number>>(new Set());
   const [scheduleSize, setScheduleSize] = useState<'small' | 'normal' | 'large'>('normal');
   const rowMinHeight = scheduleSize === 'small' ? 36 : scheduleSize === 'large' ? 68 : 44;
 
+  const isToday = selectedDate === today;
+  const selDateObj = useMemo(() => new Date(`${selectedDate}T00:00:00`), [selectedDate]);
+  const dateLabel = `${selDateObj.getFullYear()}/${pad(selDateObj.getMonth() + 1)}/${pad(selDateObj.getDate())} (${WEEKDAYS[selDateObj.getDay()]})`;
+
+  const shiftSelected = (days: number) => {
+    const d = new Date(`${selectedDate}T00:00:00`);
+    d.setDate(d.getDate() + days);
+    setSelectedDate(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
+  };
+
   const load = useCallback(async () => {
     const [ts, ids, size] = await Promise.all([
       getTasks(db),
-      getCompletedTaskIds(db, today),
+      getCompletedTaskIds(db, selectedDate),
       getSetting(db, 'schedule_size'),
     ]);
     setTasks(ts);
     setCompletedIds(new Set(ids));
     if (size === 'small' || size === 'large' || size === 'normal') setScheduleSize(size);
-  }, [db, today]);
+  }, [db, selectedDate]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const toggle = async (id: number) => {
-    if (completedIds.has(id)) await markIncomplete(db, id, today);
-    else await markComplete(db, id, today);
+    if (completedIds.has(id)) await markIncomplete(db, id, selectedDate);
+    else await markComplete(db, id, selectedDate);
     load();
   };
 
-  const due = tasks.filter((t) => isDueToday(t, now));
+  const due = tasks.filter((t) => isDueToday(t, selDateObj));
   const ordered = [...due].sort((a, b) => {
     const at = a.scheduled_time ?? '99:99';
     const bt = b.scheduled_time ?? '99:99';
@@ -182,6 +199,18 @@ export default function ScheduleScreen({ navigation }: Props) {
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
       <LinearGradient colors={grad.header} start={GRAD_START} end={GRAD_END} style={[s.headerCard, { paddingTop: insets.top + 12 }]}>
+        <View style={s.dateNavRow}>
+          <TouchableOpacity onPress={() => shiftSelected(-1)} style={s.dateNavBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Text style={s.dateNavArrow}>‹</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setSelectedDate(today)} activeOpacity={0.7} style={s.dateNavCenter}>
+            <Text style={s.dateText}>{dateLabel}</Text>
+            {!isToday && <Text style={s.dateTodayHint}>タップで今日へ</Text>}
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => shiftSelected(1)} style={s.dateNavBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Text style={s.dateNavArrow}>›</Text>
+          </TouchableOpacity>
+        </View>
         <View style={s.segRow}>
           {([['schedule', 'タイムスケジュール'], ['flow', 'フローチャート']] as [Mode, string][]).map(([m, label]) => (
             <TouchableOpacity key={m} style={[s.segChip, mode === m && s.segChipActive]} onPress={() => setMode(m)}>
@@ -189,9 +218,9 @@ export default function ScheduleScreen({ navigation }: Props) {
             </TouchableOpacity>
           ))}
         </View>
-        <Text style={s.headerSub}>
-          {mode === 'schedule' ? `日付：${dateLabel}` : `今日のワークフロー ・ ${doneCount}/${due.length} 完了`}
-        </Text>
+        {mode === 'flow' && (
+          <Text style={s.flowMeta}>{doneCount}/{due.length} 完了</Text>
+        )}
       </LinearGradient>
 
       {mode === 'schedule' ? (
@@ -203,7 +232,7 @@ export default function ScheduleScreen({ navigation }: Props) {
             </View>
             {HOURS.map((h, idx) => {
               const items = byHour[h] ?? [];
-              const isNow = h === bucketHour(nowHour);
+              const isNow = isToday && h === bucketHour(nowHour);
               return (
                 <View
                   key={h}
@@ -229,8 +258,8 @@ export default function ScheduleScreen({ navigation }: Props) {
         <ScrollView style={s.bodyView} contentContainerStyle={s.flowContent}>
           {due.length === 0 ? (
             <View style={s.empty}>
-              <Text style={s.emptyTitle}>今日のフローはありません</Text>
-              <Text style={s.emptyBody}>頻度が「今日」に当たるタスクがワークフローになります</Text>
+              <Text style={s.emptyTitle}>この日のフローはありません</Text>
+              <Text style={s.emptyBody}>頻度がこの日に当たるタスクがワークフローになります</Text>
             </View>
           ) : (
             <>
