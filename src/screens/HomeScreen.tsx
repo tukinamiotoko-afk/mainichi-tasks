@@ -377,7 +377,9 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   timeConfirmText: { color: C.onPrimary, fontSize: 14, fontWeight: '700' },
 
   thumbOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
-  thumbEmoji: { fontSize: 80 },
+  celebrateCard: { alignItems: 'center', gap: 8, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 24, paddingHorizontal: 28, paddingVertical: 20 },
+  thumbEmoji: { fontSize: 72 },
+  celebrateText: { color: '#ffffff', fontSize: 22, fontWeight: '800', letterSpacing: 0.5 },
 });
 
 // Frequency type chip row. Each chip bounces on tap, and the "任意" chip also
@@ -498,6 +500,22 @@ export default function HomeScreen({ navigation }: Props) {
   const [showThumb, setShowThumb] = useState(false);
   const thumbAnim = useRef(new Animated.Value(0)).current;
   const progressAnim = useRef(new Animated.Value(0)).current;
+  const CONF_COLORS = ['#ff6b6b', '#ffd93d', '#6bcb77', '#4d96ff', '#c084fc', '#fb923c', '#f472b6', '#34d399'];
+  const confetti = useRef(
+    Array.from({ length: 24 }, (_, i) => {
+      const angle = (i / 24) * Math.PI * 2;
+      const dist = 90 + (i % 3) * 40;
+      return {
+        pos: new Animated.ValueXY({ x: 0, y: 0 }),
+        opacity: new Animated.Value(0),
+        color: CONF_COLORS[i % CONF_COLORS.length],
+        tx: Math.cos(angle) * dist,
+        ty: Math.sin(angle) * dist - 50,
+        size: 7 + (i % 4) * 2,
+        round: i % 2 === 0,
+      };
+    })
+  ).current;
   const fabPosition = useRef({ x: Math.max(screen.width - 72, 20), y: Math.max(screen.height - insets.bottom - 132, 120) });
   const fabStartPosition = useRef(fabPosition.current);
   const fabAnim = useRef(new Animated.ValueXY(fabPosition.current)).current;
@@ -594,10 +612,22 @@ export default function HomeScreen({ navigation }: Props) {
   const triggerCelebration = () => {
     setShowThumb(true);
     thumbAnim.setValue(0);
-    Animated.sequence([
-      Animated.spring(thumbAnim, { toValue: 1, useNativeDriver: true, tension: 180, friction: 6 }),
-      Animated.delay(500),
-      Animated.timing(thumbAnim, { toValue: 0, duration: 250, useNativeDriver: true }),
+    confetti.forEach((p) => { p.pos.setValue({ x: 0, y: 0 }); p.opacity.setValue(1); });
+    Animated.parallel([
+      Animated.sequence([
+        Animated.spring(thumbAnim, { toValue: 1, useNativeDriver: true, tension: 180, friction: 6 }),
+        Animated.delay(600),
+        Animated.timing(thumbAnim, { toValue: 0, duration: 300, useNativeDriver: true }),
+      ]),
+      Animated.parallel(
+        confetti.map((p) => Animated.parallel([
+          Animated.spring(p.pos, { toValue: { x: p.tx, y: p.ty }, useNativeDriver: true, tension: 65, friction: 8 }),
+          Animated.sequence([
+            Animated.delay(320),
+            Animated.timing(p.opacity, { toValue: 0, duration: 500, useNativeDriver: true }),
+          ]),
+        ]))
+      ),
     ]).start(() => setShowThumb(false));
   };
 
@@ -1438,12 +1468,33 @@ export default function HomeScreen({ navigation }: Props) {
       </Animated.View>
 
       {showThumb && (
-        <Animated.View style={[s.thumbOverlay, {
-          opacity: thumbAnim,
-          transform: [{ scale: thumbAnim.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1] }) }],
-        }]} pointerEvents="none">
-          <Text style={s.thumbEmoji}>👍</Text>
-        </Animated.View>
+        <View style={s.thumbOverlay} pointerEvents="none">
+          {/* 紙吹雪パーティクル */}
+          <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' }}>
+            {confetti.map((p, i) => (
+              <Animated.View
+                key={i}
+                style={{
+                  position: 'absolute',
+                  width: p.size,
+                  height: p.size,
+                  borderRadius: p.round ? p.size / 2 : 2,
+                  backgroundColor: p.color,
+                  opacity: p.opacity,
+                  transform: [{ translateX: p.pos.x }, { translateY: p.pos.y }],
+                }}
+              />
+            ))}
+          </View>
+          {/* 👍 + よくできました */}
+          <Animated.View style={[s.celebrateCard, {
+            opacity: thumbAnim,
+            transform: [{ scale: thumbAnim.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1] }) }],
+          }]}>
+            <Text style={s.thumbEmoji}>👍</Text>
+            <Text style={s.celebrateText}>よくできました！</Text>
+          </Animated.View>
+        </View>
       )}
 
       {/* Add task bottom sheet */}
