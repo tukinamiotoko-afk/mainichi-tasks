@@ -75,7 +75,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   deleteLogBtn: { backgroundColor: '#fee2e2', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7 },
   deleteLogText: { color: '#dc2626', fontSize: 11, fontWeight: '900' },
   modalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  pickerSheet: { backgroundColor: C.card, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 18, gap: 12, maxHeight: '78%' },
+  pickerSheet: { backgroundColor: C.card, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 18, gap: 12, maxHeight: '88%' },
   sheetHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: C.border, alignSelf: 'center' },
   pickerTitle: { color: C.onDark, fontSize: 16, fontWeight: '900' },
   pickerItem: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderColor: C.border, borderRadius: 12, padding: 13, backgroundColor: C.body },
@@ -318,7 +318,7 @@ export default function TimerScreen({ navigation }: Props) {
             <View style={[s.pickerSheet, { paddingBottom: insets.bottom + 16 }]}>
               <View style={s.sheetHandle} />
               <Text style={s.pickerTitle}>測るタスクを追加</Text>
-              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: insets.bottom + 24 }}>
                 {availableTasks.length === 0 ? (
                   <View style={s.emptyBox}>
                     <Text style={s.emptyTitle}>追加できるタスクがありません</Text>
