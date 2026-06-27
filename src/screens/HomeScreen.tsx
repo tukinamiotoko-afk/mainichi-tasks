@@ -499,37 +499,27 @@ export default function HomeScreen({ navigation }: Props) {
   const [showThumb, setShowThumb] = useState(false);
   const thumbAnim = useRef(new Animated.Value(0)).current;
   const progressAnim = useRef(new Animated.Value(0)).current;
-  // 紙吹雪：7バンドル × 4ストリップ（斜め上バイアス）
-  const confetti = useRef((() => {
-    const COLORS = ['#ff6b6b', '#ffd93d', '#6bcb77', '#4d96ff', '#c084fc', '#fb923c', '#f472b6', '#34d399'];
-    const BUNDLES = [
-      { angle: -Math.PI * 3 / 4, dist: 155 },
-      { angle: -Math.PI * 7 / 12, dist: 180 },
-      { angle: -Math.PI / 2, dist: 205 },
-      { angle: -Math.PI * 5 / 12, dist: 180 },
-      { angle: -Math.PI / 4, dist: 155 },
-      { angle: -Math.PI * 11 / 12, dist: 125 },
-      { angle: -Math.PI / 12, dist: 125 },
-    ];
-    let ci = 0;
-    return BUNDLES.flatMap((b, bi) =>
-      Array.from({ length: 4 }, (_, si) => {
-        const a = b.angle + (si - 1.5) * 0.18;
-        const d = b.dist * (0.85 + si * 0.05);
-        return {
-          pos: new Animated.ValueXY({ x: 0, y: 0 }),
-          scale: new Animated.Value(0),
-          opacity: new Animated.Value(1),
-          rotate: new Animated.Value(0),
-          color: COLORS[ci++ % COLORS.length],
-          tx: Math.cos(a) * d,
-          ty: Math.sin(a) * d,
-          w: 4 + (si % 2) * 2,
-          h: 13 + (bi % 3) * 4,
-        };
-      })
-    );
-  })()).current;
+  // 拡散リング（2枚、時差あり）
+  const rings = useRef([
+    { scale: new Animated.Value(0), opacity: new Animated.Value(0) },
+    { scale: new Animated.Value(0), opacity: new Animated.Value(0) },
+  ]).current;
+  // 上昇スパークル（10点、扇形に上方向へ）
+  const SPARKLE_COLORS = ['#ffd93d', '#ff6b6b', '#6bcb77', '#4d96ff', '#c084fc', '#fb923c', '#f472b6', '#34d399', '#ffffff', '#ffd700'];
+  const sparkles = useRef(
+    Array.from({ length: 10 }, (_, i) => {
+      const angle = (-Math.PI * 5 / 6) + (i / 9) * (Math.PI * 2 / 3);
+      const dist = 80 + (i % 3) * 32;
+      return {
+        pos: new Animated.ValueXY({ x: 0, y: 0 }),
+        opacity: new Animated.Value(0),
+        scale: new Animated.Value(0),
+        color: SPARKLE_COLORS[i % SPARKLE_COLORS.length],
+        tx: Math.cos(angle) * dist,
+        ty: Math.sin(angle) * dist,
+      };
+    })
+  ).current;
   const fabPosition = useRef({ x: Math.max(screen.width - 72, 20), y: Math.max(screen.height - insets.bottom - 132, 120) });
   const fabStartPosition = useRef(fabPosition.current);
   const fabAnim = useRef(new Animated.ValueXY(fabPosition.current)).current;
@@ -626,37 +616,47 @@ export default function HomeScreen({ navigation }: Props) {
   const triggerCelebration = () => {
     setShowThumb(true);
     thumbAnim.setValue(0);
-    confetti.forEach((p) => {
-      p.pos.setValue({ x: 0, y: 0 });
-      p.scale.setValue(0);
-      p.opacity.setValue(1);
-      p.rotate.setValue(0);
-    });
+    rings.forEach((r) => { r.scale.setValue(0); r.opacity.setValue(0); });
+    sparkles.forEach((p) => { p.pos.setValue({ x: 0, y: 0 }); p.opacity.setValue(0); p.scale.setValue(0); });
+
+    const ringAnim = (r: typeof rings[0], delay: number) =>
+      Animated.sequence([
+        Animated.delay(delay),
+        Animated.parallel([
+          Animated.timing(r.scale, { toValue: 1, duration: 620, useNativeDriver: true }),
+          Animated.sequence([
+            Animated.timing(r.opacity, { toValue: 1, duration: 80, useNativeDriver: true }),
+            Animated.timing(r.opacity, { toValue: 0, duration: 540, useNativeDriver: true }),
+          ]),
+        ]),
+      ]);
+
+    const sparkleAnim = (p: typeof sparkles[0], delay: number) =>
+      Animated.sequence([
+        Animated.delay(delay),
+        Animated.parallel([
+          Animated.spring(p.pos, { toValue: { x: p.tx, y: p.ty }, useNativeDriver: true, tension: 90, friction: 9 }),
+          Animated.sequence([
+            Animated.spring(p.scale, { toValue: 1.3, useNativeDriver: true, tension: 350, friction: 6 }),
+            Animated.timing(p.scale, { toValue: 0, duration: 380, useNativeDriver: true }),
+          ]),
+          Animated.sequence([
+            Animated.timing(p.opacity, { toValue: 1, duration: 60, useNativeDriver: true }),
+            Animated.delay(240),
+            Animated.timing(p.opacity, { toValue: 0, duration: 380, useNativeDriver: true }),
+          ]),
+        ]),
+      ]);
+
     Animated.parallel([
       Animated.sequence([
         Animated.spring(thumbAnim, { toValue: 1, useNativeDriver: true, tension: 180, friction: 6 }),
         Animated.delay(600),
         Animated.timing(thumbAnim, { toValue: 0, duration: 300, useNativeDriver: true }),
       ]),
-      Animated.parallel(
-        confetti.map((p) =>
-          Animated.sequence([
-            // フェーズ1：発射（素早く大きく膨らみながら前方1/3まで飛ぶ）
-            Animated.parallel([
-              Animated.spring(p.pos, { toValue: { x: p.tx * 0.35, y: p.ty * 0.35 }, useNativeDriver: true, tension: 550, friction: 5 }),
-              Animated.spring(p.scale, { toValue: 1.5, useNativeDriver: true, tension: 550, friction: 5 }),
-              Animated.timing(p.rotate, { toValue: 180, duration: 120, useNativeDriver: true }),
-            ]),
-            // フェーズ2：飛散（ゆっくり最終位置へ移動しながら縮んで消える）
-            Animated.parallel([
-              Animated.spring(p.pos, { toValue: { x: p.tx, y: p.ty }, useNativeDriver: true, tension: 40, friction: 7 }),
-              Animated.timing(p.scale, { toValue: 0, duration: 560, useNativeDriver: true }),
-              Animated.timing(p.opacity, { toValue: 0, duration: 560, useNativeDriver: true }),
-              Animated.timing(p.rotate, { toValue: 720, duration: 680, useNativeDriver: true }),
-            ]),
-          ])
-        )
-      ),
+      ringAnim(rings[0], 0),
+      ringAnim(rings[1], 200),
+      ...sparkles.map((p, i) => sparkleAnim(p, i * 30)),
     ]).start(() => setShowThumb(false));
   };
 
@@ -1498,30 +1498,44 @@ export default function HomeScreen({ navigation }: Props) {
 
       {showThumb && (
         <View style={s.thumbOverlay} pointerEvents="none">
-          {/* クラッカー紙吹雪パーティクル（ストリップ形状・バンドル単位） */}
+          {/* 拡散リング */}
+          {rings.map((r, i) => (
+            <Animated.View
+              key={`ring${i}`}
+              style={{
+                position: 'absolute',
+                width: 130,
+                height: 130,
+                borderRadius: 65,
+                borderWidth: 2.5,
+                borderColor: '#ffd700',
+                opacity: r.opacity,
+                transform: [{ scale: r.scale.interpolate({ inputRange: [0, 1], outputRange: [0.25, 3.2] }) }],
+              }}
+            />
+          ))}
+          {/* 上昇スパークル */}
           <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' }}>
-            {confetti.map((p, i) => (
+            {sparkles.map((p, i) => (
               <Animated.View
-                key={i}
+                key={`sp${i}`}
                 style={{
                   position: 'absolute',
-                  width: p.w,
-                  height: p.h,
-                  borderRadius: 2,
+                  width: 11,
+                  height: 11,
+                  borderRadius: 5.5,
                   backgroundColor: p.color,
                   opacity: p.opacity,
                   transform: [
                     { translateX: p.pos.x },
                     { translateY: p.pos.y },
-                    { scaleX: p.scale },
-                    { scaleY: p.scale },
-                    { rotate: p.rotate.interpolate({ inputRange: [0, 720], outputRange: ['0deg', '720deg'] }) },
+                    { scale: p.scale },
                   ],
                 }}
               />
             ))}
           </View>
-          {/* 👍 + よくできました（背景なし・シャドウで視認性確保） */}
+          {/* 👍 + よくできました */}
           <Animated.View style={{
             alignItems: 'center',
             gap: 8,
