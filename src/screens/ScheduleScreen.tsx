@@ -4,14 +4,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { LinearGradient } from 'expo-linear-gradient';
 import { RootStackParamList } from '../../App';
 import {
   Task, getToday, getTasks, getCompletedTaskIds,
   markComplete, markIncomplete, getSetting,
 } from '../db/database';
 import { WEEKDAYS } from '../constants/taskMeta';
-import { GRAD_START, GRAD_END } from '../constants/theme';
 import TabBar from '../components/TabBar';
 import { useTheme, ColorSet } from '../contexts/ThemeContext';
 
@@ -25,13 +23,13 @@ type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'Schedu
 
 const makeStyles = (C: ColorSet) => StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: C.body },
-  headerCard: { backgroundColor: C.primary, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16 },
-  dateNavRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  dateNavBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
-  dateNavArrow: { color: '#ffffff', fontSize: 24, fontWeight: '800', marginTop: -2 },
+  topArea: { backgroundColor: C.body, paddingHorizontal: 12, paddingBottom: 8 },
+  dateCard: { backgroundColor: C.card, borderRadius: 14, paddingHorizontal: 10, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', shadowColor: '#000', shadowOpacity: 0.07, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
+  dateNavBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: C.primarySoft, alignItems: 'center', justifyContent: 'center' },
+  dateNavArrow: { color: C.primary, fontSize: 24, fontWeight: '800', marginTop: -2 },
   dateNavCenter: { flex: 1, alignItems: 'center' },
-  dateText: { color: '#ffffff', fontSize: 15, fontWeight: '800' },
-  dateTodayHint: { color: 'rgba(255,255,255,0.75)', fontSize: 10, fontWeight: '700', marginTop: 1 },
+  dateText: { color: C.ink, fontSize: 15, fontWeight: '800' },
+  dateTodayHint: { color: C.muted, fontSize: 10, fontWeight: '700', marginTop: 1 },
 
   bodyView: { flex: 1, backgroundColor: C.body },
 
@@ -60,7 +58,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
 export default function ScheduleScreen({ navigation }: Props) {
   const db = useSQLiteContext();
   const insets = useSafeAreaInsets();
-  const { C, grad } = useTheme();
+  const { C } = useTheme();
   const s = useMemo(() => makeStyles(C), [C]);
   const today = getToday();
   const now = new Date();
@@ -140,8 +138,8 @@ export default function ScheduleScreen({ navigation }: Props) {
     <View style={s.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
-      <LinearGradient colors={grad.header} start={GRAD_START} end={GRAD_END} style={[s.headerCard, { paddingTop: insets.top + 12 }]}>
-        <View style={s.dateNavRow}>
+      <View style={[s.topArea, { paddingTop: insets.top + 8 }]}>
+        <View style={s.dateCard}>
           <TouchableOpacity onPress={() => shiftSelected(-1)} style={s.dateNavBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
             <Text style={s.dateNavArrow}>‹</Text>
           </TouchableOpacity>
@@ -153,7 +151,7 @@ export default function ScheduleScreen({ navigation }: Props) {
             <Text style={s.dateNavArrow}>›</Text>
           </TouchableOpacity>
         </View>
-      </LinearGradient>
+      </View>
 
       <ScrollView style={s.bodyView} contentContainerStyle={{ padding: 12, paddingBottom: 28 }}>
         <View style={s.table}>
