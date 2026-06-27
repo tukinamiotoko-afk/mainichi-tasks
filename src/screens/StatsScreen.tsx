@@ -12,7 +12,7 @@ import {
   getCompletionCountInRange, getFirstCompletionDate, getCompletionsForMonth,
   getSetting, setSetting,
 } from '../db/database';
-import { GRAD, GRAD_START, GRAD_END } from '../constants/theme';
+import { GRAD_START, GRAD_END } from '../constants/theme';
 import TabBar from '../components/TabBar';
 import { useTheme, ColorSet } from '../contexts/ThemeContext';
 
@@ -101,7 +101,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
 export default function StatsScreen({ navigation }: Props) {
   const db = useSQLiteContext();
   const insets = useSafeAreaInsets();
-  const { C } = useTheme();
+  const { C, grad } = useTheme();
   const s = useMemo(() => makeStyles(C), [C]);
   const today = getToday();
 
@@ -232,7 +232,7 @@ export default function StatsScreen({ navigation }: Props) {
     <View style={s.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
-      <LinearGradient colors={GRAD.header} start={GRAD_START} end={GRAD_END} style={[s.headerCard, { paddingTop: insets.top + 12 }]}>
+      <LinearGradient colors={grad.header} start={GRAD_START} end={GRAD_END} style={[s.headerCard, { paddingTop: insets.top + 12 }]}>
         <View style={s.segRow}>
           {(['rate', 'calendar'] as Mode[]).map((m) => (
             <TouchableOpacity key={m} style={[s.segChip, mode === m && s.segChipActive]} onPress={() => setMode(m)}>
@@ -293,7 +293,7 @@ export default function StatsScreen({ navigation }: Props) {
                 <Text style={s.dateBtnText}>{toDateString(customEnd)}</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={loadRates} activeOpacity={0.85}>
-                <LinearGradient colors={GRAD.brand} start={GRAD_START} end={GRAD_END} style={s.applyBtn}>
+                <LinearGradient colors={grad.brand} start={GRAD_START} end={GRAD_END} style={s.applyBtn}>
                   <Text style={s.applyBtnText}>適用</Text>
                 </LinearGradient>
               </TouchableOpacity>
@@ -350,7 +350,7 @@ export default function StatsScreen({ navigation }: Props) {
                 <View key={task.id} style={[s.calCard, { width: cardW }]}>
                   <View style={s.calHeader}>
                     <Text style={s.calTitle} numberOfLines={1}>{task.icon ? `${task.icon} ` : ''}{task.title}</Text>
-                    <LinearGradient colors={GRAD.brand} start={GRAD_START} end={GRAD_END} style={s.countBadge}><Text style={s.countText}>{count}</Text></LinearGradient>
+                    <LinearGradient colors={grad.brand} start={GRAD_START} end={GRAD_END} style={s.countBadge}><Text style={s.countText}>{count}</Text></LinearGradient>
                   </View>
                   <View style={s.weekRow}>
                     {WEEKDAYS.map((w, i) => (

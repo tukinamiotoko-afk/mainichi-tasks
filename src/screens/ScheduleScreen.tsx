@@ -8,7 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { RootStackParamList } from '../../App';
 import { Task, getToday, getTasks, getCompletedTaskIds, markComplete, markIncomplete, getSetting } from '../db/database';
 import { isDueToday, WEEKDAYS } from '../constants/taskMeta';
-import { GRAD, GRAD_START, GRAD_END } from '../constants/theme';
+import { GRAD_START, GRAD_END } from '../constants/theme';
 import TabBar from '../components/TabBar';
 import { useTheme, ColorSet } from '../contexts/ThemeContext';
 
@@ -110,7 +110,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
 export default function ScheduleScreen({ navigation }: Props) {
   const db = useSQLiteContext();
   const insets = useSafeAreaInsets();
-  const { C } = useTheme();
+  const { C, grad } = useTheme();
   const s = useMemo(() => makeStyles(C), [C]);
   const today = getToday();
   const now = new Date();
@@ -181,7 +181,7 @@ export default function ScheduleScreen({ navigation }: Props) {
     <View style={s.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
-      <LinearGradient colors={GRAD.header} start={GRAD_START} end={GRAD_END} style={[s.headerCard, { paddingTop: insets.top + 12 }]}>
+      <LinearGradient colors={grad.header} start={GRAD_START} end={GRAD_END} style={[s.headerCard, { paddingTop: insets.top + 12 }]}>
         <View style={s.segRow}>
           {([['schedule', 'タイムスケジュール'], ['flow', 'フローチャート']] as [Mode, string][]).map(([m, label]) => (
             <TouchableOpacity key={m} style={[s.segChip, mode === m && s.segChipActive]} onPress={() => setMode(m)}>

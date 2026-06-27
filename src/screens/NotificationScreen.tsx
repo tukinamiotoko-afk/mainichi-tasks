@@ -7,9 +7,9 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import { RootStackParamList } from '../../App';
 import { getSetting, setSetting } from '../db/database';
-import { GRAD, GRAD_START, GRAD_END } from '../constants/theme';
+import { GRAD_START, GRAD_END } from '../constants/theme';
 import TabBar from '../components/TabBar';
-import { useTheme, ColorSet } from '../contexts/ThemeContext';
+import { useTheme, ColorSet, ACCENT_LIST, AccentKey } from '../contexts/ThemeContext';
 
 type ScheduleSize = 'small' | 'normal' | 'large';
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'Notifications'> };
@@ -30,12 +30,16 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   typeChipActive: { backgroundColor: C.primary, borderColor: C.primary },
   typeChipText: { color: C.muted, fontSize: 13, fontWeight: '700' },
   typeChipTextActive: { color: C.onPrimary },
+  accentRow: { flexDirection: 'row', gap: 10, flexWrap: 'wrap' },
+  accentChip: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: 'transparent' },
+  accentChipActive: { borderColor: C.onDark },
+  accentCheck: { color: '#ffffff', fontSize: 18, fontWeight: '900' },
 });
 
 export default function NotificationScreen({ navigation }: Props) {
   const db = useSQLiteContext();
   const insets = useSafeAreaInsets();
-  const { C, dark, setDark } = useTheme();
+  const { C, dark, setDark, accent, setAccent, grad } = useTheme();
   const s = useMemo(() => makeStyles(C), [C]);
 
   const [tagRight, setTagRight] = useState(false);
@@ -66,7 +70,7 @@ export default function NotificationScreen({ navigation }: Props) {
     <View style={s.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
-      <LinearGradient colors={GRAD.header} start={GRAD_START} end={GRAD_END} style={[s.headerCard, { paddingTop: insets.top + 12 }]}>
+      <LinearGradient colors={grad.header} start={GRAD_START} end={GRAD_END} style={[s.headerCard, { paddingTop: insets.top + 12 }]}>
         <Text style={s.headerTitle}>設定</Text>
       </LinearGradient>
 
@@ -85,6 +89,24 @@ export default function NotificationScreen({ navigation }: Props) {
               trackColor={{ false: C.border, true: C.primary }}
               thumbColor="#ffffff"
             />
+          </View>
+
+          {/* アクセントカラー */}
+          <View style={{ gap: 8 }}>
+            <Text style={s.settingRowLabel}>カラー</Text>
+            <View style={s.accentRow}>
+              {ACCENT_LIST.map(({ key, label, swatch }) => (
+                <TouchableOpacity
+                  key={key}
+                  style={[s.accentChip, { backgroundColor: swatch }, accent === key && s.accentChipActive]}
+                  onPress={() => setAccent(key as AccentKey)}
+                  activeOpacity={0.8}
+                >
+                  {accent === key && <Text style={s.accentCheck}>✓</Text>}
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={s.settingRowSub}>{ACCENT_LIST.find(a => a.key === accent)?.label ?? ''}</Text>
           </View>
         </View>
 

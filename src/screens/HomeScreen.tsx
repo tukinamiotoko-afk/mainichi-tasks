@@ -21,7 +21,7 @@ import {
   TASK_ICONS, PRIORITIES, priorityMeta, WEEKDAYS,
   FreqType, TaskFreq, FREQ_TYPES, NTH_WEEKS, frequencyLabel, parseDays, parseDateList, nextNthWeekdayDate, isDueToday,
 } from '../constants/taskMeta';
-import { GRAD, GRAD_START, GRAD_END } from '../constants/theme';
+import { GRAD_START, GRAD_END } from '../constants/theme';
 import TabBar from '../components/TabBar';
 import { useTheme, ColorSet } from '../contexts/ThemeContext';
 
@@ -488,7 +488,7 @@ function FreqCalendar({ freq, onceDate, onSelect, s }: {
 export default function HomeScreen({ navigation }: Props) {
   const db = useSQLiteContext();
   const insets = useSafeAreaInsets();
-  const { C } = useTheme();
+  const { C, grad } = useTheme();
   const s = useMemo(() => makeStyles(C), [C]);
   const screen = Dimensions.get('window');
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -1220,7 +1220,7 @@ export default function HomeScreen({ navigation }: Props) {
     <View style={s.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
-      <LinearGradient colors={GRAD.header} start={GRAD_START} end={GRAD_END} style={[s.headerCard, { paddingTop: insets.top + 12 }]}>
+      <LinearGradient colors={grad.header} start={GRAD_START} end={GRAD_END} style={[s.headerCard, { paddingTop: insets.top + 12 }]}>
         <View style={s.dateNavRow}>
           <TouchableOpacity onPress={() => shiftSelected(-1)} style={s.dateNavBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
             <Text style={s.dateNavArrow}>‹</Text>
@@ -1431,7 +1431,7 @@ export default function HomeScreen({ navigation }: Props) {
 
       <Animated.View style={[s.fabWrap, fabAnim.getLayout()]} {...fabPanResponder.panHandlers}>
         <TouchableOpacity onPress={() => setShowAdd(true)} activeOpacity={0.85}>
-          <LinearGradient colors={GRAD.brand} start={GRAD_START} end={GRAD_END} style={s.fab}>
+          <LinearGradient colors={grad.brand} start={GRAD_START} end={GRAD_END} style={s.fab}>
             <Text style={s.fabText}>＋</Text>
           </LinearGradient>
         </TouchableOpacity>
@@ -1469,7 +1469,7 @@ export default function HomeScreen({ navigation }: Props) {
                     />
                     <TouchableOpacity onPress={handleAdd} disabled={!newTitle.trim()} activeOpacity={0.85}>
                       <LinearGradient
-                        colors={!newTitle.trim() ? [C.border, C.border] : GRAD.brand}
+                        colors={!newTitle.trim() ? [C.border, C.border] : grad.brand}
                         start={GRAD_START} end={GRAD_END} style={s.sheetSaveBtn}
                       >
                         <Text style={s.sheetSaveBtnText}>追加</Text>
@@ -1546,7 +1546,7 @@ export default function HomeScreen({ navigation }: Props) {
                         />
                         <TouchableOpacity onPress={handleSaveTitle} disabled={detailTitle === detailTask.title} activeOpacity={0.85}>
                           <LinearGradient
-                            colors={detailTitle === detailTask.title ? [C.border, C.border] : GRAD.brand}
+                            colors={detailTitle === detailTask.title ? [C.border, C.border] : grad.brand}
                             start={GRAD_START} end={GRAD_END} style={s.sheetSaveBtn}
                           >
                             <Text style={s.sheetSaveBtnText}>保存</Text>
@@ -1664,7 +1664,7 @@ export default function HomeScreen({ navigation }: Props) {
                 <Text style={s.timeCancelText}>キャンセル</Text>
               </TouchableOpacity>
               <TouchableOpacity style={s.timeConfirmBtnWrap} onPress={confirmTime} activeOpacity={0.85}>
-                <LinearGradient colors={GRAD.brand} start={GRAD_START} end={GRAD_END} style={s.timeConfirmBtn}>
+                <LinearGradient colors={grad.brand} start={GRAD_START} end={GRAD_END} style={s.timeConfirmBtn}>
                   <Text style={s.timeConfirmText}>決定</Text>
                 </LinearGradient>
               </TouchableOpacity>
