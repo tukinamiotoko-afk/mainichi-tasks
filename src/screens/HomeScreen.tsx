@@ -902,29 +902,36 @@ export default function HomeScreen({ navigation }: Props) {
   const endDrag = () => {
     const state = dragState.current;
     const rawDy = currentDragYRef.current;
-    // Reset shift anims and apply list reorder in the same synchronous call so
-    // the native compositor sees them together in one frame (no intermediate pop).
-    shiftAnims.current.forEach((anim) => anim.setValue(0));
+
+    let pendingTasks: Task[] | null = null;
     if (state.changed && state.taskId != null) {
       const startTasks = displayedTasksAtDragStart.current;
       const toIdx = Math.max(0, Math.min(startTasks.length - 1, state.currentIndex));
       const ordered = [...startTasks];
       const [moved] = ordered.splice(state.startIndex, 1);
       ordered.splice(toIdx, 0, moved);
-      const newTasks = ordered.map((task, idx) => ({ ...task, sort_order: idx }));
-      setTasks(newTasks);
-      updateTaskSortOrders(db, newTasks.map((t) => t.id)).then(() => load());
+      pendingTasks = ordered.map((task, idx) => ({ ...task, sort_order: idx }));
+      updateTaskSortOrders(db, pendingTasks.map((t) => t.id)).then(() => load());
     }
-    // Adjust dragY so the card stays at its current visual position after the
-    // list repositions it, then spring it to 0 (its new resting place).
-    const adjustedDy = rawDy - (state.currentIndex - state.startIndex) * dragSlotRef.current;
+
+    // Spring the dragged card from its release position to the slot-aligned
+    // target. Only after the spring lands do we apply the React state changes
+    // (setTasks + setActiveDragId), so there is no native/JS frame where cards
+    // briefly snap back to their pre-drag positions.
+    const targetDy = (state.currentIndex - state.startIndex) * dragSlotRef.current;
     dragState.current = { taskId: null, startIndex: 0, currentIndex: 0, changed: false };
-    setActiveDragId(null);
-    dragY.setValue(adjustedDy);
+    dragY.setValue(rawDy);
+
+    const tasks = pendingTasks;
     Animated.parallel([
-      Animated.spring(dragY, { toValue: 0, useNativeDriver: true, tension: 220, friction: 14 }),
+      Animated.spring(dragY, { toValue: targetDy, useNativeDriver: true, tension: 220, friction: 14 }),
       Animated.spring(dragScale, { toValue: 1, useNativeDriver: true, tension: 220, friction: 14 }),
-    ]).start();
+    ]).start(({ finished }) => {
+      if (!finished) return;
+      if (tasks) setTasks(tasks);
+      setActiveDragId(null);
+      // shiftAnims are ignored once activeDragId is null; startDrag resets them.
+    });
   };
 
   const resetSwipe = () => {
