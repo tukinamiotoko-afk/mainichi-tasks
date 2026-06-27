@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity, Modal,
   TextInput, StyleSheet, Alert, KeyboardAvoidingView,
-  Platform, StatusBar, Animated, ScrollView, PanResponder, Dimensions, Switch,
+  Platform, StatusBar, Animated, Easing, ScrollView, PanResponder, Dimensions, Switch,
   LayoutAnimation, UIManager,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -513,6 +513,8 @@ export default function HomeScreen({ navigation }: Props) {
   const shiftAnims = useRef<Map<number, Animated.Value>>(new Map());
   const currentDragYRef = useRef(0);
   const displayedTasksAtDragStart = useRef<Task[]>([]);
+  // Measured at runtime via onLayout so shift animations match actual card height.
+  const dragSlotRef = useRef(DRAG_SLOT);
   const dragY = useRef(new Animated.Value(0)).current;
   const dragScale = useRef(new Animated.Value(1)).current;
   const getShiftAnim = (taskId: number): Animated.Value => {
@@ -869,10 +871,11 @@ export default function HomeScreen({ navigation }: Props) {
     if (state.taskId == null) return;
     currentDragYRef.current = dy;
     dragY.setValue(dy);
+    const slot = dragSlotRef.current;
     const tasksAtStart = displayedTasksAtDragStart.current;
     const newCurrentIndex = Math.max(0, Math.min(
       tasksAtStart.length - 1,
-      state.startIndex + Math.round(dy / DRAG_SLOT),
+      state.startIndex + Math.round(dy / slot),
     ));
     if (newCurrentIndex === state.currentIndex) return;
     state.currentIndex = newCurrentIndex;
@@ -882,15 +885,15 @@ export default function HomeScreen({ navigation }: Props) {
       if (task.id === state.taskId) return;
       let shift = 0;
       if (newCurrentIndex > dragStartIndex && i > dragStartIndex && i <= newCurrentIndex) {
-        shift = -DRAG_SLOT;
+        shift = -slot;
       } else if (newCurrentIndex < dragStartIndex && i >= newCurrentIndex && i < dragStartIndex) {
-        shift = DRAG_SLOT;
+        shift = slot;
       }
-      Animated.spring(getShiftAnim(task.id), {
+      Animated.timing(getShiftAnim(task.id), {
         toValue: shift,
+        duration: 180,
+        easing: Easing.out(Easing.quad),
         useNativeDriver: true,
-        tension: 300,
-        friction: 20,
       }).start();
     });
   };
@@ -913,7 +916,7 @@ export default function HomeScreen({ navigation }: Props) {
     }
     // Adjust dragY so the card stays at its current visual position after the
     // list repositions it, then spring it to 0 (its new resting place).
-    const adjustedDy = rawDy - (state.currentIndex - state.startIndex) * DRAG_SLOT;
+    const adjustedDy = rawDy - (state.currentIndex - state.startIndex) * dragSlotRef.current;
     dragState.current = { taskId: null, startIndex: 0, currentIndex: 0, changed: false };
     setActiveDragId(null);
     dragY.setValue(adjustedDy);
@@ -1390,7 +1393,13 @@ export default function HomeScreen({ navigation }: Props) {
             : null;
           const priority = priorityMeta(item.priority);
           return (
-            <View style={s.swipeWrap}>
+            <View
+              style={s.swipeWrap}
+              onLayout={(e) => {
+                const h = e.nativeEvent.layout.height;
+                if (h > 10) dragSlotRef.current = h + DRAG_GAP;
+              }}
+            >
               <Animated.View style={[s.swipeDeleteBg, swipeBgStyle]}>
                 <Text style={s.swipeDeleteText}>削除</Text>
               </Animated.View>
