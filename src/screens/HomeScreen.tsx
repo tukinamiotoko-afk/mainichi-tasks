@@ -499,27 +499,7 @@ export default function HomeScreen({ navigation }: Props) {
   const [showThumb, setShowThumb] = useState(false);
   const thumbAnim = useRef(new Animated.Value(0)).current;
   const progressAnim = useRef(new Animated.Value(0)).current;
-  // 拡散リング（2枚、時差あり）
-  const rings = useRef([
-    { scale: new Animated.Value(0), opacity: new Animated.Value(0) },
-    { scale: new Animated.Value(0), opacity: new Animated.Value(0) },
-  ]).current;
-  // 上昇スパークル（10点、扇形に上方向へ）
-  const SPARKLE_COLORS = ['#ffd93d', '#ff6b6b', '#6bcb77', '#4d96ff', '#c084fc', '#fb923c', '#f472b6', '#34d399', '#ffffff', '#ffd700'];
-  const sparkles = useRef(
-    Array.from({ length: 10 }, (_, i) => {
-      const angle = (-Math.PI * 5 / 6) + (i / 9) * (Math.PI * 2 / 3);
-      const dist = 80 + (i % 3) * 32;
-      return {
-        pos: new Animated.ValueXY({ x: 0, y: 0 }),
-        opacity: new Animated.Value(0),
-        scale: new Animated.Value(0),
-        color: SPARKLE_COLORS[i % SPARKLE_COLORS.length],
-        tx: Math.cos(angle) * dist,
-        ty: Math.sin(angle) * dist,
-      };
-    })
-  ).current;
+  const bloomAnim = useRef(new Animated.Value(0)).current;
   const fabPosition = useRef({ x: Math.max(screen.width - 72, 20), y: Math.max(screen.height - insets.bottom - 132, 120) });
   const fabStartPosition = useRef(fabPosition.current);
   const fabAnim = useRef(new Animated.ValueXY(fabPosition.current)).current;
@@ -616,47 +596,15 @@ export default function HomeScreen({ navigation }: Props) {
   const triggerCelebration = () => {
     setShowThumb(true);
     thumbAnim.setValue(0);
-    rings.forEach((r) => { r.scale.setValue(0); r.opacity.setValue(0); });
-    sparkles.forEach((p) => { p.pos.setValue({ x: 0, y: 0 }); p.opacity.setValue(0); p.scale.setValue(0); });
-
-    const ringAnim = (r: typeof rings[0], delay: number) =>
-      Animated.sequence([
-        Animated.delay(delay),
-        Animated.parallel([
-          Animated.timing(r.scale, { toValue: 1, duration: 620, useNativeDriver: true }),
-          Animated.sequence([
-            Animated.timing(r.opacity, { toValue: 1, duration: 80, useNativeDriver: true }),
-            Animated.timing(r.opacity, { toValue: 0, duration: 540, useNativeDriver: true }),
-          ]),
-        ]),
-      ]);
-
-    const sparkleAnim = (p: typeof sparkles[0], delay: number) =>
-      Animated.sequence([
-        Animated.delay(delay),
-        Animated.parallel([
-          Animated.spring(p.pos, { toValue: { x: p.tx, y: p.ty }, useNativeDriver: true, tension: 90, friction: 9 }),
-          Animated.sequence([
-            Animated.spring(p.scale, { toValue: 1.3, useNativeDriver: true, tension: 350, friction: 6 }),
-            Animated.timing(p.scale, { toValue: 0, duration: 380, useNativeDriver: true }),
-          ]),
-          Animated.sequence([
-            Animated.timing(p.opacity, { toValue: 1, duration: 60, useNativeDriver: true }),
-            Animated.delay(240),
-            Animated.timing(p.opacity, { toValue: 0, duration: 380, useNativeDriver: true }),
-          ]),
-        ]),
-      ]);
-
+    bloomAnim.setValue(0);
     Animated.parallel([
+      Animated.timing(bloomAnim, { toValue: 1, duration: 700, useNativeDriver: true }),
       Animated.sequence([
-        Animated.spring(thumbAnim, { toValue: 1, useNativeDriver: true, tension: 180, friction: 6 }),
-        Animated.delay(600),
-        Animated.timing(thumbAnim, { toValue: 0, duration: 300, useNativeDriver: true }),
+        Animated.delay(80),
+        Animated.spring(thumbAnim, { toValue: 1, useNativeDriver: true, tension: 90, friction: 12 }),
+        Animated.delay(900),
+        Animated.timing(thumbAnim, { toValue: 0, duration: 400, useNativeDriver: true }),
       ]),
-      ringAnim(rings[0], 0),
-      ringAnim(rings[1], 200),
-      ...sparkles.map((p, i) => sparkleAnim(p, i * 30)),
     ]).start(() => setShowThumb(false));
   };
 
@@ -1498,52 +1446,25 @@ export default function HomeScreen({ navigation }: Props) {
 
       {showThumb && (
         <View style={s.thumbOverlay} pointerEvents="none">
-          {/* 拡散リング */}
-          {rings.map((r, i) => (
-            <Animated.View
-              key={`ring${i}`}
-              style={{
-                position: 'absolute',
-                width: 130,
-                height: 130,
-                borderRadius: 65,
-                borderWidth: 2.5,
-                borderColor: '#ffd700',
-                opacity: r.opacity,
-                transform: [{ scale: r.scale.interpolate({ inputRange: [0, 1], outputRange: [0.25, 3.2] }) }],
-              }}
-            />
-          ))}
-          {/* 上昇スパークル */}
-          <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' }}>
-            {sparkles.map((p, i) => (
-              <Animated.View
-                key={`sp${i}`}
-                style={{
-                  position: 'absolute',
-                  width: 11,
-                  height: 11,
-                  borderRadius: 5.5,
-                  backgroundColor: p.color,
-                  opacity: p.opacity,
-                  transform: [
-                    { translateX: p.pos.x },
-                    { translateY: p.pos.y },
-                    { scale: p.scale },
-                  ],
-                }}
-              />
-            ))}
-          </View>
-          {/* 👍 + よくできました */}
+          {/* ソフトな光のブルーム */}
+          <Animated.View style={{
+            position: 'absolute',
+            width: 240,
+            height: 240,
+            borderRadius: 120,
+            backgroundColor: '#ffffff',
+            opacity: bloomAnim.interpolate({ inputRange: [0, 0.3, 1], outputRange: [0, 0.14, 0] }),
+            transform: [{ scale: bloomAnim.interpolate({ inputRange: [0, 1], outputRange: [0.3, 2.6] }) }],
+          }} />
+          {/* 👍 + 達成しました */}
           <Animated.View style={{
             alignItems: 'center',
             gap: 8,
             opacity: thumbAnim,
-            transform: [{ scale: thumbAnim.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1] }) }],
+            transform: [{ scale: thumbAnim.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1] }) }],
           }}>
             <Text style={s.thumbEmoji}>👍</Text>
-            <Text style={s.celebrateText}>よくできました！</Text>
+            <Text style={s.celebrateText}>達成しました！</Text>
           </Animated.View>
         </View>
       )}
