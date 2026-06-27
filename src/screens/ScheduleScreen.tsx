@@ -159,6 +159,21 @@ export default function ScheduleScreen({ navigation }: Props) {
     load();
   };
 
+  // タイムスケジュール：全タスクを表示（HomeScreen と同様に期限切れのみ除外）
+  const allActive = tasks.filter((t) => {
+    if (t.freq_type === 'once' && t.once_date && t.once_date < selectedDate) return false;
+    if (t.freq_type === 'dates') {
+      const ds = (t.freq_dates ?? '').split(',').filter(Boolean);
+      if (ds.length > 0 && ds.every((d) => d < selectedDate)) return false;
+    }
+    return true;
+  });
+  const timedAll = allActive.filter((t) => t.scheduled_time).sort((a, b) =>
+    a.scheduled_time! < b.scheduled_time! ? -1 : a.scheduled_time! > b.scheduled_time! ? 1 : a.sort_order - b.sort_order
+  );
+  const untimedAll = allActive.filter((t) => !t.scheduled_time);
+
+  // フローチャート：今日対象のタスクのみ
   const due = tasks.filter((t) => isDueToday(t, selDateObj));
   const ordered = [...due].sort((a, b) => {
     const at = a.scheduled_time ?? '99:99';
@@ -166,14 +181,12 @@ export default function ScheduleScreen({ navigation }: Props) {
     if (at !== bt) return at < bt ? -1 : 1;
     return a.sort_order - b.sort_order;
   });
-  const timed = due.filter((t) => t.scheduled_time);
-  const untimed = due.filter((t) => !t.scheduled_time);
   const doneCount = due.filter((t) => completedIds.has(t.id)).length;
   const remaining = due.length - doneCount;
   const allDone = due.length > 0 && remaining === 0;
 
   const byHour: Record<number, Task[]> = {};
-  for (const t of timed) {
+  for (const t of timedAll) {
     const h = bucketHour(Number(t.scheduled_time!.slice(0, 2)));
     (byHour[h] ??= []).push(t);
   }
@@ -247,10 +260,10 @@ export default function ScheduleScreen({ navigation }: Props) {
             })}
           </View>
 
-          {untimed.length > 0 && (
+          {untimedAll.length > 0 && (
             <View style={s.untimedBox}>
               <Text style={s.untimedLabel}>時間未設定</Text>
-              {untimed.map(renderPill)}
+              {untimedAll.map(renderPill)}
             </View>
           )}
         </ScrollView>
