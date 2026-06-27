@@ -6,7 +6,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import { RootStackParamList } from '../../App';
-import { Task, getToday, getTasks, getCompletedTaskIds, markComplete, markIncomplete } from '../db/database';
+import { Task, getToday, getTasks, getCompletedTaskIds, markComplete, markIncomplete, updateTaskSortOrders } from '../db/database';
 import { isDueToday, WEEKDAYS } from '../constants/taskMeta';
 import { GRAD_START, GRAD_END } from '../constants/theme';
 import TabBar from '../components/TabBar';
@@ -40,9 +40,15 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   dateNavCenter: { flex: 1, alignItems: 'center' },
   dateText: { color: '#ffffff', fontSize: 15, fontWeight: '800' },
   dateTodayHint: { color: 'rgba(255,255,255,0.75)', fontSize: 10, fontWeight: '700', marginTop: 1 },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  editBtn: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.22)' },
+  editBtnActive: { backgroundColor: '#ffffff' },
+  editBtnText: { color: '#ffffff', fontSize: 13, fontWeight: '800' },
+  editBtnTextActive: { color: C.primary },
 
   bodyView: { flex: 1, backgroundColor: C.body },
 
+  // ── flowchart ──
   flowContent: { padding: 16, paddingBottom: 40, alignItems: 'center' },
   terminator: { backgroundColor: C.termBg, borderWidth: 1.5, borderColor: C.termBorder, borderRadius: 22, paddingHorizontal: 30, paddingVertical: 10 },
   terminatorText: { color: C.termText, fontSize: 14, fontWeight: '800', letterSpacing: 1 },
@@ -74,6 +80,18 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   mergeRailWrap: { width: '50%', alignItems: 'center', marginTop: 14 },
   mergeRail: { width: '100%', height: 2, backgroundColor: C.line },
 
+  // ── edit mode ──
+  editList: { paddingHorizontal: 12, paddingTop: 12, paddingBottom: 40, gap: 8 },
+  editHint: { color: C.muted, fontSize: 12, textAlign: 'center', marginBottom: 4 },
+  editRow: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: C.card, borderRadius: 10, borderWidth: 1, borderColor: C.border, paddingHorizontal: 12, paddingVertical: 10 },
+  editHandle: { fontSize: 18, color: C.muted, paddingRight: 2 },
+  editStepNo: { width: 22, height: 22, borderRadius: 4, backgroundColor: C.termBorder, alignItems: 'center', justifyContent: 'center' },
+  editStepNoText: { color: '#ffffff', fontSize: 12, fontWeight: '800' },
+  editTitle: { flex: 1, color: C.ink, fontSize: 13, fontWeight: '700' },
+  editArrowBtn: { width: 30, height: 30, borderRadius: 8, backgroundColor: C.primarySoft, alignItems: 'center', justifyContent: 'center' },
+  editArrowText: { color: C.primary, fontSize: 16, fontWeight: '900' },
+  editArrowDisabled: { opacity: 0.25 },
+
   empty: { paddingVertical: 60, alignItems: 'center', gap: 8 },
   emptyTitle: { color: C.ink, fontSize: 16, fontWeight: '700' },
   emptyBody: { color: C.muted, fontSize: 13, textAlign: 'center', paddingHorizontal: 24 },
@@ -89,6 +107,8 @@ export default function FlowScreen({ navigation }: Props) {
   const [selectedDate, setSelectedDate] = useState(today);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [completedIds, setCompletedIds] = useState<Set<number>>(new Set());
+  const [editMode, setEditMode] = useState(false);
+  const [editOrdered, setEditOrdered] = useState<Task[]>([]);
 
   const isToday = selectedDate === today;
   const selDateObj = useMemo(() => new Date(`${selectedDate}T00:00:00`), [selectedDate]);
@@ -125,79 +145,142 @@ export default function FlowScreen({ navigation }: Props) {
   const remaining = due.length - doneCount;
   const allDone = due.length > 0 && remaining === 0;
 
+  const enterEdit = () => {
+    setEditOrdered([...ordered]);
+    setEditMode(true);
+  };
+
+  const exitEdit = async () => {
+    await updateTaskSortOrders(db, editOrdered.map((t) => t.id));
+    setEditMode(false);
+    load();
+  };
+
+  const moveStep = (idx: number, dir: -1 | 1) => {
+    const next = idx + dir;
+    if (next < 0 || next >= editOrdered.length) return;
+    setEditOrdered((prev) => {
+      const arr = [...prev];
+      [arr[idx], arr[next]] = [arr[next], arr[idx]];
+      return arr;
+    });
+  };
+
   return (
     <View style={s.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
       <LinearGradient colors={grad.header} start={GRAD_START} end={GRAD_END} style={[s.headerCard, { paddingTop: insets.top + 12 }]}>
         <View style={s.dateNavRow}>
-          <TouchableOpacity onPress={() => shiftSelected(-1)} style={s.dateNavBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Text style={s.dateNavArrow}>‹</Text>
+          <TouchableOpacity onPress={() => shiftSelected(-1)} style={s.dateNavBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} disabled={editMode}>
+            <Text style={[s.dateNavArrow, editMode && { opacity: 0.3 }]}>‹</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => setSelectedDate(today)} activeOpacity={0.7} style={s.dateNavCenter}>
+          <TouchableOpacity onPress={() => setSelectedDate(today)} activeOpacity={0.7} style={s.dateNavCenter} disabled={editMode}>
             <Text style={s.dateText}>{dateLabel}</Text>
             {!isToday && <Text style={s.dateTodayHint}>タップで今日へ</Text>}
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => shiftSelected(1)} style={s.dateNavBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Text style={s.dateNavArrow}>›</Text>
-          </TouchableOpacity>
+          <View style={s.headerRight}>
+            <TouchableOpacity onPress={() => shiftSelected(1)} style={s.dateNavBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} disabled={editMode}>
+              <Text style={[s.dateNavArrow, editMode && { opacity: 0.3 }]}>›</Text>
+            </TouchableOpacity>
+            {due.length > 0 && (
+              <TouchableOpacity
+                style={[s.editBtn, editMode && s.editBtnActive]}
+                onPress={editMode ? exitEdit : enterEdit}
+              >
+                <Text style={[s.editBtnText, editMode && s.editBtnTextActive]}>
+                  {editMode ? '完了' : '編集'}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       </LinearGradient>
 
-      <ScrollView style={s.bodyView} contentContainerStyle={s.flowContent}>
-        {due.length === 0 ? (
-          <View style={s.empty}>
-            <Text style={s.emptyTitle}>この日のフローはありません</Text>
-            <Text style={s.emptyBody}>頻度がこの日に当たるタスクがワークフローになります</Text>
-          </View>
-        ) : (
-          <>
-            <View style={s.terminator}><Text style={s.terminatorText}>開始</Text></View>
-            {ordered.map((task, i) => {
-              const isDone = completedIds.has(task.id);
-              return (
-                <View key={task.id} style={s.stepWrap}>
-                  <Down color={isDone ? C.doneBg : C.line} />
-                  <TouchableOpacity style={[s.process, isDone && s.processDone]} onPress={() => toggle(task.id)} activeOpacity={0.8}>
-                    <View style={[s.stepNo, isDone && s.stepNoDone]}><Text style={s.stepNoText}>{i + 1}</Text></View>
-                    <Text style={[s.processText, isDone && s.processTextDone]} numberOfLines={2}>
-                      {task.icon ? `${task.icon} ` : ''}{task.title}{task.scheduled_time ? `  (${task.scheduled_time})` : ''}
-                    </Text>
-                    {isDone && <Text style={s.processCheck}>✓</Text>}
-                  </TouchableOpacity>
-                </View>
-              );
-            })}
-            <Down color={allDone ? C.doneBg : C.line} />
-            <View style={[s.diamond, allDone && s.diamondDone]}>
-              <View style={s.diamondInner}>
-                <Text style={[s.diamondText, allDone && s.diamondTextDone]}>全部{'\n'}完了?</Text>
-              </View>
+      {editMode ? (
+        <ScrollView style={s.bodyView} contentContainerStyle={s.editList}>
+          <Text style={s.editHint}>↑↓ でステップの順番を変更</Text>
+          {editOrdered.map((task, i) => (
+            <View key={task.id} style={s.editRow}>
+              <Text style={s.editHandle}>☰</Text>
+              <View style={s.editStepNo}><Text style={s.editStepNoText}>{i + 1}</Text></View>
+              <Text style={s.editTitle} numberOfLines={2}>
+                {task.icon ? `${task.icon} ` : ''}{task.title}
+                {task.scheduled_time ? `  (${task.scheduled_time})` : ''}
+              </Text>
+              <TouchableOpacity
+                style={[s.editArrowBtn, i === 0 && s.editArrowDisabled]}
+                onPress={() => moveStep(i, -1)}
+                disabled={i === 0}
+              >
+                <Text style={s.editArrowText}>↑</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[s.editArrowBtn, i === editOrdered.length - 1 && s.editArrowDisabled]}
+                onPress={() => moveStep(i, 1)}
+                disabled={i === editOrdered.length - 1}
+              >
+                <Text style={s.editArrowText}>↓</Text>
+              </TouchableOpacity>
             </View>
-            <View style={s.branchRow}>
-              <View style={s.branchCol}>
-                <Text style={[s.branchLabel, { color: C.diaBorder }]}>はい</Text>
-                <Down color={allDone ? C.doneBg : C.line} h={16} />
-                <View style={[s.outBox, allDone && s.outBoxDone]}>
-                  <Text style={[s.outText, allDone && s.outTextDone]}>完了 🎉</Text>
+          ))}
+        </ScrollView>
+      ) : (
+        <ScrollView style={s.bodyView} contentContainerStyle={s.flowContent}>
+          {due.length === 0 ? (
+            <View style={s.empty}>
+              <Text style={s.emptyTitle}>この日のフローはありません</Text>
+              <Text style={s.emptyBody}>頻度がこの日に当たるタスクがワークフローになります</Text>
+            </View>
+          ) : (
+            <>
+              <View style={s.terminator}><Text style={s.terminatorText}>開始</Text></View>
+              {ordered.map((task, i) => {
+                const isDone = completedIds.has(task.id);
+                return (
+                  <View key={task.id} style={s.stepWrap}>
+                    <Down color={isDone ? C.doneBg : C.line} />
+                    <TouchableOpacity style={[s.process, isDone && s.processDone]} onPress={() => toggle(task.id)} activeOpacity={0.8}>
+                      <View style={[s.stepNo, isDone && s.stepNoDone]}><Text style={s.stepNoText}>{i + 1}</Text></View>
+                      <Text style={[s.processText, isDone && s.processTextDone]} numberOfLines={2}>
+                        {task.icon ? `${task.icon} ` : ''}{task.title}{task.scheduled_time ? `  (${task.scheduled_time})` : ''}
+                      </Text>
+                      {isDone && <Text style={s.processCheck}>✓</Text>}
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
+              <Down color={allDone ? C.doneBg : C.line} />
+              <View style={[s.diamond, allDone && s.diamondDone]}>
+                <View style={s.diamondInner}>
+                  <Text style={[s.diamondText, allDone && s.diamondTextDone]}>全部{'\n'}完了?</Text>
                 </View>
               </View>
-              <View style={s.branchCol}>
-                <Text style={[s.branchLabel, { color: C.muted }]}>いいえ</Text>
-                <Down color={C.line} h={16} />
-                <View style={[s.outBox, s.outBoxNo]}>
-                  <Text style={s.outNoText}>残り {remaining} 件</Text>
+              <View style={s.branchRow}>
+                <View style={s.branchCol}>
+                  <Text style={[s.branchLabel, { color: C.diaBorder }]}>はい</Text>
+                  <Down color={allDone ? C.doneBg : C.line} h={16} />
+                  <View style={[s.outBox, allDone && s.outBoxDone]}>
+                    <Text style={[s.outText, allDone && s.outTextDone]}>完了 🎉</Text>
+                  </View>
+                </View>
+                <View style={s.branchCol}>
+                  <Text style={[s.branchLabel, { color: C.muted }]}>いいえ</Text>
+                  <Down color={C.line} h={16} />
+                  <View style={[s.outBox, s.outBoxNo]}>
+                    <Text style={s.outNoText}>残り {remaining} 件</Text>
+                  </View>
                 </View>
               </View>
-            </View>
-            <View style={s.mergeRailWrap}><View style={s.mergeRail} /></View>
-            <Down color={allDone ? C.doneBg : C.line} h={16} />
-            <View style={[s.terminator, allDone && s.terminatorDone]}>
-              <Text style={[s.terminatorText, allDone && s.terminatorEndText]}>終了</Text>
-            </View>
-          </>
-        )}
-      </ScrollView>
+              <View style={s.mergeRailWrap}><View style={s.mergeRail} /></View>
+              <Down color={allDone ? C.doneBg : C.line} h={16} />
+              <View style={[s.terminator, allDone && s.terminatorDone]}>
+                <Text style={[s.terminatorText, allDone && s.terminatorEndText]}>終了</Text>
+              </View>
+            </>
+          )}
+        </ScrollView>
+      )}
 
       <TabBar current="Flow" navigation={navigation} />
     </View>
