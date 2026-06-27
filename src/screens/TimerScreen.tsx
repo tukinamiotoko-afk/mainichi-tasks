@@ -39,9 +39,9 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   modeText: { color: C.onDark, fontSize: 13, fontWeight: '900' },
   modeTextActive: { color: C.onPrimary },
   modeSub: { color: C.muted, fontSize: 11, fontWeight: '800', textAlign: 'center' },
-  minuteRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  minuteRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   minuteLabel: { color: C.muted, fontSize: 12, fontWeight: '700' },
-  minuteInput: { borderWidth: 1.5, borderColor: C.border, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, color: C.onDark, fontSize: 14, fontWeight: '900', backgroundColor: C.body, minWidth: 56, textAlign: 'center' },
+  minuteInput: { color: C.primary, fontSize: 14, fontWeight: '900', minWidth: 24, textAlign: 'center', padding: 0 },
   addBtnWrap: { flex: 1 },
   addBtn: { borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
   addBtnText: { color: C.onPrimary, fontSize: 14, fontWeight: '900' },
@@ -250,7 +250,6 @@ export default function TimerScreen({ navigation }: Props) {
               </View>
               {mode === 'timer' && (
                 <View style={s.minuteRow}>
-                  <Text style={s.minuteLabel}>目標</Text>
                   <TextInput
                     style={s.minuteInput}
                     value={minuteInputs[item.task.id] ?? String(Math.round(item.targetSeconds / 60))}
