@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import {
   View, Text, FlatList, TouchableOpacity, Modal,
   TextInput, StyleSheet, Alert, KeyboardAvoidingView,
-  Platform, StatusBar, Animated, Easing, ScrollView, PanResponder, Dimensions, Switch,
+  Platform, StatusBar, Animated, ScrollView, PanResponder, Dimensions, Switch,
   LayoutAnimation, UIManager,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -873,28 +873,29 @@ export default function HomeScreen({ navigation }: Props) {
     dragY.setValue(dy);
     const slot = dragSlotRef.current;
     const tasksAtStart = displayedTasksAtDragStart.current;
+    const dragStartIndex = state.startIndex;
+    // Fractional slots moved — drives both the threshold check and proportional shifts.
+    const virtualOffset = dy / slot;
     const newCurrentIndex = Math.max(0, Math.min(
       tasksAtStart.length - 1,
-      state.startIndex + Math.round(dy / slot),
+      dragStartIndex + Math.round(virtualOffset),
     ));
-    if (newCurrentIndex === state.currentIndex) return;
-    state.currentIndex = newCurrentIndex;
-    state.changed = true;
-    const dragStartIndex = state.startIndex;
+    if (newCurrentIndex !== state.currentIndex) {
+      state.currentIndex = newCurrentIndex;
+      state.changed = true;
+    }
+    // Move each surrounding card proportionally to where the dragged card is.
+    // No threshold, no animation — pure setValue so motion is perfectly continuous.
     tasksAtStart.forEach((task, i) => {
       if (task.id === state.taskId) return;
+      const relPos = i - dragStartIndex;
       let shift = 0;
-      if (newCurrentIndex > dragStartIndex && i > dragStartIndex && i <= newCurrentIndex) {
-        shift = -slot;
-      } else if (newCurrentIndex < dragStartIndex && i >= newCurrentIndex && i < dragStartIndex) {
-        shift = slot;
+      if (virtualOffset > 0 && relPos > 0) {
+        shift = -slot * Math.max(0, Math.min(1, virtualOffset - relPos + 1));
+      } else if (virtualOffset < 0 && relPos < 0) {
+        shift = slot * Math.max(0, Math.min(1, -virtualOffset + relPos + 1));
       }
-      Animated.timing(getShiftAnim(task.id), {
-        toValue: shift,
-        duration: 180,
-        easing: Easing.out(Easing.quad),
-        useNativeDriver: true,
-      }).start();
+      getShiftAnim(task.id).setValue(shift);
     });
   };
 
