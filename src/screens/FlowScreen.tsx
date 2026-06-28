@@ -128,19 +128,16 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   },
   branchDeleteBubbleText: { color: '#dc2626', fontSize: 13, fontWeight: '900', lineHeight: 16 },
 
-  // horizontal branch layout
-  branchHRow: { flexDirection: 'row', width: '100%', alignItems: 'flex-start' },
-  branchMainCol: { flex: 1, alignItems: 'center' },
-  branchSideCol: { flex: 1, paddingTop: 60 },
+  // horizontal branch layout (reference-flowchart style)
+  branchMainCol: { width: 140, alignItems: 'center' },
+  branchSideCol: { flex: 1, paddingTop: 58, marginLeft: -4 },
   skipLabel: { color: C.muted, fontSize: 12, fontWeight: '800', marginTop: 28 },
-  skipVLine: { width: 2, height: 44, backgroundColor: C.line },
-  // "する ──→ [subtask]" all in one horizontal row
-  hBranchRow: { flexDirection: 'row', alignItems: 'center' },
-  doLabel: { color: '#7c3aed', fontSize: 12, fontWeight: '800', marginRight: 4 },
-  hConnectorLine: { width: 28, height: 2, backgroundColor: '#7c3aed' },
-  hArrowHead: { width: 0, height: 0, borderTopWidth: 5, borderBottomWidth: 5, borderLeftWidth: 8, borderTopColor: 'transparent', borderBottomColor: 'transparent', borderLeftColor: '#7c3aed' },
-  returnVLine: { width: 2, height: 28, backgroundColor: C.line, alignSelf: 'center' },
-  branchMergeRail: { width: '100%', height: 2, backgroundColor: C.line },
+  skipVLine: { width: 2, height: 30, backgroundColor: C.line },
+  doLabel: { color: '#7c3aed', fontSize: 12, fontWeight: '800' },
+  hLine: { width: '100%', height: 2, backgroundColor: '#7c3aed' },
+  hVertTop: { width: 2, height: 20, backgroundColor: '#7c3aed', alignSelf: 'flex-end' },
+  hVertBottom: { width: 2, height: 40, backgroundColor: C.line, alignSelf: 'flex-end' },
+  branchReturnLine: { width: '100%', height: 2, backgroundColor: C.line },
 
   // shared by end-of-flow diamond
   branchRow: { flexDirection: 'row', width: '100%', marginTop: 2 },
@@ -642,8 +639,9 @@ export default function FlowScreen({ navigation }: Props) {
         style={s.stepWrap}
         onLayout={(e) => { branchYsById.current.set(br.id, e.nativeEvent.layout.y); }}
       >
-        <View style={s.branchHRow}>
-          {/* LEFT: main flow — entry connector + diamond + skip path down */}
+        <View style={{ flexDirection: 'row', width: '100%' }}>
+
+          {/* LEFT: main flow — Down + diamond + スキップ path */}
           <View style={s.branchMainCol}>
             <Down color={C.line} />
             <Animated.View
@@ -664,27 +662,28 @@ export default function FlowScreen({ navigation }: Props) {
             <View style={s.skipVLine} />
           </View>
 
-          {/* RIGHT: "する ──→ [subtask]" all in one horizontal line */}
+          {/* RIGHT: horizontal line from diamond right-tip → down → subtask → down */}
           <View style={s.branchSideCol}>
-            <View style={s.hBranchRow}>
-              <Text style={s.doLabel}>する</Text>
-              <View style={s.hConnectorLine} />
-              <View style={s.hArrowHead} />
-              <View style={{ width: 8 }} />
-              <TouchableOpacity onPress={() => openEditBranch(br)} activeOpacity={0.75}>
-                {br.yes_text
-                  ? <View style={s.outBoxYes}><Text style={s.outYesText}>{br.yes_text}</Text></View>
-                  : <View style={[s.outBoxYes, { opacity: 0.4 }]}><Text style={s.outYesText}>サブタスクを設定</Text></View>
-                }
-              </TouchableOpacity>
-            </View>
-            <View style={s.returnVLine} />
+            {/* "する" label above the horizontal line */}
+            <Text style={s.doLabel}>する</Text>
+            {/* Horizontal line spans full right column (to right edge) */}
+            <View style={s.hLine} />
+            {/* Vertical line on right edge, down to subtask */}
+            <View style={s.hVertTop} />
+            {/* Subtask box, right-aligned */}
+            <TouchableOpacity onPress={() => openEditBranch(br)} activeOpacity={0.75} style={{ alignSelf: 'flex-end' }}>
+              {br.yes_text
+                ? <View style={s.outBoxYes}><Text style={s.outYesText}>{br.yes_text}</Text></View>
+                : <View style={[s.outBoxYes, { opacity: 0.4 }]}><Text style={s.outYesText}>サブタスクを設定</Text></View>
+              }
+            </TouchableOpacity>
+            {/* Vertical line on right edge, down to return line */}
+            <View style={s.hVertBottom} />
           </View>
         </View>
 
-        {/* Merge rail */}
-        <View style={s.branchMergeRail} />
-        <Text style={s.returnLabel}>本流に戻る</Text>
+        {/* Full-width return line from right back to main flow */}
+        <View style={s.branchReturnLine} />
       </View>
     );
   };
