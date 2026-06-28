@@ -70,7 +70,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   addBranchBtnText: { color: '#ffffff', fontSize: 15, fontWeight: '900' },
 
   body: { flex: 1, backgroundColor: C.body },
-  content: { padding: 16, paddingBottom: 60, alignItems: 'center' },
+  content: { padding: 16, paddingBottom: 60, alignItems: 'center', overflow: 'visible' },
 
   // terminators
   terminator: { backgroundColor: C.termBg, borderWidth: 1.5, borderColor: C.termBorder, borderRadius: 22, paddingHorizontal: 30, paddingVertical: 10 },
@@ -79,7 +79,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   terminatorDoneText: { color: '#ffffff' },
 
   // task process box
-  stepWrap: { alignItems: 'center', width: '100%' },
+  stepWrap: { alignItems: 'center', width: '100%', overflow: 'visible' },
   process: {
     flexDirection: 'row', alignItems: 'stretch',
     width: '92%', backgroundColor: C.termBg,
@@ -269,10 +269,10 @@ export default function FlowScreen({ navigation }: Props) {
   // ── canvas pan / zoom state ──
   const canvasXAnim = useRef(new Animated.Value(0)).current;
   const canvasYAnim = useRef(new Animated.Value(0)).current;
-  const canvasScaleAnim = useRef(new Animated.Value(1)).current;
+  const canvasScaleAnim = useRef(new Animated.Value(0.65)).current;
   const canvasXRef = useRef(0);
   const canvasYRef = useRef(0);
-  const canvasScaleRef = useRef(1);
+  const canvasScaleRef = useRef(0.65);
   const canvasPanStart = useRef({ x: 0, y: 0 });
   const pinchRef = useRef<{ dist: number; scale: number } | null>(null);
   const pinchModeRef = useRef(false);
@@ -536,11 +536,11 @@ export default function FlowScreen({ navigation }: Props) {
     Animated.parallel([
       Animated.spring(canvasXAnim, { toValue: 0, useNativeDriver: false, tension: 120, friction: 12 }),
       Animated.spring(canvasYAnim, { toValue: 0, useNativeDriver: false, tension: 120, friction: 12 }),
-      Animated.spring(canvasScaleAnim, { toValue: 1, useNativeDriver: false, tension: 120, friction: 12 }),
+      Animated.spring(canvasScaleAnim, { toValue: 0.65, useNativeDriver: false, tension: 120, friction: 12 }),
     ]).start(() => {
       canvasXRef.current = 0;
       canvasYRef.current = 0;
-      canvasScaleRef.current = 1;
+      canvasScaleRef.current = 0.65;
       setCanvasMoved(false);
     });
   }, []);
@@ -646,8 +646,8 @@ export default function FlowScreen({ navigation }: Props) {
         {/* Entry Down — centered by stepWrap's alignItems:center */}
         <Down color={C.line} />
 
-        {/* ROW 1: diamond centered, YES horizontal line flies right beyond task-box width */}
-        <View style={{ flexDirection: 'row', width: windowWidth - 16 }}>
+        {/* ROW 1: diamond centered, YES horizontal line flies right on wide virtual canvas */}
+        <View style={{ flexDirection: 'row', width: windowWidth * 2 }}>
           <View style={{ flex: 1 }} />
           <Animated.View
             style={[s.diamondWrap, isActiveBr && { zIndex: 99 }, { transform: [{ translateY: branchAnim }] }]}
@@ -671,7 +671,7 @@ export default function FlowScreen({ navigation }: Props) {
         </View>
 
         {/* ROW 2: NO path under diamond, right verticals + subtask on right edge */}
-        <View style={{ flexDirection: 'row', width: windowWidth - 16 }}>
+        <View style={{ flexDirection: 'row', width: windowWidth * 2 }}>
           <View style={{ flex: 1 }} />
           {/* 96px center section aligns NO path under diamond center */}
           <View style={{ width: 96, alignItems: 'center', paddingTop: 28 }}>
@@ -691,8 +691,8 @@ export default function FlowScreen({ navigation }: Props) {
           </View>
         </View>
 
-        {/* Return line: full width, merges right path back to main flow */}
-        <View style={[s.branchReturnLine, { width: windowWidth - 16 }]} />
+        {/* Return line: full virtual canvas width, merges right path back to main flow */}
+        <View style={[s.branchReturnLine, { width: windowWidth * 2 }]} />
       </View>
     );
   };
@@ -724,7 +724,7 @@ export default function FlowScreen({ navigation }: Props) {
       </LinearGradient>
 
       <View style={[s.body, { overflow: 'hidden' }]} {...(canvasPanRef.current!.panHandlers)}>
-        <Animated.View style={{ transform: [{ translateX: canvasXAnim }, { translateY: canvasYAnim }, { scale: canvasScaleAnim }] }}>
+        <Animated.View style={{ overflow: 'visible', transform: [{ translateX: canvasXAnim }, { translateY: canvasYAnim }, { scale: canvasScaleAnim }] }}>
           <View style={s.content}>
             {due.length === 0 ? (
               <View style={s.empty}>
