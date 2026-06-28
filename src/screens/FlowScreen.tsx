@@ -46,7 +46,7 @@ function parseSubtasks(text: string | null): string[] {
 function buildNodes(tasks: Task[], branches: FlowBranch[]): FlowNode[] {
   const nodes: FlowNode[] = [];
   for (let i = 0; i < tasks.length; i++) {
-    // 分岐はタスクの前に置く（条件を確認してからタスクを実行）
+    // なぞるやつはタスクの前に置く（確認してからタスクを実行）
     branches
       .filter((b) => b.after_task_id === tasks[i].id)
       .forEach((b) => nodes.push({ type: 'branch', branch: b }));
@@ -585,7 +585,7 @@ export default function FlowScreen({ navigation }: Props) {
       openEditBranch(existing);
       return;
     }
-    Alert.alert('条件を先に追加', 'アクションは条件カードにつながります。先に「条件」を追加してください。');
+    Alert.alert('なぞるやつを先に追加', '下につなげるには、先になぞるやつを追加してください。');
   };
 
   const addModalSubtask = () => {
@@ -602,7 +602,7 @@ export default function FlowScreen({ navigation }: Props) {
     if (!modal || modal.afterTaskId === null) return;
     const data: Omit<FlowBranch, 'id'> = {
       after_task_id: modal.afterTaskId,
-      question: modal.condition.trim() || '条件',
+      question: modal.condition.trim() || 'なぞるやつ',
       yes_label: 'する',
       yes_text: parseSubtasks(modal.stepText).join('\n') || null,
       no_label: 'スキップ',
@@ -637,7 +637,7 @@ export default function FlowScreen({ navigation }: Props) {
         onPress={() => openAddBranch(task.id)}
         activeOpacity={0.8}
       >
-        <Text style={s.insertSlotText}>{index === 0 ? '最初に条件を入れる' : 'ここに条件を入れる'}</Text>
+        <Text style={s.insertSlotText}>{index === 0 ? '最初になぞるやつを入れる' : 'ここになぞるやつを入れる'}</Text>
       </TouchableOpacity>
     );
   };
@@ -761,14 +761,14 @@ export default function FlowScreen({ navigation }: Props) {
                 </React.Fragment>
               )) : (
                 <TouchableOpacity onPress={() => openEditBranch(br)} activeOpacity={0.75}>
-                  <View style={[s.outBoxYes, { opacity: 0.4 }]}><Text style={s.outYesText}>サブタスクを設定</Text></View>
+                  <View style={[s.outBoxYes, { opacity: 0.4 }]}><Text style={s.outYesText}>なぞるやつを設定</Text></View>
                 </TouchableOpacity>
               )}
               {insertMode === 'action' && (
                 <>
                   <View style={s.hVertBottom} />
                   <TouchableOpacity style={s.actionInsertSlot} onPress={() => openEditBranch(br)} activeOpacity={0.8}>
-                    <Text style={s.actionInsertText}>ここにアクション</Text>
+                    <Text style={s.actionInsertText}>ここになぞるやつ</Text>
                   </TouchableOpacity>
                 </>
               )}
@@ -817,7 +817,7 @@ export default function FlowScreen({ navigation }: Props) {
             onPress={() => setInsertMode((m) => m === 'condition' ? null : 'condition')}
             disabled={ordered.length === 0}
           >
-            <Text style={s.editPaletteText}>条件</Text>
+            <Text style={s.editPaletteText}>なぞるやつ</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[s.editPaletteBtn, insertMode === 'action' && s.editPaletteBtnActive]}
@@ -827,7 +827,7 @@ export default function FlowScreen({ navigation }: Props) {
             }}
             disabled={ordered.length === 0}
           >
-            <Text style={s.editPaletteText}>アクション</Text>
+            <Text style={s.editPaletteText}>下になぞるやつ</Text>
           </TouchableOpacity>
         </View>
       </LinearGradient>
@@ -894,7 +894,7 @@ export default function FlowScreen({ navigation }: Props) {
         <TouchableOpacity style={s.overlay} activeOpacity={1} onPress={() => setModal(null)}>
           <TouchableOpacity activeOpacity={1} style={s.sheet} onPress={() => {}}>
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" bounces={false}>
-            <Text style={s.sheetTitle}>{modal?.mode === 'add' ? '◇ 分岐を追加' : '◇ 分岐を編集'}</Text>
+            <Text style={s.sheetTitle}>{modal?.mode === 'add' ? '◇ なぞるやつを追加' : '◇ なぞるやつを編集'}</Text>
 
             {/* どのタスクの前に入れるか — タップで全画面選択へ */}
             {(() => {
@@ -912,7 +912,7 @@ export default function FlowScreen({ navigation }: Props) {
               );
             })()}
 
-            <Text style={s.sheetLabel}>分岐する条件</Text>
+            <Text style={s.sheetLabel}>なぞる内容</Text>
             <TextInput
               style={s.input}
               placeholder="例：雨が降ってたら"
@@ -922,7 +922,7 @@ export default function FlowScreen({ navigation }: Props) {
               returnKeyType="next"
             />
 
-            <Text style={s.sheetLabel}>サブタスク（改行で下につなげる）</Text>
+            <Text style={s.sheetLabel}>下につなげるなぞるやつ</Text>
             <TextInput
               style={[s.input, { minHeight: 92, textAlignVertical: 'top' }]}
               placeholder={'例：傘を持っていく\n靴を変える\n駅まで歩く'}
@@ -932,11 +932,11 @@ export default function FlowScreen({ navigation }: Props) {
               multiline
               returnKeyType="default"
             />
-            <Text style={s.sheetLabel}>追加するサブタスク</Text>
+            <Text style={s.sheetLabel}>追加するなぞるやつ</Text>
             <View style={s.subtaskAddRow}>
               <TextInput
                 style={[s.input, s.subtaskAddInput]}
-                placeholder="下につなげるサブタスク"
+                placeholder="下につなげるなぞるやつ"
                 placeholderTextColor={C.muted + '66'}
                 value={modal?.newSubtask ?? ''}
                 onChangeText={(v) => setModal((m) => m ? { ...m, newSubtask: v } : m)}
@@ -962,7 +962,7 @@ export default function FlowScreen({ navigation }: Props) {
 
             {modal?.mode === 'edit' && modal.editId !== null && (
               <TouchableOpacity style={s.deleteSheetBtn} onPress={() => removeBranch(modal.editId!)}>
-                <Text style={s.deleteSheetText}>この分岐を削除</Text>
+                <Text style={s.deleteSheetText}>このなぞるやつを削除</Text>
               </TouchableOpacity>
             )}
             </ScrollView>
