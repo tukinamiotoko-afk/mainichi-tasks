@@ -33,7 +33,6 @@ type BranchModal = {
   editId: number | null;
   condition: string;
   stepText: string;
-  side: 'left' | 'right';
 };
 
 function buildNodes(tasks: Task[], branches: FlowBranch[]): FlowNode[] {
@@ -539,11 +538,11 @@ export default function FlowScreen({ navigation }: Props) {
 
   // ── branch modal helpers ──
   const openAddBranch = (_afterTaskId: number | null = null) => {
-    setModal({ mode: 'add', afterTaskId: ordered[0]?.id ?? null, editId: null, condition: '', stepText: '', side: 'left' });
+    setModal({ mode: 'add', afterTaskId: ordered[0]?.id ?? null, editId: null, condition: '', stepText: '' });
   };
 
   const openEditBranch = (br: FlowBranch) => {
-    setModal({ mode: 'edit', afterTaskId: br.after_task_id, editId: br.id, condition: br.question, stepText: br.yes_text ?? '', side: br.branch_side ?? 'left' });
+    setModal({ mode: 'edit', afterTaskId: br.after_task_id, editId: br.id, condition: br.question, stepText: br.yes_text ?? '' });
   };
 
   const saveBranch = async () => {
@@ -555,7 +554,7 @@ export default function FlowScreen({ navigation }: Props) {
       yes_text: modal.stepText.trim() || null,
       no_label: 'スキップ',
       no_text: null,
-      branch_side: modal.side,
+      branch_side: 'left',
     };
     if (modal.mode === 'add') await addFlowBranch(db, data);
     else if (modal.editId !== null) await updateFlowBranch(db, modal.editId, data);
@@ -806,18 +805,6 @@ export default function FlowScreen({ navigation }: Props) {
               onChangeText={(v) => setModal((m) => m ? { ...m, stepText: v } : m)}
               returnKeyType="done"
             />
-
-            <Text style={s.sheetLabel}>追加ステップを置く側</Text>
-            <View style={s.sideRow}>
-              {(['left', 'right'] as const).map((side) => {
-                const active = modal?.side === side;
-                return (
-                  <TouchableOpacity key={side} style={[s.sideBtn, active && s.sideBtnActive]} onPress={() => setModal((m) => m ? { ...m, side } : m)}>
-                    <Text style={active ? s.sideBtnTextActive : s.sideBtnText}>{side === 'left' ? '← 左' : '右 →'}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
 
             <View style={s.actionRow}>
               <TouchableOpacity style={s.cancelBtn} onPress={() => setModal(null)}>
