@@ -519,8 +519,8 @@ export default function FlowScreen({ navigation }: Props) {
   }, []);
 
   // ── branch modal helpers ──
-  const openAddBranch = (afterTaskId: number | null = null) =>
-    setModal({ mode: 'add', afterTaskId, editId: null, condition: '', stepText: '', side: 'left' });
+  const openAddBranch = (_afterTaskId: number | null = null) =>
+    setModal({ mode: 'add', afterTaskId: ordered[0]?.id ?? null, editId: null, condition: '', stepText: '', side: 'left' });
 
   const openEditBranch = (br: FlowBranch) =>
     setModal({ mode: 'edit', afterTaskId: br.after_task_id, editId: br.id, condition: br.question, stepText: br.yes_text ?? '', side: br.branch_side ?? 'left' });
@@ -749,20 +749,7 @@ export default function FlowScreen({ navigation }: Props) {
           <TouchableOpacity activeOpacity={1} style={s.sheet} onPress={() => {}}>
             <Text style={s.sheetTitle}>{modal?.mode === 'add' ? '◇ 分岐を追加' : '◇ 分岐を編集'}</Text>
 
-            {/* task picker */}
-            <Text style={s.sheetLabel}>どのタスクの前に分岐を置く？</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.pickerScroll}>
-              {ordered.map((t) => {
-                const active = modal?.afterTaskId === t.id;
-                return (
-                  <TouchableOpacity key={t.id} style={[s.pickerChip, active && s.pickerChipActive]} onPress={() => setModal((m) => m ? { ...m, afterTaskId: t.id } : m)}>
-                    <Text style={active ? s.pickerChipTextActive : s.pickerChipText}>{t.icon ? `${t.icon} ` : ''}{t.title}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-
-            <Text style={s.sheetLabel}>◇ 条件（いつ分岐する？）</Text>
+            <Text style={s.sheetLabel}>◇ 条件（何をチェックする？）</Text>
             <TextInput
               style={s.input}
               placeholder="例：雨が降ってたら"
@@ -799,9 +786,8 @@ export default function FlowScreen({ navigation }: Props) {
                 <Text style={s.cancelText}>キャンセル</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[s.saveBtn, modal?.afterTaskId === null && { opacity: 0.45 }]}
+                style={s.saveBtn}
                 onPress={saveBranch}
-                disabled={modal?.afterTaskId === null}
               >
                 <Text style={s.saveText}>保存</Text>
               </TouchableOpacity>
