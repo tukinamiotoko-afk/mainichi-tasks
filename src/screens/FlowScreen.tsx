@@ -165,17 +165,23 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   sheetTitle: { color: C.ink, fontSize: 16, fontWeight: '800', marginBottom: 2 },
   sheetLabel: { color: C.muted, fontSize: 11, fontWeight: '700', marginTop: 4, marginBottom: 2 },
   input: { borderWidth: 1.5, borderColor: C.grid, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: C.ink, fontSize: 14, backgroundColor: C.body },
-  // task picker
-  taskPickerBtn: { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: C.grid, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 11, backgroundColor: C.body },
+  // task picker button (in branch modal)
+  taskPickerBtn: { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: C.grid, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 12, backgroundColor: C.body },
   taskPickerBtnText: { flex: 1, color: C.ink, fontSize: 14, fontWeight: '600' },
-  taskPickerBtnArrow: { color: C.muted, fontSize: 11, marginLeft: 8 },
-  taskPickerList: { borderWidth: 1.5, borderColor: '#7c3aed', borderRadius: 10, overflow: 'hidden', marginTop: 4 },
-  taskPickerRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 11, gap: 10, borderBottomWidth: 1, borderBottomColor: C.grid },
-  taskPickerRowActive: { backgroundColor: '#ede9fe' },
-  taskPickerRadio: { color: C.muted, fontSize: 14 },
-  taskPickerRadioActive: { color: '#7c3aed' },
-  taskPickerText: { flex: 1, color: C.ink, fontSize: 13, fontWeight: '600' },
-  taskPickerTextActive: { color: '#4c1d95', fontWeight: '700' },
+  taskPickerBtnArrow: { color: C.muted, fontSize: 20, marginLeft: 8 },
+
+  // task select full-screen modal
+  taskSelectHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: C.grid, gap: 12 },
+  taskSelectBack: { paddingRight: 8 },
+  taskSelectBackText: { color: C.primary, fontSize: 17, fontWeight: '700' },
+  taskSelectTitle: { flex: 1, color: C.ink, fontSize: 16, fontWeight: '800' },
+  taskSelectRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: C.grid, gap: 14 },
+  taskSelectRowActive: { backgroundColor: '#ede9fe' },
+  taskSelectNum: { width: 28, height: 28, borderRadius: 14, backgroundColor: C.primarySoft, alignItems: 'center', justifyContent: 'center' },
+  taskSelectNumText: { color: C.primary, fontSize: 12, fontWeight: '800' },
+  taskSelectText: { flex: 1, color: C.ink, fontSize: 15, fontWeight: '600' },
+  taskSelectTextActive: { color: '#4c1d95', fontWeight: '700' },
+  taskSelectCheck: { color: '#7c3aed', fontSize: 16 },
 
   // side toggle
   sideRow: { flexDirection: 'row', gap: 8 },
@@ -226,17 +232,7 @@ export default function FlowScreen({ navigation }: Props) {
   const [completedIds, setCompletedIds] = useState<Set<number>>(new Set());
   const [branches, setBranches] = useState<FlowBranch[]>([]);
   const [modal, setModal] = useState<BranchModal | null>(null);
-  const [taskPickerOpen, setTaskPickerOpen] = useState(false);
-  const pickerAnim = useRef(new Animated.Value(0)).current;
-
-  const togglePicker = (open: boolean) => {
-    setTaskPickerOpen(open);
-    Animated.timing(pickerAnim, {
-      toValue: open ? 1 : 0,
-      duration: 220,
-      useNativeDriver: false,
-    }).start();
-  };
+  const [taskSelectVisible, setTaskSelectVisible] = useState(false);
 
   // ── task drag state ──
   const taskDragY = useRef(new Animated.Value(0)).current;
@@ -543,14 +539,10 @@ export default function FlowScreen({ navigation }: Props) {
 
   // ── branch modal helpers ──
   const openAddBranch = (_afterTaskId: number | null = null) => {
-    pickerAnim.setValue(0);
-    setTaskPickerOpen(false);
     setModal({ mode: 'add', afterTaskId: ordered[0]?.id ?? null, editId: null, condition: '', stepText: '', side: 'left' });
   };
 
   const openEditBranch = (br: FlowBranch) => {
-    pickerAnim.setValue(0);
-    setTaskPickerOpen(false);
     setModal({ mode: 'edit', afterTaskId: br.after_task_id, editId: br.id, condition: br.question, stepText: br.yes_text ?? '', side: br.branch_side ?? 'left' });
   };
 
@@ -779,42 +771,18 @@ export default function FlowScreen({ navigation }: Props) {
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" bounces={false}>
             <Text style={s.sheetTitle}>{modal?.mode === 'add' ? '◇ 分岐を追加' : '◇ 分岐を編集'}</Text>
 
-            {/* どのタスクの前に入れるか — タップで一覧を開閉 */}
+            {/* どのタスクの前に入れるか — タップで全画面選択へ */}
             {(() => {
               const selected = ordered.find((t) => t.id === modal?.afterTaskId);
               return (
                 <>
                   <Text style={s.sheetLabel}>どのタスクの前に入れる？</Text>
-                  <TouchableOpacity style={s.taskPickerBtn} onPress={() => togglePicker(!taskPickerOpen)}>
+                  <TouchableOpacity style={s.taskPickerBtn} onPress={() => setTaskSelectVisible(true)}>
                     <Text style={s.taskPickerBtnText} numberOfLines={1}>
                       {selected ? `${selected.icon ? `${selected.icon} ` : ''}${selected.title}` : 'タスクを選ぶ'}
                     </Text>
-                    <Text style={s.taskPickerBtnArrow}>{taskPickerOpen ? '▲' : '▼'}</Text>
+                    <Text style={s.taskPickerBtnArrow}>›</Text>
                   </TouchableOpacity>
-                  <Animated.View style={{
-                    overflow: 'hidden',
-                    maxHeight: pickerAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 280] }),
-                    opacity: pickerAnim,
-                    marginTop: 4,
-                  }}>
-                    <View style={s.taskPickerList}>
-                      {ordered.map((t) => {
-                        const active = modal?.afterTaskId === t.id;
-                        return (
-                          <TouchableOpacity
-                            key={t.id}
-                            style={[s.taskPickerRow, active && s.taskPickerRowActive]}
-                            onPress={() => { setModal((m) => m ? { ...m, afterTaskId: t.id } : m); togglePicker(false); }}
-                          >
-                            <Text style={[s.taskPickerRadio, active && s.taskPickerRadioActive]}>{active ? '●' : '○'}</Text>
-                            <Text style={[s.taskPickerText, active && s.taskPickerTextActive]} numberOfLines={1}>
-                              {t.icon ? `${t.icon} ` : ''}{t.title}
-                            </Text>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
-                  </Animated.View>
                 </>
               );
             })()}
@@ -871,6 +839,41 @@ export default function FlowScreen({ navigation }: Props) {
             </ScrollView>
           </TouchableOpacity>
         </TouchableOpacity>
+      </Modal>
+
+      {/* ── task select screen ── */}
+      <Modal visible={taskSelectVisible} transparent={false} animationType="slide" onRequestClose={() => setTaskSelectVisible(false)}>
+        <View style={[s.safeArea, { paddingTop: insets.top }]}>
+          <View style={s.taskSelectHeader}>
+            <TouchableOpacity style={s.taskSelectBack} onPress={() => setTaskSelectVisible(false)}>
+              <Text style={s.taskSelectBackText}>‹ 戻る</Text>
+            </TouchableOpacity>
+            <Text style={s.taskSelectTitle}>どのタスクの前に入れる？</Text>
+          </View>
+          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 40 }}>
+            {ordered.map((t, i) => {
+              const active = modal?.afterTaskId === t.id;
+              return (
+                <TouchableOpacity
+                  key={t.id}
+                  style={[s.taskSelectRow, active && s.taskSelectRowActive]}
+                  onPress={() => {
+                    setModal((m) => m ? { ...m, afterTaskId: t.id } : m);
+                    setTaskSelectVisible(false);
+                  }}
+                >
+                  <View style={s.taskSelectNum}>
+                    <Text style={s.taskSelectNumText}>{i + 1}</Text>
+                  </View>
+                  <Text style={[s.taskSelectText, active && s.taskSelectTextActive]} numberOfLines={2}>
+                    {t.icon ? `${t.icon} ` : ''}{t.title}
+                  </Text>
+                  {active && <Text style={s.taskSelectCheck}>●</Text>}
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
       </Modal>
 
       <TabBar current="Flow" navigation={navigation} />
