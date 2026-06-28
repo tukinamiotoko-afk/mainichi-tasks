@@ -113,7 +113,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   // branch diamond
   diamondWrap: { alignItems: 'center', position: 'relative' },
   diamond: {
-    width: 96, height: 96, borderRadius: 8,
+    width: 132, height: 76, borderRadius: 8,
     borderWidth: 1.5, borderColor: '#7c3aed', backgroundColor: '#ede9fe',
     alignItems: 'center', justifyContent: 'center',
     transform: [{ rotate: '45deg' }],
@@ -135,8 +135,9 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   doLabel: { color: '#000', fontSize: 12, fontWeight: '800' },
   hLine: { width: '100%', height: 2, backgroundColor: '#000' },
   hVertTop: { width: 2, height: 16, backgroundColor: '#000' },
-  hVertBottom: { width: 2, height: 20, backgroundColor: '#000' },
+  hVertBottom: { width: 2, height: 24, backgroundColor: '#000' },
   branchReturnLine: { width: '100%', height: 2, backgroundColor: '#000' },
+  branchReturnDrop: { width: 2, height: 18, backgroundColor: '#000' },
   branchChronoSpace: { height: 44 },
 
   // shared by end-of-flow diamond
@@ -685,7 +686,7 @@ export default function FlowScreen({ navigation }: Props) {
         <View style={{ flexDirection: 'row', width: windowWidth * 2 }}>
           <View style={{ flex: 1 }} />
           {/* NO label + vertical line under diamond center */}
-          <View style={{ width: 96, alignItems: 'center', paddingTop: 28 }}>
+          <View style={{ width: 132, alignItems: 'center', paddingTop: 22 }}>
             <Text style={s.skipLabel}>NO</Text>
             <View style={s.skipVLine} />
           </View>
@@ -699,13 +700,17 @@ export default function FlowScreen({ navigation }: Props) {
                   : <View style={[s.outBoxYes, { opacity: 0.4 }]}><Text style={s.outYesText}>サブタスクを設定</Text></View>
                 }
               </TouchableOpacity>
-              <Down color={'#000'} h={14} />
+              <View style={s.hVertBottom} />
             </View>
           </View>
         </View>
 
-        {/* Return line: from stepWrap left to subtask center */}
-        <View style={[s.branchReturnLine, { alignSelf: 'flex-start', width: returnLineW }]} />
+        {/* Return line: 90-degree path from subtask center back to the main task line */}
+        <View style={{ width: windowWidth * 2, alignItems: 'flex-start' }}>
+          <View style={[s.branchReturnLine, { width: returnLineW }]} />
+        </View>
+        <View style={s.branchReturnDrop} />
+        <Down color={'#000'} h={14} />
         <View style={s.branchChronoSpace} />
       </View>
     );
