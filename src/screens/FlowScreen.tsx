@@ -76,6 +76,9 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   navRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   addBranchBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
   addBranchBtnText: { color: '#ffffff', fontSize: 15, fontWeight: '900' },
+  editPalette: { flexDirection: 'row', gap: 8, marginTop: 12 },
+  editPaletteBtn: { flex: 1, backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: 12, paddingVertical: 9, alignItems: 'center' },
+  editPaletteText: { color: '#ffffff', fontSize: 12, fontWeight: '900' },
 
   body: { flex: 1, backgroundColor: C.body },
   content: { padding: 16, paddingBottom: 60, alignItems: 'center', overflow: 'visible' },
@@ -568,6 +571,15 @@ export default function FlowScreen({ navigation }: Props) {
     setModal({ mode: 'edit', afterTaskId: br.after_task_id, editId: br.id, condition: br.question, stepText: br.yes_text ?? '', newSubtask: '' });
   };
 
+  const openAddAction = () => {
+    const existing = branches.find((b) => b.after_task_id !== null && dueIds.has(b.after_task_id));
+    if (existing) {
+      openEditBranch(existing);
+      return;
+    }
+    Alert.alert('条件を先に追加', 'アクションは条件カードにつながります。先に「条件」を追加してください。');
+  };
+
   const addModalSubtask = () => {
     setModal((m) => {
       if (!m) return m;
@@ -752,13 +764,7 @@ export default function FlowScreen({ navigation }: Props) {
 
       <LinearGradient colors={grad.header} start={GRAD_START} end={GRAD_END} style={[s.header, { paddingTop: insets.top + 12 }]}>
         <View style={s.navRow}>
-          {due.length > 0 ? (
-            <TouchableOpacity style={s.addBranchBtn} onPress={() => openAddBranch(null)}>
-              <Text style={s.addBranchBtnText}>◇</Text>
-            </TouchableOpacity>
-          ) : (
-            <View style={s.addBranchBtn} />
-          )}
+          <View style={s.addBranchBtn} />
           <TouchableOpacity style={s.navCenter} onPress={() => setSelectedDate(today)} activeOpacity={0.7}>
             <Text style={s.navDateText}>{dateLabel}</Text>
             {!isToday && <Text style={s.navTodayHint}>タップで今日へ</Text>}
@@ -771,6 +777,17 @@ export default function FlowScreen({ navigation }: Props) {
               <Text style={s.navArrow}>›</Text>
             </TouchableOpacity>
           </View>
+        </View>
+        <View style={s.editPalette}>
+          <TouchableOpacity style={s.editPaletteBtn} onPress={() => navigation.navigate('Home')}>
+            <Text style={s.editPaletteText}>タスク</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={s.editPaletteBtn} onPress={() => openAddBranch(null)} disabled={ordered.length === 0}>
+            <Text style={s.editPaletteText}>条件</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={s.editPaletteBtn} onPress={openAddAction} disabled={ordered.length === 0}>
+            <Text style={s.editPaletteText}>アクション</Text>
+          </TouchableOpacity>
         </View>
       </LinearGradient>
 
