@@ -790,7 +790,7 @@ export default function FlowScreen({ navigation }: Props) {
             <TextInput
               style={s.input}
               placeholder="例：雨が降ってたら"
-              placeholderTextColor={C.muted}
+              placeholderTextColor={C.muted + '66'}
               value={modal?.condition ?? ''}
               onChangeText={(v) => setModal((m) => m ? { ...m, condition: v } : m)}
               returnKeyType="next"
@@ -800,7 +800,7 @@ export default function FlowScreen({ navigation }: Props) {
             <TextInput
               style={s.input}
               placeholder="例：傘を持っていく"
-              placeholderTextColor={C.muted}
+              placeholderTextColor={C.muted + '66'}
               value={modal?.stepText ?? ''}
               onChangeText={(v) => setModal((m) => m ? { ...m, stepText: v } : m)}
               returnKeyType="done"
