@@ -39,10 +39,11 @@ type BranchModal = {
 function buildNodes(tasks: Task[], branches: FlowBranch[]): FlowNode[] {
   const nodes: FlowNode[] = [];
   for (let i = 0; i < tasks.length; i++) {
-    nodes.push({ type: 'task', task: tasks[i], taskIdx: i });
+    // 分岐はタスクの前に置く（条件を確認してからタスクを実行）
     branches
       .filter((b) => b.after_task_id === tasks[i].id)
       .forEach((b) => nodes.push({ type: 'branch', branch: b }));
+    nodes.push({ type: 'task', task: tasks[i], taskIdx: i });
   }
   return nodes;
 }
@@ -749,7 +750,7 @@ export default function FlowScreen({ navigation }: Props) {
             <Text style={s.sheetTitle}>{modal?.mode === 'add' ? '◇ 分岐を追加' : '◇ 分岐を編集'}</Text>
 
             {/* task picker */}
-            <Text style={s.sheetLabel}>どのステップの後に入れる？</Text>
+            <Text style={s.sheetLabel}>どのタスクの前に分岐を置く？</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.pickerScroll}>
               {ordered.map((t) => {
                 const active = modal?.afterTaskId === t.id;
