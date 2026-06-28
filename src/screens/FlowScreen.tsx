@@ -78,10 +78,15 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   addBranchBtnText: { color: '#ffffff', fontSize: 15, fontWeight: '900' },
   editPalette: { flexDirection: 'row', gap: 8, marginTop: 12 },
   editPaletteBtn: { flex: 1, backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: 12, paddingVertical: 9, alignItems: 'center' },
+  editPaletteBtnActive: { backgroundColor: 'rgba(255,255,255,0.34)' },
   editPaletteText: { color: '#ffffff', fontSize: 12, fontWeight: '900' },
 
   body: { flex: 1, backgroundColor: C.body },
   content: { padding: 16, paddingBottom: 60, alignItems: 'center', overflow: 'visible' },
+  insertSlot: { width: '92%', borderWidth: 1.5, borderStyle: 'dashed', borderColor: '#7c3aed', borderRadius: 10, backgroundColor: '#f5f3ff', paddingVertical: 10, alignItems: 'center', marginTop: 8, marginBottom: 4 },
+  insertSlotText: { color: '#5b21b6', fontSize: 12, fontWeight: '900' },
+  actionInsertSlot: { borderWidth: 1.5, borderStyle: 'dashed', borderColor: '#16a34a', borderRadius: 8, backgroundColor: '#f0fdf4', paddingHorizontal: 12, paddingVertical: 8, minWidth: 112, alignItems: 'center' },
+  actionInsertText: { color: '#166534', fontSize: 12, fontWeight: '900' },
 
   // terminators
   terminator: { backgroundColor: C.termBg, borderWidth: 1.5, borderColor: C.termBorder, borderRadius: 22, paddingHorizontal: 30, paddingVertical: 10 },
@@ -258,6 +263,7 @@ export default function FlowScreen({ navigation }: Props) {
   const [branches, setBranches] = useState<FlowBranch[]>([]);
   const [modal, setModal] = useState<BranchModal | null>(null);
   const [taskSelectVisible, setTaskSelectVisible] = useState(false);
+  const [insertMode, setInsertMode] = useState<'condition' | 'action' | null>(null);
 
   // ── task drag state ──
   const taskDragY = useRef(new Animated.Value(0)).current;
@@ -564,10 +570,12 @@ export default function FlowScreen({ navigation }: Props) {
 
   // ── branch modal helpers ──
   const openAddBranch = (_afterTaskId: number | null = null) => {
-    setModal({ mode: 'add', afterTaskId: ordered[0]?.id ?? null, editId: null, condition: '', stepText: '', newSubtask: '' });
+    setInsertMode(null);
+    setModal({ mode: 'add', afterTaskId: _afterTaskId ?? ordered[0]?.id ?? null, editId: null, condition: '', stepText: '', newSubtask: '' });
   };
 
   const openEditBranch = (br: FlowBranch) => {
+    setInsertMode(null);
     setModal({ mode: 'edit', afterTaskId: br.after_task_id, editId: br.id, condition: br.question, stepText: br.yes_text ?? '', newSubtask: '' });
   };
 
@@ -618,6 +626,20 @@ export default function FlowScreen({ navigation }: Props) {
       { text: 'キャンセル', style: 'cancel' },
       { text: '削除', style: 'destructive', onPress: async () => { await deleteTask(db, task.id); load(); } },
     ]);
+  };
+
+  const renderInsertSlot = (task: Task, index: number) => {
+    if (insertMode !== 'condition') return null;
+    return (
+      <TouchableOpacity
+        key={`slot-${task.id}`}
+        style={s.insertSlot}
+        onPress={() => openAddBranch(task.id)}
+        activeOpacity={0.8}
+      >
+        <Text style={s.insertSlotText}>{index === 0 ? '最初に条件を入れる' : 'ここに条件を入れる'}</Text>
+      </TouchableOpacity>
+    );
   };
 
   // ── render task node ──
@@ -742,6 +764,14 @@ export default function FlowScreen({ navigation }: Props) {
                   <View style={[s.outBoxYes, { opacity: 0.4 }]}><Text style={s.outYesText}>サブタスクを設定</Text></View>
                 </TouchableOpacity>
               )}
+              {insertMode === 'action' && (
+                <>
+                  <View style={s.hVertBottom} />
+                  <TouchableOpacity style={s.actionInsertSlot} onPress={() => openEditBranch(br)} activeOpacity={0.8}>
+                    <Text style={s.actionInsertText}>ここにアクション</Text>
+                  </TouchableOpacity>
+                </>
+              )}
               <View style={s.hVertBottom} />
             </View>
           </View>
@@ -782,10 +812,21 @@ export default function FlowScreen({ navigation }: Props) {
           <TouchableOpacity style={s.editPaletteBtn} onPress={() => navigation.navigate('Home')}>
             <Text style={s.editPaletteText}>タスク</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={s.editPaletteBtn} onPress={() => openAddBranch(null)} disabled={ordered.length === 0}>
+          <TouchableOpacity
+            style={[s.editPaletteBtn, insertMode === 'condition' && s.editPaletteBtnActive]}
+            onPress={() => setInsertMode((m) => m === 'condition' ? null : 'condition')}
+            disabled={ordered.length === 0}
+          >
             <Text style={s.editPaletteText}>条件</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={s.editPaletteBtn} onPress={openAddAction} disabled={ordered.length === 0}>
+          <TouchableOpacity
+            style={[s.editPaletteBtn, insertMode === 'action' && s.editPaletteBtnActive]}
+            onPress={() => {
+              if (!branches.some((b) => b.after_task_id !== null && dueIds.has(b.after_task_id))) openAddAction();
+              else setInsertMode((m) => m === 'action' ? null : 'action');
+            }}
+            disabled={ordered.length === 0}
+          >
             <Text style={s.editPaletteText}>アクション</Text>
           </TouchableOpacity>
         </View>
@@ -802,9 +843,14 @@ export default function FlowScreen({ navigation }: Props) {
             ) : (
               <>
                 <View style={s.terminator}><Text style={s.terminatorText}>開始</Text></View>
-                {flowNodes.map((node) =>
-                  node.type === 'task' ? renderTask(node) : renderBranch(node),
-                )}
+                {flowNodes.map((node) => (
+                  node.type === 'task' ? (
+                    <React.Fragment key={`task-frag-${node.task.id}`}>
+                      {renderInsertSlot(node.task, node.taskIdx)}
+                      {renderTask(node)}
+                    </React.Fragment>
+                  ) : renderBranch(node)
+                ))}
                 <Down color={allDone ? C.doneBg : C.line} />
                 <View style={[s.finDiamond, allDone && s.finDiamondDone]}>
                   <View style={s.finDiamondInner}>
