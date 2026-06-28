@@ -227,6 +227,16 @@ export default function FlowScreen({ navigation }: Props) {
   const [branches, setBranches] = useState<FlowBranch[]>([]);
   const [modal, setModal] = useState<BranchModal | null>(null);
   const [taskPickerOpen, setTaskPickerOpen] = useState(false);
+  const pickerAnim = useRef(new Animated.Value(0)).current;
+
+  const togglePicker = (open: boolean) => {
+    setTaskPickerOpen(open);
+    Animated.timing(pickerAnim, {
+      toValue: open ? 1 : 0,
+      duration: 220,
+      useNativeDriver: false,
+    }).start();
+  };
 
   // ── task drag state ──
   const taskDragY = useRef(new Animated.Value(0)).current;
@@ -533,11 +543,13 @@ export default function FlowScreen({ navigation }: Props) {
 
   // ── branch modal helpers ──
   const openAddBranch = (_afterTaskId: number | null = null) => {
+    pickerAnim.setValue(0);
     setTaskPickerOpen(false);
     setModal({ mode: 'add', afterTaskId: ordered[0]?.id ?? null, editId: null, condition: '', stepText: '', side: 'left' });
   };
 
   const openEditBranch = (br: FlowBranch) => {
+    pickerAnim.setValue(0);
     setTaskPickerOpen(false);
     setModal({ mode: 'edit', afterTaskId: br.after_task_id, editId: br.id, condition: br.question, stepText: br.yes_text ?? '', side: br.branch_side ?? 'left' });
   };
@@ -764,21 +776,27 @@ export default function FlowScreen({ navigation }: Props) {
       <Modal visible={modal !== null} transparent animationType="slide" onRequestClose={() => setModal(null)}>
         <TouchableOpacity style={s.overlay} activeOpacity={1} onPress={() => setModal(null)}>
           <TouchableOpacity activeOpacity={1} style={s.sheet} onPress={() => {}}>
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" bounces={false}>
             <Text style={s.sheetTitle}>{modal?.mode === 'add' ? '◇ 分岐を追加' : '◇ 分岐を編集'}</Text>
 
             {/* どのタスクの前に入れるか — タップで一覧を開閉 */}
-            <Text style={s.sheetLabel}>どのタスクの前に入れる？</Text>
             {(() => {
               const selected = ordered.find((t) => t.id === modal?.afterTaskId);
               return (
                 <>
-                  <TouchableOpacity style={s.taskPickerBtn} onPress={() => setTaskPickerOpen((v) => !v)}>
+                  <Text style={s.sheetLabel}>どのタスクの前に入れる？</Text>
+                  <TouchableOpacity style={s.taskPickerBtn} onPress={() => togglePicker(!taskPickerOpen)}>
                     <Text style={s.taskPickerBtnText} numberOfLines={1}>
                       {selected ? `${selected.icon ? `${selected.icon} ` : ''}${selected.title}` : 'タスクを選ぶ'}
                     </Text>
                     <Text style={s.taskPickerBtnArrow}>{taskPickerOpen ? '▲' : '▼'}</Text>
                   </TouchableOpacity>
-                  {taskPickerOpen && (
+                  <Animated.View style={{
+                    overflow: 'hidden',
+                    maxHeight: pickerAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 280] }),
+                    opacity: pickerAnim,
+                    marginTop: 4,
+                  }}>
                     <View style={s.taskPickerList}>
                       {ordered.map((t) => {
                         const active = modal?.afterTaskId === t.id;
@@ -786,7 +804,7 @@ export default function FlowScreen({ navigation }: Props) {
                           <TouchableOpacity
                             key={t.id}
                             style={[s.taskPickerRow, active && s.taskPickerRowActive]}
-                            onPress={() => { setModal((m) => m ? { ...m, afterTaskId: t.id } : m); setTaskPickerOpen(false); }}
+                            onPress={() => { setModal((m) => m ? { ...m, afterTaskId: t.id } : m); togglePicker(false); }}
                           >
                             <Text style={[s.taskPickerRadio, active && s.taskPickerRadioActive]}>{active ? '●' : '○'}</Text>
                             <Text style={[s.taskPickerText, active && s.taskPickerTextActive]} numberOfLines={1}>
@@ -796,7 +814,7 @@ export default function FlowScreen({ navigation }: Props) {
                         );
                       })}
                     </View>
-                  )}
+                  </Animated.View>
                 </>
               );
             })()}
@@ -850,6 +868,7 @@ export default function FlowScreen({ navigation }: Props) {
                 <Text style={s.deleteSheetText}>この分岐を削除</Text>
               </TouchableOpacity>
             )}
+            </ScrollView>
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
