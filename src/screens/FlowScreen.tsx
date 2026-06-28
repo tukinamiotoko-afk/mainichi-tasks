@@ -137,6 +137,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   hVertTop: { width: 2, height: 16, backgroundColor: '#000' },
   hVertBottom: { width: 2, height: 20, backgroundColor: '#000' },
   branchReturnLine: { width: '100%', height: 2, backgroundColor: '#000' },
+  branchChronoSpace: { height: 44 },
 
   // shared by end-of-flow diamond
   branchRow: { flexDirection: 'row', width: '100%', marginTop: 2 },
@@ -705,6 +706,7 @@ export default function FlowScreen({ navigation }: Props) {
 
         {/* Return line: from stepWrap left to subtask center */}
         <View style={[s.branchReturnLine, { alignSelf: 'flex-start', width: returnLineW }]} />
+        <View style={s.branchChronoSpace} />
       </View>
     );
   };
