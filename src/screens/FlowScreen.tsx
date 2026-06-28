@@ -33,6 +33,7 @@ type BranchModal = {
   editId: number | null;
   condition: string;
   stepText: string;
+  newSubtask: string;
 };
 
 function parseSubtasks(text: string | null): string[] {
@@ -181,6 +182,10 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   sheetTitle: { color: C.ink, fontSize: 16, fontWeight: '800', marginBottom: 2 },
   sheetLabel: { color: C.muted, fontSize: 11, fontWeight: '700', marginTop: 4, marginBottom: 2 },
   input: { borderWidth: 1.5, borderColor: C.grid, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: C.ink, fontSize: 14, backgroundColor: C.body },
+  subtaskAddRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
+  subtaskAddInput: { flex: 1 },
+  subtaskAddBtn: { backgroundColor: C.primary, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 11 },
+  subtaskAddText: { color: '#ffffff', fontSize: 12, fontWeight: '800' },
   // task picker button (in branch modal)
   taskPickerBtn: { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: C.grid, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 12, backgroundColor: C.body },
   taskPickerBtnText: { flex: 1, color: C.ink, fontSize: 14, fontWeight: '600' },
@@ -556,11 +561,21 @@ export default function FlowScreen({ navigation }: Props) {
 
   // ── branch modal helpers ──
   const openAddBranch = (_afterTaskId: number | null = null) => {
-    setModal({ mode: 'add', afterTaskId: ordered[0]?.id ?? null, editId: null, condition: '', stepText: '' });
+    setModal({ mode: 'add', afterTaskId: ordered[0]?.id ?? null, editId: null, condition: '', stepText: '', newSubtask: '' });
   };
 
   const openEditBranch = (br: FlowBranch) => {
-    setModal({ mode: 'edit', afterTaskId: br.after_task_id, editId: br.id, condition: br.question, stepText: br.yes_text ?? '' });
+    setModal({ mode: 'edit', afterTaskId: br.after_task_id, editId: br.id, condition: br.question, stepText: br.yes_text ?? '', newSubtask: '' });
+  };
+
+  const addModalSubtask = () => {
+    setModal((m) => {
+      if (!m) return m;
+      const next = m.newSubtask.trim();
+      if (!next) return m;
+      const current = parseSubtasks(m.stepText);
+      return { ...m, stepText: [...current, next].join('\n'), newSubtask: '' };
+    });
   };
 
   const saveBranch = async () => {
@@ -852,6 +867,21 @@ export default function FlowScreen({ navigation }: Props) {
               multiline
               returnKeyType="default"
             />
+            <Text style={s.sheetLabel}>追加するサブタスク</Text>
+            <View style={s.subtaskAddRow}>
+              <TextInput
+                style={[s.input, s.subtaskAddInput]}
+                placeholder="下につなげるサブタスク"
+                placeholderTextColor={C.muted + '66'}
+                value={modal?.newSubtask ?? ''}
+                onChangeText={(v) => setModal((m) => m ? { ...m, newSubtask: v } : m)}
+                returnKeyType="done"
+                onSubmitEditing={addModalSubtask}
+              />
+              <TouchableOpacity style={s.subtaskAddBtn} onPress={addModalSubtask}>
+                <Text style={s.subtaskAddText}>追加</Text>
+              </TouchableOpacity>
+            </View>
 
             <View style={s.actionRow}>
               <TouchableOpacity style={s.cancelBtn} onPress={() => setModal(null)}>
