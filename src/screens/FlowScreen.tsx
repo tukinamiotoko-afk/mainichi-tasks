@@ -29,11 +29,8 @@ type BranchModal = {
   mode: 'add' | 'edit';
   afterTaskId: number | null;
   editId: number | null;
-  question: string;
-  yesLabel: string;
-  yesText: string;
-  noLabel: string;
-  noText: string;
+  condition: string;
+  stepText: string;
 };
 
 function buildNodes(tasks: Task[], branches: FlowBranch[]): FlowNode[] {
@@ -110,16 +107,16 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   outBoxDone: { backgroundColor: C.doneBg, borderColor: C.doneBorder },
   outBoxNo: { backgroundColor: '#fef3c7', borderColor: '#d97706' },
   outBoxYes: { backgroundColor: '#f0fdf4', borderColor: '#86efac' },
-  outBoxCustomNo: { backgroundColor: '#faf5ff', borderColor: '#c4b5fd' },
   outText: { color: C.termText, fontSize: 13, fontWeight: '800' },
   outTextDone: { color: '#ffffff' },
   outNoText: { color: '#92400e', fontSize: 13, fontWeight: '800' },
   outYesText: { color: '#166534', fontSize: 13, fontWeight: '800' },
-  outCustomNoText: { color: '#5b21b6', fontSize: 13, fontWeight: '800' },
   mergeRailWrap: { width: '50%', alignItems: 'center', marginTop: 14 },
   mergeRail: { width: '100%', height: 2, backgroundColor: C.line },
+  // detour skip col
+  skipPassLine: { width: 2, flex: 1, backgroundColor: C.line, marginVertical: 4 },
 
-  // ── edit mode (drag list) ──
+  // ── edit mode ──
   editList: { paddingHorizontal: 12, paddingTop: 12, paddingBottom: 40 },
   editHint: { color: C.muted, fontSize: 12, textAlign: 'center', marginBottom: 10 },
   editTaskRow: {
@@ -130,7 +127,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   editTaskRowDragging: {
     shadowColor: '#000', shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.18, shadowRadius: 12, elevation: 10,
-    borderColor: C.primary, backgroundColor: C.card,
+    borderColor: C.primary,
   },
   editHandle: { fontSize: 18, color: C.muted, paddingHorizontal: 4, paddingVertical: 4 },
   editStepNo: { width: 22, height: 22, borderRadius: 4, backgroundColor: C.termBorder, alignItems: 'center', justifyContent: 'center' },
@@ -144,7 +141,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   editBranchIcon: { fontSize: 14, color: '#7c3aed' },
   editBranchBody: { flex: 1 },
   editBranchQuestion: { color: '#4c1d95', fontSize: 13, fontWeight: '800' },
-  editBranchLabels: { color: '#7c3aed', fontSize: 11, marginTop: 1 },
+  editBranchStep: { color: '#7c3aed', fontSize: 11, marginTop: 1 },
   editBranchActionBtn: { width: 28, height: 28, borderRadius: 8, backgroundColor: '#ede9fe', alignItems: 'center', justifyContent: 'center' },
   editBranchActionText: { fontSize: 13, fontWeight: '800' },
 
@@ -154,13 +151,13 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   modalTitle: { color: C.ink, fontSize: 16, fontWeight: '800', marginBottom: 2 },
   modalSection: { color: C.muted, fontSize: 11, fontWeight: '700', marginTop: 6, marginBottom: 2 },
   modalInput: { borderWidth: 1.5, borderColor: C.grid, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: C.ink, fontSize: 14, backgroundColor: C.body },
-  modalRow: { flexDirection: 'row', gap: 8 },
-  modalHalf: { flex: 1 },
   modalActions: { flexDirection: 'row', gap: 10, marginTop: 6 },
   modalCancel: { flex: 1, paddingVertical: 12, borderRadius: 10, borderWidth: 1.5, borderColor: C.grid, alignItems: 'center' },
   modalCancelText: { color: C.muted, fontSize: 14, fontWeight: '700' },
   modalOk: { flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: '#7c3aed', alignItems: 'center' },
   modalOkText: { color: '#ffffff', fontSize: 14, fontWeight: '700' },
+  modalDelete: { paddingVertical: 12, borderRadius: 10, backgroundColor: '#fef2f2', borderWidth: 1.5, borderColor: '#fca5a5', alignItems: 'center', marginTop: 2 },
+  modalDeleteText: { color: '#dc2626', fontSize: 14, fontWeight: '700' },
   pickerScroll: { marginVertical: 2 },
   pickerChip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, backgroundColor: C.body, borderWidth: 1.5, borderColor: C.border, marginRight: 8 },
   pickerChipActive: { backgroundColor: '#ede9fe', borderColor: '#7c3aed' },
@@ -199,7 +196,6 @@ export default function FlowScreen({ navigation }: Props) {
 
   editOrderedRef.current = editOrdered;
 
-  // sync shiftAnims length with editOrdered
   while (shiftAnims.current.length < editOrdered.length) {
     shiftAnims.current.push(new Animated.Value(0));
   }
@@ -320,14 +316,16 @@ export default function FlowScreen({ navigation }: Props) {
   };
 
   const openAddBranch = (afterTaskId: number | null = null) => {
-    setModal({ mode: 'add', afterTaskId, editId: null, question: '', yesLabel: 'はい', yesText: '', noLabel: 'いいえ', noText: '' });
+    setModal({ mode: 'add', afterTaskId, editId: null, condition: '', stepText: '' });
   };
 
   const openEditBranch = (branch: FlowBranch) => {
     setModal({
-      mode: 'edit', afterTaskId: branch.after_task_id, editId: branch.id,
-      question: branch.question, yesLabel: branch.yes_label, yesText: branch.yes_text ?? '',
-      noLabel: branch.no_label, noText: branch.no_text ?? '',
+      mode: 'edit',
+      afterTaskId: branch.after_task_id,
+      editId: branch.id,
+      condition: branch.question,
+      stepText: branch.yes_text ?? '',
     });
   };
 
@@ -335,11 +333,11 @@ export default function FlowScreen({ navigation }: Props) {
     if (!modal || modal.afterTaskId === null) return;
     const data: Omit<FlowBranch, 'id'> = {
       after_task_id: modal.afterTaskId,
-      question: modal.question.trim() || '確認',
-      yes_label: modal.yesLabel.trim() || 'はい',
-      yes_text: modal.yesText.trim() || null,
-      no_label: modal.noLabel.trim() || 'いいえ',
-      no_text: modal.noText.trim() || null,
+      question: modal.condition.trim() || '条件',
+      yes_label: 'する',
+      yes_text: modal.stepText.trim() || null,
+      no_label: 'スキップ',
+      no_text: null,
     };
     if (modal.mode === 'add') await addFlowBranch(db, data);
     else if (modal.editId !== null) await updateFlowBranch(db, modal.editId, data);
@@ -349,14 +347,9 @@ export default function FlowScreen({ navigation }: Props) {
 
   const removeBranch = async (id: number) => {
     await deleteFlowBranch(db, id);
+    setModal(null);
     load();
   };
-
-  const setTextField = (field: 'question' | 'yesLabel' | 'yesText' | 'noLabel' | 'noText', value: string) =>
-    setModal((m) => (m ? { ...m, [field]: value } : m));
-
-  const selectPickerTask = (id: number) =>
-    setModal((m) => (m ? { ...m, afterTaskId: id } : m));
 
   const editIds = useMemo(() => new Set(editOrdered.map((t) => t.id)), [editOrdered]);
   const editBranches = useMemo(
@@ -400,7 +393,7 @@ export default function FlowScreen({ navigation }: Props) {
       </LinearGradient>
 
       {editMode ? (
-        /* ── edit mode: drag to reorder ── */
+        /* ── edit mode ── */
         <ScrollView style={s.bodyView} contentContainerStyle={s.editList} scrollEnabled={draggingIdx === null}>
           <Text style={s.editHint}>☰ を押しながらなぞって並び替え</Text>
           {editOrdered.map((task, i) => {
@@ -431,9 +424,7 @@ export default function FlowScreen({ navigation }: Props) {
                     <Text style={s.editBranchIcon}>◇</Text>
                     <View style={s.editBranchBody}>
                       <Text style={s.editBranchQuestion}>{br.question}</Text>
-                      <Text style={s.editBranchLabels}>
-                        {br.yes_label}{br.yes_text ? `→${br.yes_text}` : ''} / {br.no_label}{br.no_text ? `→${br.no_text}` : ''}
-                      </Text>
+                      <Text style={s.editBranchStep}>{br.yes_text ? `→ ${br.yes_text}` : '追加ステップなし'}</Text>
                     </View>
                     <TouchableOpacity style={s.editBranchActionBtn} onPress={() => openEditBranch(br)}>
                       <Text style={s.editBranchActionText}>✎</Text>
@@ -477,6 +468,7 @@ export default function FlowScreen({ navigation }: Props) {
                       </View>
                     );
                   }
+                  // detour branch
                   const br = node.branch;
                   return (
                     <View key={`branch-${br.id}`} style={s.stepWrap}>
@@ -487,18 +479,24 @@ export default function FlowScreen({ navigation }: Props) {
                         </View>
                       </View>
                       <View style={s.branchRow}>
+                        {/* LEFT: do the extra step */}
                         <View style={s.branchCol}>
-                          <Text style={[s.branchLabel, { color: '#7c3aed' }]}>{br.yes_label}</Text>
+                          <Text style={[s.branchLabel, { color: '#7c3aed' }]}>する</Text>
                           <Down color={C.line} h={16} />
-                          {br.yes_text ? <View style={s.outBoxYes}><Text style={s.outYesText}>{br.yes_text}</Text></View> : null}
+                          {br.yes_text ? (
+                            <View style={s.outBoxYes}>
+                              <Text style={s.outYesText}>{br.yes_text}</Text>
+                            </View>
+                          ) : null}
                         </View>
-                        <View style={s.branchCol}>
-                          <Text style={[s.branchLabel, { color: '#a78bfa' }]}>{br.no_label}</Text>
-                          <Down color={C.line} h={16} />
-                          {br.no_text ? <View style={s.outBoxCustomNo}><Text style={s.outCustomNoText}>{br.no_text}</Text></View> : null}
+                        {/* RIGHT: skip through */}
+                        <View style={[s.branchCol, { justifyContent: 'flex-start' }]}>
+                          <Text style={[s.branchLabel, { color: C.muted }]}>スキップ</Text>
+                          <View style={s.skipPassLine} />
                         </View>
                       </View>
                       <View style={s.mergeRailWrap}><View style={s.mergeRail} /></View>
+                      <Text style={[s.branchLabel, { color: C.muted, marginTop: 4 }]}>本流に戻る</Text>
                     </View>
                   );
                 });
@@ -541,6 +539,7 @@ export default function FlowScreen({ navigation }: Props) {
           <TouchableOpacity activeOpacity={1} style={s.modalCard} onPress={() => {}}>
             <Text style={s.modalTitle}>{modal?.mode === 'add' ? '分岐を追加' : '分岐を編集'}</Text>
 
+            {/* task picker: only for add-from-header (afterTaskId is null initially) */}
             {modal?.mode === 'add' && (
               <>
                 <Text style={s.modalSection}>どのステップの後に入れる？</Text>
@@ -548,7 +547,11 @@ export default function FlowScreen({ navigation }: Props) {
                   {pickerTasks.map((t) => {
                     const active = modal.afterTaskId === t.id;
                     return (
-                      <TouchableOpacity key={t.id} style={[s.pickerChip, active && s.pickerChipActive]} onPress={() => selectPickerTask(t.id)}>
+                      <TouchableOpacity
+                        key={t.id}
+                        style={[s.pickerChip, active && s.pickerChipActive]}
+                        onPress={() => setModal((m) => m ? { ...m, afterTaskId: t.id } : m)}
+                      >
                         <Text style={active ? s.pickerChipTextActive : s.pickerChipText}>
                           {t.icon ? `${t.icon} ` : ''}{t.title}
                         </Text>
@@ -559,35 +562,25 @@ export default function FlowScreen({ navigation }: Props) {
               </>
             )}
 
-            <Text style={s.modalSection}>◇ 条件（ひし形のテキスト）</Text>
+            <Text style={s.modalSection}>◇ 条件（いつ分岐する？）</Text>
             <TextInput
               style={s.modalInput}
-              placeholder="例：全部完了？"
+              placeholder="例：雨が降ってたら"
               placeholderTextColor={C.muted}
-              value={modal?.question ?? ''}
-              onChangeText={(v) => setTextField('question', v)}
+              value={modal?.condition ?? ''}
+              onChangeText={(v) => setModal((m) => m ? { ...m, condition: v } : m)}
               returnKeyType="next"
             />
 
-            <Text style={s.modalSection}>はい側</Text>
-            <View style={s.modalRow}>
-              <View style={s.modalHalf}>
-                <TextInput style={s.modalInput} placeholder="ラベル" placeholderTextColor={C.muted} value={modal?.yesLabel ?? ''} onChangeText={(v) => setTextField('yesLabel', v)} />
-              </View>
-              <View style={s.modalHalf}>
-                <TextInput style={s.modalInput} placeholder="テキスト（任意）" placeholderTextColor={C.muted} value={modal?.yesText ?? ''} onChangeText={(v) => setTextField('yesText', v)} />
-              </View>
-            </View>
-
-            <Text style={s.modalSection}>いいえ側</Text>
-            <View style={s.modalRow}>
-              <View style={s.modalHalf}>
-                <TextInput style={s.modalInput} placeholder="ラベル" placeholderTextColor={C.muted} value={modal?.noLabel ?? ''} onChangeText={(v) => setTextField('noLabel', v)} />
-              </View>
-              <View style={s.modalHalf}>
-                <TextInput style={s.modalInput} placeholder="テキスト（任意）" placeholderTextColor={C.muted} value={modal?.noText ?? ''} onChangeText={(v) => setTextField('noText', v)} />
-              </View>
-            </View>
+            <Text style={s.modalSection}>追加ステップ（分岐でやること）</Text>
+            <TextInput
+              style={s.modalInput}
+              placeholder="例：傘を持っていく"
+              placeholderTextColor={C.muted}
+              value={modal?.stepText ?? ''}
+              onChangeText={(v) => setModal((m) => m ? { ...m, stepText: v } : m)}
+              returnKeyType="done"
+            />
 
             <View style={s.modalActions}>
               <TouchableOpacity style={s.modalCancel} onPress={() => setModal(null)}>
@@ -601,6 +594,12 @@ export default function FlowScreen({ navigation }: Props) {
                 <Text style={s.modalOkText}>保存</Text>
               </TouchableOpacity>
             </View>
+
+            {modal?.mode === 'edit' && modal.editId !== null && (
+              <TouchableOpacity style={s.modalDelete} onPress={() => removeBranch(modal.editId!)}>
+                <Text style={s.modalDeleteText}>この分岐を削除</Text>
+              </TouchableOpacity>
+            )}
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
