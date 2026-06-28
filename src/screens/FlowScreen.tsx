@@ -128,15 +128,14 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   },
   branchDeleteBubbleText: { color: '#dc2626', fontSize: 13, fontWeight: '900', lineHeight: 16 },
 
-  // horizontal branch layout (reference-flowchart style)
-  branchMainCol: { width: 140, alignItems: 'center' },
-  branchSideCol: { flex: 1, paddingTop: 58, marginLeft: -4 },
-  skipLabel: { color: C.muted, fontSize: 12, fontWeight: '800', marginTop: 28 },
-  skipVLine: { width: 2, height: 30, backgroundColor: C.line },
+  // horizontal branch layout - reference image style
+  // diamond is centered; branch path flies out to the right beyond task-box width
+  skipLabel: { color: C.muted, fontSize: 12, fontWeight: '800', marginTop: 4 },
+  skipVLine: { width: 2, height: 28, backgroundColor: C.line },
   doLabel: { color: '#7c3aed', fontSize: 12, fontWeight: '800' },
   hLine: { width: '100%', height: 2, backgroundColor: '#7c3aed' },
-  hVertTop: { width: 2, height: 20, backgroundColor: '#7c3aed', alignSelf: 'flex-end' },
-  hVertBottom: { width: 2, height: 40, backgroundColor: C.line, alignSelf: 'flex-end' },
+  hVertTop: { width: 2, height: 16, backgroundColor: '#7c3aed' },
+  hVertBottom: { width: 2, height: 20, backgroundColor: C.line },
   branchReturnLine: { width: '100%', height: 2, backgroundColor: C.line },
 
   // shared by end-of-flow diamond
@@ -633,56 +632,65 @@ export default function FlowScreen({ navigation }: Props) {
     const branchPan = getBranchPan(br.id);
     const branchAnim = getBranchAnim(br.id);
 
+    // The diamond is centered via [flex:1 empty][diamond 96px][flex:1 marginLeft:20 branch].
+    // marginLeft:20 on the right column makes it start at the diamond's visual right tip,
+    // and since the column is flex:1, it extends to the screen right edge — beyond task boxes.
+
     return (
       <View
         key={`branch-${br.id}`}
         style={s.stepWrap}
         onLayout={(e) => { branchYsById.current.set(br.id, e.nativeEvent.layout.y); }}
       >
-        <View style={{ flexDirection: 'row', width: '100%' }}>
+        {/* Entry Down — centered by stepWrap's alignItems:center */}
+        <Down color={C.line} />
 
-          {/* LEFT: main flow — Down + diamond + スキップ path */}
-          <View style={s.branchMainCol}>
-            <Down color={C.line} />
-            <Animated.View
-              style={[s.diamondWrap, isActiveBr && { zIndex: 99 }, { transform: [{ translateY: branchAnim }] }]}
-            >
-              <View {...branchPan.panHandlers}>
-                <TouchableOpacity style={s.diamond} onPress={() => openEditBranch(br)} activeOpacity={0.75}>
-                  <View style={s.diamondInner}>
-                    <Text style={s.diamondText} numberOfLines={3}>{br.question}</Text>
-                  </View>
-                </TouchableOpacity>
-              </View>
-              <TouchableOpacity style={s.branchDeleteBubble} onPress={() => removeBranch(br.id)}>
-                <Text style={s.branchDeleteBubbleText}>×</Text>
+        {/* ROW 1: diamond centered, "する" horizontal line flies right */}
+        <View style={{ flexDirection: 'row', width: '100%' }}>
+          <View style={{ flex: 1 }} />
+          <Animated.View
+            style={[s.diamondWrap, isActiveBr && { zIndex: 99 }, { transform: [{ translateY: branchAnim }] }]}
+          >
+            <View {...branchPan.panHandlers}>
+              <TouchableOpacity style={s.diamond} onPress={() => openEditBranch(br)} activeOpacity={0.75}>
+                <View style={s.diamondInner}>
+                  <Text style={s.diamondText} numberOfLines={3}>{br.question}</Text>
+                </View>
               </TouchableOpacity>
-            </Animated.View>
+            </View>
+            <TouchableOpacity style={s.branchDeleteBubble} onPress={() => removeBranch(br.id)}>
+              <Text style={s.branchDeleteBubbleText}>×</Text>
+            </TouchableOpacity>
+          </Animated.View>
+          {/* Right: label above horizontal line, extends to screen right edge */}
+          <View style={{ flex: 1, marginLeft: 20, paddingTop: 30 }}>
+            <Text style={s.doLabel}>する</Text>
+            <View style={s.hLine} />
+          </View>
+        </View>
+
+        {/* ROW 2: skip path under diamond, right verticals + subtask on right edge */}
+        <View style={{ flexDirection: 'row', width: '100%' }}>
+          <View style={{ flex: 1 }} />
+          {/* 96px center section aligns skip path under diamond center */}
+          <View style={{ width: 96, alignItems: 'center', paddingTop: 28 }}>
             <Text style={s.skipLabel}>スキップ</Text>
             <View style={s.skipVLine} />
           </View>
-
-          {/* RIGHT: horizontal line from diamond right-tip → down → subtask → down */}
-          <View style={s.branchSideCol}>
-            {/* "する" label above the horizontal line */}
-            <Text style={s.doLabel}>する</Text>
-            {/* Horizontal line spans full right column (to right edge) */}
-            <View style={s.hLine} />
-            {/* Vertical line on right edge, down to subtask */}
+          {/* Right verticals + subtask, right-edge aligned, extends beyond task boxes */}
+          <View style={{ flex: 1, marginLeft: 20, alignItems: 'flex-end' }}>
             <View style={s.hVertTop} />
-            {/* Subtask box, right-aligned */}
-            <TouchableOpacity onPress={() => openEditBranch(br)} activeOpacity={0.75} style={{ alignSelf: 'flex-end' }}>
+            <TouchableOpacity onPress={() => openEditBranch(br)} activeOpacity={0.75}>
               {br.yes_text
                 ? <View style={s.outBoxYes}><Text style={s.outYesText}>{br.yes_text}</Text></View>
                 : <View style={[s.outBoxYes, { opacity: 0.4 }]}><Text style={s.outYesText}>サブタスクを設定</Text></View>
               }
             </TouchableOpacity>
-            {/* Vertical line on right edge, down to return line */}
             <View style={s.hVertBottom} />
           </View>
         </View>
 
-        {/* Full-width return line from right back to main flow */}
+        {/* Return line: full width, merges right path back to main flow */}
         <View style={s.branchReturnLine} />
       </View>
     );
