@@ -796,7 +796,7 @@ export default function FlowScreen({ navigation }: Props) {
               returnKeyType="next"
             />
 
-            <Text style={s.sheetLabel}>追加ステップ（分岐でやること）</Text>
+            <Text style={s.sheetLabel}>サブタスク（条件が成立したときにやること）</Text>
             <TextInput
               style={s.input}
               placeholder="例：傘を持っていく"
