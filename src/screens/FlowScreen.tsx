@@ -637,6 +637,16 @@ export default function FlowScreen({ navigation }: Props) {
     // marginLeft:20 on the right column makes it start at the diamond's visual right tip,
     // and since the column is flex:1, it extends to the screen right edge — beyond task boxes.
 
+    // Subtask positioning: left edge = task box right + 12px gap
+    // task box right in stepWrap = 0.96 * (windowWidth - 32)
+    // right section start in stepWrap (for 2x branch rows) = windowWidth / 2 + 42
+    const contentInner = windowWidth - 32;
+    const rightSecStart = windowWidth / 2 + 42;
+    const SUB_HALF = 50; // half of ~100px subtask box
+    const subtaskML = Math.max(0, Math.round(contentInner * 0.96 + 12 - rightSecStart));
+    const hLineW = subtaskML + SUB_HALF;
+    const returnLineW = Math.round(rightSecStart + subtaskML + SUB_HALF);
+
     return (
       <View
         key={`branch-${br.id}`}
@@ -646,7 +656,7 @@ export default function FlowScreen({ navigation }: Props) {
         {/* Entry Down — centered by stepWrap's alignItems:center */}
         <Down color={C.line} />
 
-        {/* ROW 1: diamond centered, YES horizontal line flies right on wide virtual canvas */}
+        {/* ROW 1: diamond centered, YES horizontal line stops at subtask center */}
         <View style={{ flexDirection: 'row', width: windowWidth * 2 }}>
           <View style={{ flex: 1 }} />
           <Animated.View
@@ -663,36 +673,38 @@ export default function FlowScreen({ navigation }: Props) {
               <Text style={s.branchDeleteBubbleText}>×</Text>
             </TouchableOpacity>
           </Animated.View>
-          {/* Right: YES label + horizontal line, overflows beyond task boxes */}
+          {/* Right: YES label + horizontal line ending at subtask center */}
           <View style={{ flex: 1, marginLeft: 20, paddingTop: 30 }}>
             <Text style={s.doLabel}>YES</Text>
-            <View style={s.hLine} />
+            <View style={[s.hLine, { width: hLineW }]} />
           </View>
         </View>
 
-        {/* ROW 2: NO path under diamond, right verticals + subtask on right edge */}
+        {/* ROW 2: NO path under diamond, subtask placed at task-right + gap */}
         <View style={{ flexDirection: 'row', width: windowWidth * 2 }}>
           <View style={{ flex: 1 }} />
-          {/* 96px center section aligns NO path under diamond center */}
+          {/* NO label + vertical line under diamond center */}
           <View style={{ width: 96, alignItems: 'center', paddingTop: 28 }}>
             <Text style={s.skipLabel}>NO</Text>
             <View style={s.skipVLine} />
           </View>
-          {/* Right verticals + subtask, right-edge aligned, extends beyond task boxes */}
-          <View style={{ flex: 1, marginLeft: 20, alignItems: 'flex-end' }}>
-            <View style={s.hVertTop} />
-            <TouchableOpacity onPress={() => openEditBranch(br)} activeOpacity={0.75}>
-              {br.yes_text
-                ? <View style={s.outBoxYes}><Text style={s.outYesText}>{br.yes_text}</Text></View>
-                : <View style={[s.outBoxYes, { opacity: 0.4 }]}><Text style={s.outYesText}>サブタスクを設定</Text></View>
-              }
-            </TouchableOpacity>
-            <View style={s.hVertBottom} />
+          {/* Subtask column: line centered on subtask box, with arrow below */}
+          <View style={{ flex: 1, marginLeft: 20 }}>
+            <View style={{ alignItems: 'center', marginLeft: subtaskML }}>
+              <View style={s.hVertTop} />
+              <TouchableOpacity onPress={() => openEditBranch(br)} activeOpacity={0.75}>
+                {br.yes_text
+                  ? <View style={s.outBoxYes}><Text style={s.outYesText}>{br.yes_text}</Text></View>
+                  : <View style={[s.outBoxYes, { opacity: 0.4 }]}><Text style={s.outYesText}>サブタスクを設定</Text></View>
+                }
+              </TouchableOpacity>
+              <Down color={'#000'} h={14} />
+            </View>
           </View>
         </View>
 
-        {/* Return line: full virtual canvas width, merges right path back to main flow */}
-        <View style={[s.branchReturnLine, { width: windowWidth * 2 }]} />
+        {/* Return line: from stepWrap left to subtask center */}
+        <View style={[s.branchReturnLine, { alignSelf: 'flex-start', width: returnLineW }]} />
       </View>
     );
   };
