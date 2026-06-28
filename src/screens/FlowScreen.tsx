@@ -752,22 +752,24 @@ export default function FlowScreen({ navigation }: Props) {
 
       <LinearGradient colors={grad.header} start={GRAD_START} end={GRAD_END} style={[s.header, { paddingTop: insets.top + 12 }]}>
         <View style={s.navRow}>
-          <TouchableOpacity style={s.navBtn} onPress={() => shiftSelected(-1)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Text style={s.navArrow}>‹</Text>
-          </TouchableOpacity>
+          {due.length > 0 ? (
+            <TouchableOpacity style={s.addBranchBtn} onPress={() => openAddBranch(null)}>
+              <Text style={s.addBranchBtnText}>◇</Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={s.addBranchBtn} />
+          )}
           <TouchableOpacity style={s.navCenter} onPress={() => setSelectedDate(today)} activeOpacity={0.7}>
             <Text style={s.navDateText}>{dateLabel}</Text>
             {!isToday && <Text style={s.navTodayHint}>タップで今日へ</Text>}
           </TouchableOpacity>
           <View style={s.navRight}>
+            <TouchableOpacity style={s.navBtn} onPress={() => shiftSelected(-1)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Text style={s.navArrow}>‹</Text>
+            </TouchableOpacity>
             <TouchableOpacity style={s.navBtn} onPress={() => shiftSelected(1)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Text style={s.navArrow}>›</Text>
             </TouchableOpacity>
-            {due.length > 0 && (
-              <TouchableOpacity style={s.addBranchBtn} onPress={() => openAddBranch(null)}>
-                <Text style={s.addBranchBtnText}>◇</Text>
-              </TouchableOpacity>
-            )}
           </View>
         </View>
       </LinearGradient>
