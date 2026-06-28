@@ -35,6 +35,13 @@ type BranchModal = {
   stepText: string;
 };
 
+function parseSubtasks(text: string | null): string[] {
+  return (text ?? '')
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+}
+
 function buildNodes(tasks: Task[], branches: FlowBranch[]): FlowNode[] {
   const nodes: FlowNode[] = [];
   for (let i = 0; i < tasks.length; i++) {
@@ -562,7 +569,7 @@ export default function FlowScreen({ navigation }: Props) {
       after_task_id: modal.afterTaskId,
       question: modal.condition.trim() || '条件',
       yes_label: 'する',
-      yes_text: modal.stepText.trim() || null,
+      yes_text: parseSubtasks(modal.stepText).join('\n') || null,
       no_label: 'スキップ',
       no_text: null,
       branch_side: 'left',
@@ -634,6 +641,8 @@ export default function FlowScreen({ navigation }: Props) {
     const isActiveBr = activeBranchDragId === br.id;
     const branchPan = getBranchPan(br.id);
     const branchAnim = getBranchAnim(br.id);
+    const subtasks = parseSubtasks(br.yes_text);
+    const subtaskSpace = 44 + Math.max(0, subtasks.length - 1) * 54;
 
     // The diamond is centered via [flex:1 empty][diamond 96px][flex:1 marginLeft:20 branch].
     // marginLeft:20 on the right column makes it start at the diamond's visual right tip,
@@ -694,12 +703,18 @@ export default function FlowScreen({ navigation }: Props) {
           <View style={{ flex: 1, marginLeft: 20 }}>
             <View style={{ alignItems: 'center', marginLeft: subtaskML }}>
               <View style={s.hVertTop} />
-              <TouchableOpacity onPress={() => openEditBranch(br)} activeOpacity={0.75}>
-                {br.yes_text
-                  ? <View style={s.outBoxYes}><Text style={s.outYesText}>{br.yes_text}</Text></View>
-                  : <View style={[s.outBoxYes, { opacity: 0.4 }]}><Text style={s.outYesText}>サブタスクを設定</Text></View>
-                }
-              </TouchableOpacity>
+              {subtasks.length > 0 ? subtasks.map((text, index) => (
+                <React.Fragment key={`${br.id}-sub-${index}`}>
+                  <TouchableOpacity onPress={() => openEditBranch(br)} activeOpacity={0.75}>
+                    <View style={s.outBoxYes}><Text style={s.outYesText}>{text}</Text></View>
+                  </TouchableOpacity>
+                  {index < subtasks.length - 1 && <View style={s.hVertBottom} />}
+                </React.Fragment>
+              )) : (
+                <TouchableOpacity onPress={() => openEditBranch(br)} activeOpacity={0.75}>
+                  <View style={[s.outBoxYes, { opacity: 0.4 }]}><Text style={s.outYesText}>サブタスクを設定</Text></View>
+                </TouchableOpacity>
+              )}
               <View style={s.hVertBottom} />
             </View>
           </View>
@@ -711,7 +726,7 @@ export default function FlowScreen({ navigation }: Props) {
         </View>
         <View style={s.branchReturnDrop} />
         <Down color={'#000'} h={14} />
-        <View style={s.branchChronoSpace} />
+        <View style={{ height: subtaskSpace }} />
       </View>
     );
   };
@@ -827,14 +842,15 @@ export default function FlowScreen({ navigation }: Props) {
               returnKeyType="next"
             />
 
-            <Text style={s.sheetLabel}>サブタスク（条件が成立したときにやること）</Text>
+            <Text style={s.sheetLabel}>サブタスク（改行で下につなげる）</Text>
             <TextInput
-              style={s.input}
-              placeholder="例：傘を持っていく"
+              style={[s.input, { minHeight: 92, textAlignVertical: 'top' }]}
+              placeholder={'例：傘を持っていく\n靴を変える\n駅まで歩く'}
               placeholderTextColor={C.muted + '66'}
               value={modal?.stepText ?? ''}
               onChangeText={(v) => setModal((m) => m ? { ...m, stepText: v } : m)}
-              returnKeyType="done"
+              multiline
+              returnKeyType="default"
             />
 
             <View style={s.actionRow}>
