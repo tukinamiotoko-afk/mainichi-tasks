@@ -120,7 +120,6 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   },
   diamondInner: { width: 140, alignItems: 'center', transform: [{ rotate: '-45deg' }] },
   diamondText: { color: '#4c1d95', fontSize: 12, fontWeight: '800', textAlign: 'center' },
-  diamondBadge: { color: '#7c3aed', fontSize: 10, fontWeight: '700', marginTop: 2 },
   branchDeleteBubble: {
     position: 'absolute', bottom: -24, left: 36,
     width: 24, height: 24, borderRadius: 12,
@@ -129,13 +128,25 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   },
   branchDeleteBubbleText: { color: '#dc2626', fontSize: 13, fontWeight: '900', lineHeight: 16 },
 
-  // branch split row
+  // horizontal branch layout
+  branchHRow: { flexDirection: 'row', width: '100%', alignItems: 'flex-start' },
+  branchMainCol: { flex: 1, alignItems: 'center' },
+  branchSideCol: { flex: 1, paddingTop: 62, paddingRight: 8, marginLeft: -8 },
+  skipLabel: { color: C.muted, fontSize: 12, fontWeight: '800', marginTop: 28 },
+  skipVLine: { width: 2, height: 44, backgroundColor: C.line },
+  hConnectorRow: { flexDirection: 'row', alignItems: 'center', height: 22 },
+  doLabel: { color: '#7c3aed', fontSize: 12, fontWeight: '800', marginRight: 6 },
+  hConnectorLine: { flex: 1, height: 2, backgroundColor: '#7c3aed' },
+  hArrowHead: { width: 0, height: 0, borderTopWidth: 5, borderBottomWidth: 5, borderLeftWidth: 8, borderTopColor: 'transparent', borderBottomColor: 'transparent', borderLeftColor: '#7c3aed' },
+  returnVLine: { width: 2, height: 28, backgroundColor: C.line },
+  branchMergeRail: { width: '100%', height: 2, backgroundColor: C.line },
+
+  // shared by end-of-flow diamond
   branchRow: { flexDirection: 'row', width: '100%', marginTop: 2 },
   branchCol: { flex: 1, alignItems: 'center' },
   branchLabel: { fontSize: 12, fontWeight: '800', marginBottom: -2 },
   outBoxYes: { backgroundColor: '#f0fdf4', borderWidth: 1.5, borderColor: '#86efac', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8, minWidth: 88, alignItems: 'center' },
   outYesText: { color: '#166534', fontSize: 13, fontWeight: '800' },
-  skipLine: { width: 2, height: 36, backgroundColor: '#cbd5e1', marginVertical: 4 },
   mergeRailWrap: { width: '50%', alignItems: 'center', marginTop: 12 },
   mergeRail: { width: '100%', height: 2, backgroundColor: C.line },
   returnLabel: { color: C.muted, fontSize: 11, fontWeight: '700', marginTop: 3 },
@@ -620,26 +631,9 @@ export default function FlowScreen({ navigation }: Props) {
   // ── render branch stamp ──
   const renderBranch = (node: Extract<FlowNode, { type: 'branch' }>) => {
     const { branch: br } = node;
-    const side = br.branch_side ?? 'left';
     const isActiveBr = activeBranchDragId === br.id;
     const branchPan = getBranchPan(br.id);
     const branchAnim = getBranchAnim(br.id);
-
-    const doCol = (
-      <View style={s.branchCol}>
-        <Text style={[s.branchLabel, { color: '#7c3aed' }]}>する</Text>
-        <Down color={C.line} h={16} />
-        {br.yes_text
-          ? <View style={s.outBoxYes}><Text style={s.outYesText}>{br.yes_text}</Text></View>
-          : null}
-      </View>
-    );
-    const skipCol = (
-      <View style={[s.branchCol, { justifyContent: 'flex-start' }]}>
-        <Text style={[s.branchLabel, { color: C.muted }]}>スキップ</Text>
-        <View style={s.skipLine} />
-      </View>
-    );
 
     return (
       <View
@@ -647,39 +641,48 @@ export default function FlowScreen({ navigation }: Props) {
         style={s.stepWrap}
         onLayout={(e) => { branchYsById.current.set(br.id, e.nativeEvent.layout.y); }}
       >
-        <Down color={C.line} />
-        <Animated.View
-          style={[
-            s.diamondWrap,
-            isActiveBr && { zIndex: 99 },
-            { transform: [{ translateY: branchAnim }] },
-          ]}
-        >
-          {/* drag handle on diamond */}
-          <View {...branchPan.panHandlers}>
-            <TouchableOpacity style={s.diamond} onPress={() => openEditBranch(br)} activeOpacity={0.75}>
-              <View style={s.diamondInner}>
-                <Text style={s.diamondText} numberOfLines={3}>{br.question}</Text>
-                <Text style={s.diamondBadge}>{side === 'left' ? '← する' : 'する →'}</Text>
+        <View style={s.branchHRow}>
+          {/* LEFT: main flow — entry connector + diamond + skip path down */}
+          <View style={s.branchMainCol}>
+            <Down color={C.line} />
+            <Animated.View
+              style={[s.diamondWrap, isActiveBr && { zIndex: 99 }, { transform: [{ translateY: branchAnim }] }]}
+            >
+              <View {...branchPan.panHandlers}>
+                <TouchableOpacity style={s.diamond} onPress={() => openEditBranch(br)} activeOpacity={0.75}>
+                  <View style={s.diamondInner}>
+                    <Text style={s.diamondText} numberOfLines={3}>{br.question}</Text>
+                  </View>
+                </TouchableOpacity>
               </View>
-            </TouchableOpacity>
+              <TouchableOpacity style={s.branchDeleteBubble} onPress={() => removeBranch(br.id)}>
+                <Text style={s.branchDeleteBubbleText}>×</Text>
+              </TouchableOpacity>
+            </Animated.View>
+            <Text style={s.skipLabel}>スキップ</Text>
+            <View style={s.skipVLine} />
           </View>
-          {/* delete bubble */}
-          <TouchableOpacity style={s.branchDeleteBubble} onPress={() => removeBranch(br.id)}>
-            <Text style={s.branchDeleteBubbleText}>×</Text>
-          </TouchableOpacity>
-        </Animated.View>
 
-        {/* branch split: tap row to edit */}
-        <TouchableOpacity style={s.branchRow} onPress={() => openEditBranch(br)} activeOpacity={0.7}>
-          {side === 'left' ? doCol : skipCol}
-          {side === 'left' ? skipCol : doCol}
-        </TouchableOpacity>
+          {/* RIGHT: "する" path flying horizontally to subtask box */}
+          <View style={s.branchSideCol}>
+            <View style={s.hConnectorRow}>
+              <Text style={s.doLabel}>する</Text>
+              <View style={s.hConnectorLine} />
+              <View style={s.hArrowHead} />
+            </View>
+            <Down color="#7c3aed" h={10} />
+            <TouchableOpacity onPress={() => openEditBranch(br)} activeOpacity={0.75}>
+              {br.yes_text
+                ? <View style={s.outBoxYes}><Text style={s.outYesText}>{br.yes_text}</Text></View>
+                : <View style={[s.outBoxYes, { opacity: 0.4 }]}><Text style={s.outYesText}>サブタスクを設定</Text></View>
+              }
+            </TouchableOpacity>
+            <View style={s.returnVLine} />
+          </View>
+        </View>
 
-        {/* merge rail: tap to edit */}
-        <TouchableOpacity style={s.mergeRailWrap} onPress={() => openEditBranch(br)} activeOpacity={0.7}>
-          <View style={s.mergeRail} />
-        </TouchableOpacity>
+        {/* Merge rail */}
+        <View style={s.branchMergeRail} />
         <Text style={s.returnLabel}>本流に戻る</Text>
       </View>
     );
