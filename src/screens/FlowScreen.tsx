@@ -165,6 +165,15 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   sheetTitle: { color: C.ink, fontSize: 16, fontWeight: '800', marginBottom: 2 },
   sheetLabel: { color: C.muted, fontSize: 11, fontWeight: '700', marginTop: 4, marginBottom: 2 },
   input: { borderWidth: 1.5, borderColor: C.grid, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: C.ink, fontSize: 14, backgroundColor: C.body },
+  // task picker list
+  taskPickerList: { borderWidth: 1.5, borderColor: C.grid, borderRadius: 10, overflow: 'hidden', marginBottom: 2 },
+  taskPickerRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 11, gap: 10, borderBottomWidth: 1, borderBottomColor: C.grid },
+  taskPickerRowActive: { backgroundColor: '#ede9fe' },
+  taskPickerRadio: { color: C.muted, fontSize: 14 },
+  taskPickerRadioActive: { color: '#7c3aed' },
+  taskPickerText: { flex: 1, color: C.ink, fontSize: 13, fontWeight: '600' },
+  taskPickerTextActive: { color: '#4c1d95', fontWeight: '700' },
+
   // side toggle
   sideRow: { flexDirection: 'row', gap: 8 },
   sideBtn: { flex: 1, paddingVertical: 10, borderRadius: 10, borderWidth: 1.5, borderColor: C.border, alignItems: 'center' },
@@ -748,6 +757,26 @@ export default function FlowScreen({ navigation }: Props) {
         <TouchableOpacity style={s.overlay} activeOpacity={1} onPress={() => setModal(null)}>
           <TouchableOpacity activeOpacity={1} style={s.sheet} onPress={() => {}}>
             <Text style={s.sheetTitle}>{modal?.mode === 'add' ? '◇ 分岐を追加' : '◇ 分岐を編集'}</Text>
+
+            {/* どのタスクの前に入れるか — 縦リストで順番を見ながら選ぶ */}
+            <Text style={s.sheetLabel}>どのタスクの前に入れる？</Text>
+            <View style={s.taskPickerList}>
+              {ordered.map((t) => {
+                const active = modal?.afterTaskId === t.id;
+                return (
+                  <TouchableOpacity
+                    key={t.id}
+                    style={[s.taskPickerRow, active && s.taskPickerRowActive]}
+                    onPress={() => setModal((m) => m ? { ...m, afterTaskId: t.id } : m)}
+                  >
+                    <Text style={[s.taskPickerRadio, active && s.taskPickerRadioActive]}>{active ? '●' : '○'}</Text>
+                    <Text style={[s.taskPickerText, active && s.taskPickerTextActive]} numberOfLines={1}>
+                      {t.icon ? `${t.icon} ` : ''}{t.title}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
 
             <Text style={s.sheetLabel}>◇ 条件（何をチェックする？）</Text>
             <TextInput
