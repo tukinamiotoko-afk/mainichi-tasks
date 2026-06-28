@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, StatusBar,
-  Modal, TextInput, Animated, PanResponder, Alert,
+  Modal, TextInput, Animated, PanResponder, Alert, useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSQLiteContext } from 'expo-sqlite';
@@ -130,13 +130,13 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
 
   // horizontal branch layout - reference image style
   // diamond is centered; branch path flies out to the right beyond task-box width
-  skipLabel: { color: C.muted, fontSize: 12, fontWeight: '800', marginTop: 4 },
-  skipVLine: { width: 2, height: 28, backgroundColor: C.line },
-  doLabel: { color: '#7c3aed', fontSize: 12, fontWeight: '800' },
-  hLine: { width: '100%', height: 2, backgroundColor: '#7c3aed' },
-  hVertTop: { width: 2, height: 16, backgroundColor: '#7c3aed' },
-  hVertBottom: { width: 2, height: 20, backgroundColor: C.line },
-  branchReturnLine: { width: '100%', height: 2, backgroundColor: C.line },
+  skipLabel: { color: '#000', fontSize: 12, fontWeight: '800', marginTop: 4 },
+  skipVLine: { width: 2, height: 28, backgroundColor: '#000' },
+  doLabel: { color: '#000', fontSize: 12, fontWeight: '800' },
+  hLine: { width: '100%', height: 2, backgroundColor: '#000' },
+  hVertTop: { width: 2, height: 16, backgroundColor: '#000' },
+  hVertBottom: { width: 2, height: 20, backgroundColor: '#000' },
+  branchReturnLine: { width: '100%', height: 2, backgroundColor: '#000' },
 
   // shared by end-of-flow diamond
   branchRow: { flexDirection: 'row', width: '100%', marginTop: 2 },
@@ -231,6 +231,7 @@ export default function FlowScreen({ navigation }: Props) {
   const db = useSQLiteContext();
   const insets = useSafeAreaInsets();
   const { C, grad } = useTheme();
+  const { width: windowWidth } = useWindowDimensions();
   const s = useMemo(() => makeStyles(C), [C]);
   const today = getToday();
 
@@ -645,8 +646,8 @@ export default function FlowScreen({ navigation }: Props) {
         {/* Entry Down — centered by stepWrap's alignItems:center */}
         <Down color={C.line} />
 
-        {/* ROW 1: diamond centered, "する" horizontal line flies right */}
-        <View style={{ flexDirection: 'row', width: '100%' }}>
+        {/* ROW 1: diamond centered, YES horizontal line flies right beyond task-box width */}
+        <View style={{ flexDirection: 'row', width: windowWidth - 16 }}>
           <View style={{ flex: 1 }} />
           <Animated.View
             style={[s.diamondWrap, isActiveBr && { zIndex: 99 }, { transform: [{ translateY: branchAnim }] }]}
@@ -662,19 +663,19 @@ export default function FlowScreen({ navigation }: Props) {
               <Text style={s.branchDeleteBubbleText}>×</Text>
             </TouchableOpacity>
           </Animated.View>
-          {/* Right: label above horizontal line, extends to screen right edge */}
+          {/* Right: YES label + horizontal line, overflows beyond task boxes */}
           <View style={{ flex: 1, marginLeft: 20, paddingTop: 30 }}>
-            <Text style={s.doLabel}>する</Text>
+            <Text style={s.doLabel}>YES</Text>
             <View style={s.hLine} />
           </View>
         </View>
 
-        {/* ROW 2: skip path under diamond, right verticals + subtask on right edge */}
-        <View style={{ flexDirection: 'row', width: '100%' }}>
+        {/* ROW 2: NO path under diamond, right verticals + subtask on right edge */}
+        <View style={{ flexDirection: 'row', width: windowWidth - 16 }}>
           <View style={{ flex: 1 }} />
-          {/* 96px center section aligns skip path under diamond center */}
+          {/* 96px center section aligns NO path under diamond center */}
           <View style={{ width: 96, alignItems: 'center', paddingTop: 28 }}>
-            <Text style={s.skipLabel}>スキップ</Text>
+            <Text style={s.skipLabel}>NO</Text>
             <View style={s.skipVLine} />
           </View>
           {/* Right verticals + subtask, right-edge aligned, extends beyond task boxes */}
@@ -691,7 +692,7 @@ export default function FlowScreen({ navigation }: Props) {
         </View>
 
         {/* Return line: full width, merges right path back to main flow */}
-        <View style={s.branchReturnLine} />
+        <View style={[s.branchReturnLine, { width: windowWidth - 16 }]} />
       </View>
     );
   };
