@@ -1,5 +1,8 @@
-import React, { useState, useCallback, useMemo } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, StatusBar, Modal, TextInput } from 'react-native';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
+import {
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, StatusBar,
+  Modal, TextInput, Animated, PanResponder,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useFocusEffect } from '@react-navigation/native';
@@ -73,6 +76,8 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   editBtnActive: { backgroundColor: '#ffffff' },
   editBtnText: { color: '#ffffff', fontSize: 13, fontWeight: '800' },
   editBtnTextActive: { color: C.primary },
+  branchHeaderBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
+  branchHeaderBtnText: { color: '#ffffff', fontSize: 16, fontWeight: '900', marginTop: -1 },
 
   bodyView: { flex: 1, backgroundColor: C.body },
 
@@ -114,26 +119,34 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   mergeRailWrap: { width: '50%', alignItems: 'center', marginTop: 14 },
   mergeRail: { width: '100%', height: 2, backgroundColor: C.line },
 
-  // ── edit mode ──
-  editList: { paddingHorizontal: 12, paddingTop: 12, paddingBottom: 40, gap: 0 },
+  // ── edit mode (drag list) ──
+  editList: { paddingHorizontal: 12, paddingTop: 12, paddingBottom: 40 },
   editHint: { color: C.muted, fontSize: 12, textAlign: 'center', marginBottom: 10 },
-  editTaskRow: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: C.card, borderRadius: 10, borderWidth: 1, borderColor: C.border, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 6 },
-  editHandle: { fontSize: 16, color: C.muted },
+  editTaskRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: C.card, borderRadius: 10, borderWidth: 1, borderColor: C.border,
+    paddingHorizontal: 12, paddingVertical: 10, marginBottom: 6,
+  },
+  editTaskRowDragging: {
+    shadowColor: '#000', shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18, shadowRadius: 12, elevation: 10,
+    borderColor: C.primary, backgroundColor: C.card,
+  },
+  editHandle: { fontSize: 18, color: C.muted, paddingHorizontal: 4, paddingVertical: 4 },
   editStepNo: { width: 22, height: 22, borderRadius: 4, backgroundColor: C.termBorder, alignItems: 'center', justifyContent: 'center' },
   editStepNoText: { color: '#ffffff', fontSize: 12, fontWeight: '800' },
   editTaskTitle: { flex: 1, color: C.ink, fontSize: 13, fontWeight: '700' },
-  editArrowBtn: { width: 30, height: 30, borderRadius: 8, backgroundColor: C.primarySoft, alignItems: 'center', justifyContent: 'center' },
-  editArrowText: { color: C.primary, fontSize: 16, fontWeight: '900' },
-  editArrowDisabled: { opacity: 0.25 },
-  editBranchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#faf5ff', borderRadius: 10, borderWidth: 1, borderColor: '#c4b5fd', paddingHorizontal: 12, paddingVertical: 9, marginBottom: 4, marginLeft: 20 },
+  editBranchRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: '#faf5ff', borderRadius: 10, borderWidth: 1, borderColor: '#c4b5fd',
+    paddingHorizontal: 12, paddingVertical: 9, marginBottom: 4, marginLeft: 20,
+  },
   editBranchIcon: { fontSize: 14, color: '#7c3aed' },
   editBranchBody: { flex: 1 },
   editBranchQuestion: { color: '#4c1d95', fontSize: 13, fontWeight: '800' },
   editBranchLabels: { color: '#7c3aed', fontSize: 11, marginTop: 1 },
   editBranchActionBtn: { width: 28, height: 28, borderRadius: 8, backgroundColor: '#ede9fe', alignItems: 'center', justifyContent: 'center' },
   editBranchActionText: { fontSize: 13, fontWeight: '800' },
-  addBranchBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 6, paddingHorizontal: 12, marginLeft: 20, marginBottom: 10 },
-  addBranchText: { color: '#7c3aed', fontSize: 12, fontWeight: '700' },
 
   // ── modal ──
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
@@ -148,6 +161,11 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   modalCancelText: { color: C.muted, fontSize: 14, fontWeight: '700' },
   modalOk: { flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: '#7c3aed', alignItems: 'center' },
   modalOkText: { color: '#ffffff', fontSize: 14, fontWeight: '700' },
+  pickerScroll: { marginVertical: 2 },
+  pickerChip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, backgroundColor: C.body, borderWidth: 1.5, borderColor: C.border, marginRight: 8 },
+  pickerChipActive: { backgroundColor: '#ede9fe', borderColor: '#7c3aed' },
+  pickerChipText: { color: C.muted, fontSize: 12, fontWeight: '700' },
+  pickerChipTextActive: { color: '#4c1d95', fontSize: 12, fontWeight: '700' },
 
   empty: { paddingVertical: 60, alignItems: 'center', gap: 8 },
   emptyTitle: { color: C.ink, fontSize: 16, fontWeight: '700' },
@@ -168,6 +186,81 @@ export default function FlowScreen({ navigation }: Props) {
   const [editMode, setEditMode] = useState(false);
   const [editOrdered, setEditOrdered] = useState<Task[]>([]);
   const [modal, setModal] = useState<BranchModal | null>(null);
+
+  // ── drag state ──
+  const dragY = useRef(new Animated.Value(0)).current;
+  const [draggingIdx, setDraggingIdx] = useState<number | null>(null);
+  const draggingIdxRef = useRef<number | null>(null);
+  const dropRef = useRef(0);
+  const slotH = useRef(56);
+  const shiftAnims = useRef<Animated.Value[]>([]);
+  const editOrderedRef = useRef<Task[]>([]);
+  const panMap = useRef<Map<number, ReturnType<typeof PanResponder.create>>>(new Map());
+
+  editOrderedRef.current = editOrdered;
+
+  // sync shiftAnims length with editOrdered
+  while (shiftAnims.current.length < editOrdered.length) {
+    shiftAnims.current.push(new Animated.Value(0));
+  }
+  if (shiftAnims.current.length > editOrdered.length) {
+    shiftAnims.current = shiftAnims.current.slice(0, editOrdered.length);
+  }
+
+  const getPan = (taskId: number) => {
+    if (!panMap.current.has(taskId)) {
+      panMap.current.set(taskId, PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: (_, { dy }) => Math.abs(dy) > 3,
+        onPanResponderGrant: () => {
+          const idx = editOrderedRef.current.findIndex((t) => t.id === taskId);
+          draggingIdxRef.current = idx;
+          dropRef.current = idx;
+          dragY.setValue(0);
+          shiftAnims.current.forEach((a) => a.setValue(0));
+          setDraggingIdx(idx);
+        },
+        onPanResponderMove: (_, { dy }) => {
+          const startIdx = draggingIdxRef.current ?? 0;
+          dragY.setValue(dy);
+          const slot = slotH.current;
+          const n = editOrderedRef.current.length;
+          const drop = Math.max(0, Math.min(n - 1, startIdx + Math.round(dy / slot)));
+          dropRef.current = drop;
+          shiftAnims.current.forEach((anim, i) => {
+            if (i === startIdx) return;
+            let shift = 0;
+            if (drop > startIdx && i > startIdx && i <= drop) shift = -slot;
+            else if (drop < startIdx && i < startIdx && i >= drop) shift = slot;
+            anim.setValue(shift);
+          });
+        },
+        onPanResponderRelease: () => {
+          const from = draggingIdxRef.current ?? 0;
+          const to = dropRef.current;
+          shiftAnims.current.forEach((a) => a.setValue(0));
+          dragY.setValue(0);
+          draggingIdxRef.current = null;
+          setDraggingIdx(null);
+          if (from !== to) {
+            setEditOrdered((prev) => {
+              const arr = [...prev];
+              const [item] = arr.splice(from, 1);
+              arr.splice(to, 0, item);
+              return arr;
+            });
+          }
+        },
+        onPanResponderTerminate: () => {
+          shiftAnims.current.forEach((a) => a.setValue(0));
+          dragY.setValue(0);
+          draggingIdxRef.current = null;
+          setDraggingIdx(null);
+        },
+      }));
+    }
+    return panMap.current.get(taskId)!;
+  };
 
   const isToday = selectedDate === today;
   const selDateObj = useMemo(() => new Date(`${selectedDate}T00:00:00`), [selectedDate]);
@@ -226,17 +319,7 @@ export default function FlowScreen({ navigation }: Props) {
     load();
   };
 
-  const moveStep = (idx: number, dir: -1 | 1) => {
-    const next = idx + dir;
-    if (next < 0 || next >= editOrdered.length) return;
-    setEditOrdered((prev) => {
-      const arr = [...prev];
-      [arr[idx], arr[next]] = [arr[next], arr[idx]];
-      return arr;
-    });
-  };
-
-  const openAddBranch = (afterTaskId: number) => {
+  const openAddBranch = (afterTaskId: number | null = null) => {
     setModal({ mode: 'add', afterTaskId, editId: null, question: '', yesLabel: 'はい', yesText: '', noLabel: 'いいえ', noText: '' });
   };
 
@@ -249,7 +332,7 @@ export default function FlowScreen({ navigation }: Props) {
   };
 
   const saveBranch = async () => {
-    if (!modal) return;
+    if (!modal || modal.afterTaskId === null) return;
     const data: Omit<FlowBranch, 'id'> = {
       after_task_id: modal.afterTaskId,
       question: modal.question.trim() || '確認',
@@ -269,15 +352,19 @@ export default function FlowScreen({ navigation }: Props) {
     load();
   };
 
-  const setField = (field: keyof BranchModal, value: string) =>
+  const setTextField = (field: 'question' | 'yesLabel' | 'yesText' | 'noLabel' | 'noText', value: string) =>
     setModal((m) => (m ? { ...m, [field]: value } : m));
 
-  // Branches visible in edit mode (only for today's due tasks)
+  const selectPickerTask = (id: number) =>
+    setModal((m) => (m ? { ...m, afterTaskId: id } : m));
+
   const editIds = useMemo(() => new Set(editOrdered.map((t) => t.id)), [editOrdered]);
   const editBranches = useMemo(
     () => branches.filter((b) => b.after_task_id !== null && editIds.has(b.after_task_id!)),
     [branches, editIds],
   );
+
+  const pickerTasks = editMode ? editOrdered : ordered;
 
   let taskCounter = 0;
 
@@ -299,36 +386,46 @@ export default function FlowScreen({ navigation }: Props) {
               <Text style={[s.dateNavArrow, editMode && { opacity: 0.3 }]}>›</Text>
             </TouchableOpacity>
             {due.length > 0 && (
-              <TouchableOpacity style={[s.editBtn, editMode && s.editBtnActive]} onPress={editMode ? exitEdit : enterEdit}>
-                <Text style={[s.editBtnText, editMode && s.editBtnTextActive]}>{editMode ? '完了' : '編集'}</Text>
-              </TouchableOpacity>
+              <>
+                <TouchableOpacity style={s.branchHeaderBtn} onPress={() => openAddBranch(null)}>
+                  <Text style={s.branchHeaderBtnText}>◇</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[s.editBtn, editMode && s.editBtnActive]} onPress={editMode ? exitEdit : enterEdit}>
+                  <Text style={[s.editBtnText, editMode && s.editBtnTextActive]}>{editMode ? '完了' : '編集'}</Text>
+                </TouchableOpacity>
+              </>
             )}
           </View>
         </View>
       </LinearGradient>
 
       {editMode ? (
-        /* ── edit mode ── */
-        <ScrollView style={s.bodyView} contentContainerStyle={s.editList}>
-          <Text style={s.editHint}>↑↓ でステップ順変更 / ◇ で分岐追加</Text>
+        /* ── edit mode: drag to reorder ── */
+        <ScrollView style={s.bodyView} contentContainerStyle={s.editList} scrollEnabled={draggingIdx === null}>
+          <Text style={s.editHint}>☰ を押しながらなぞって並び替え</Text>
           {editOrdered.map((task, i) => {
             taskCounter += 1;
+            const isDragging = draggingIdx === i;
             const taskBranches = editBranches.filter((b) => b.after_task_id === task.id);
+            const pan = getPan(task.id);
+            const animStyle = isDragging
+              ? { transform: [{ translateY: dragY }], zIndex: 99 }
+              : { transform: [{ translateY: shiftAnims.current[i] ?? new Animated.Value(0) }] };
+
             return (
               <View key={task.id}>
-                <View style={s.editTaskRow}>
-                  <Text style={s.editHandle}>☰</Text>
+                <Animated.View
+                  style={[s.editTaskRow, isDragging && s.editTaskRowDragging, animStyle]}
+                  onLayout={i === 0 ? (e) => { slotH.current = e.nativeEvent.layout.height + 6; } : undefined}
+                >
+                  <View {...pan.panHandlers}>
+                    <Text style={s.editHandle}>☰</Text>
+                  </View>
                   <View style={s.editStepNo}><Text style={s.editStepNoText}>{taskCounter}</Text></View>
                   <Text style={s.editTaskTitle} numberOfLines={2}>
                     {task.icon ? `${task.icon} ` : ''}{task.title}{task.scheduled_time ? `  (${task.scheduled_time})` : ''}
                   </Text>
-                  <TouchableOpacity style={[s.editArrowBtn, i === 0 && s.editArrowDisabled]} onPress={() => moveStep(i, -1)} disabled={i === 0}>
-                    <Text style={s.editArrowText}>↑</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={[s.editArrowBtn, i === editOrdered.length - 1 && s.editArrowDisabled]} onPress={() => moveStep(i, 1)} disabled={i === editOrdered.length - 1}>
-                    <Text style={s.editArrowText}>↓</Text>
-                  </TouchableOpacity>
-                </View>
+                </Animated.View>
                 {taskBranches.map((br) => (
                   <View key={br.id} style={s.editBranchRow}>
                     <Text style={s.editBranchIcon}>◇</Text>
@@ -346,10 +443,6 @@ export default function FlowScreen({ navigation }: Props) {
                     </TouchableOpacity>
                   </View>
                 ))}
-                <TouchableOpacity style={s.addBranchBtn} onPress={() => openAddBranch(task.id)}>
-                  <Text style={{ color: '#7c3aed', fontSize: 14 }}>◇</Text>
-                  <Text style={s.addBranchText}>分岐を追加</Text>
-                </TouchableOpacity>
               </View>
             );
           })}
@@ -384,7 +477,6 @@ export default function FlowScreen({ navigation }: Props) {
                       </View>
                     );
                   }
-                  // branch node
                   const br = node.branch;
                   return (
                     <View key={`branch-${br.id}`} style={s.stepWrap}>
@@ -398,16 +490,12 @@ export default function FlowScreen({ navigation }: Props) {
                         <View style={s.branchCol}>
                           <Text style={[s.branchLabel, { color: '#7c3aed' }]}>{br.yes_label}</Text>
                           <Down color={C.line} h={16} />
-                          {br.yes_text ? (
-                            <View style={s.outBoxYes}><Text style={s.outYesText}>{br.yes_text}</Text></View>
-                          ) : null}
+                          {br.yes_text ? <View style={s.outBoxYes}><Text style={s.outYesText}>{br.yes_text}</Text></View> : null}
                         </View>
                         <View style={s.branchCol}>
                           <Text style={[s.branchLabel, { color: '#a78bfa' }]}>{br.no_label}</Text>
                           <Down color={C.line} h={16} />
-                          {br.no_text ? (
-                            <View style={s.outBoxCustomNo}><Text style={s.outCustomNoText}>{br.no_text}</Text></View>
-                          ) : null}
+                          {br.no_text ? <View style={s.outBoxCustomNo}><Text style={s.outCustomNoText}>{br.no_text}</Text></View> : null}
                         </View>
                       </View>
                       <View style={s.mergeRailWrap}><View style={s.mergeRail} /></View>
@@ -447,11 +535,29 @@ export default function FlowScreen({ navigation }: Props) {
         </ScrollView>
       )}
 
-      {/* ── branch edit modal ── */}
+      {/* ── branch modal ── */}
       <Modal visible={modal !== null} transparent animationType="slide" onRequestClose={() => setModal(null)}>
         <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setModal(null)}>
           <TouchableOpacity activeOpacity={1} style={s.modalCard} onPress={() => {}}>
             <Text style={s.modalTitle}>{modal?.mode === 'add' ? '分岐を追加' : '分岐を編集'}</Text>
+
+            {modal?.mode === 'add' && (
+              <>
+                <Text style={s.modalSection}>どのステップの後に入れる？</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.pickerScroll}>
+                  {pickerTasks.map((t) => {
+                    const active = modal.afterTaskId === t.id;
+                    return (
+                      <TouchableOpacity key={t.id} style={[s.pickerChip, active && s.pickerChipActive]} onPress={() => selectPickerTask(t.id)}>
+                        <Text style={active ? s.pickerChipTextActive : s.pickerChipText}>
+                          {t.icon ? `${t.icon} ` : ''}{t.title}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </>
+            )}
 
             <Text style={s.modalSection}>◇ 条件（ひし形のテキスト）</Text>
             <TextInput
@@ -459,27 +565,27 @@ export default function FlowScreen({ navigation }: Props) {
               placeholder="例：全部完了？"
               placeholderTextColor={C.muted}
               value={modal?.question ?? ''}
-              onChangeText={(v) => setField('question', v)}
+              onChangeText={(v) => setTextField('question', v)}
               returnKeyType="next"
             />
 
             <Text style={s.modalSection}>はい側</Text>
             <View style={s.modalRow}>
               <View style={s.modalHalf}>
-                <TextInput style={s.modalInput} placeholder="ラベル" placeholderTextColor={C.muted} value={modal?.yesLabel ?? ''} onChangeText={(v) => setField('yesLabel', v)} />
+                <TextInput style={s.modalInput} placeholder="ラベル" placeholderTextColor={C.muted} value={modal?.yesLabel ?? ''} onChangeText={(v) => setTextField('yesLabel', v)} />
               </View>
               <View style={s.modalHalf}>
-                <TextInput style={s.modalInput} placeholder="テキスト（任意）" placeholderTextColor={C.muted} value={modal?.yesText ?? ''} onChangeText={(v) => setField('yesText', v)} />
+                <TextInput style={s.modalInput} placeholder="テキスト（任意）" placeholderTextColor={C.muted} value={modal?.yesText ?? ''} onChangeText={(v) => setTextField('yesText', v)} />
               </View>
             </View>
 
             <Text style={s.modalSection}>いいえ側</Text>
             <View style={s.modalRow}>
               <View style={s.modalHalf}>
-                <TextInput style={s.modalInput} placeholder="ラベル" placeholderTextColor={C.muted} value={modal?.noLabel ?? ''} onChangeText={(v) => setField('noLabel', v)} />
+                <TextInput style={s.modalInput} placeholder="ラベル" placeholderTextColor={C.muted} value={modal?.noLabel ?? ''} onChangeText={(v) => setTextField('noLabel', v)} />
               </View>
               <View style={s.modalHalf}>
-                <TextInput style={s.modalInput} placeholder="テキスト（任意）" placeholderTextColor={C.muted} value={modal?.noText ?? ''} onChangeText={(v) => setField('noText', v)} />
+                <TextInput style={s.modalInput} placeholder="テキスト（任意）" placeholderTextColor={C.muted} value={modal?.noText ?? ''} onChangeText={(v) => setTextField('noText', v)} />
               </View>
             </View>
 
@@ -487,7 +593,11 @@ export default function FlowScreen({ navigation }: Props) {
               <TouchableOpacity style={s.modalCancel} onPress={() => setModal(null)}>
                 <Text style={s.modalCancelText}>キャンセル</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={s.modalOk} onPress={saveBranch}>
+              <TouchableOpacity
+                style={[s.modalOk, modal?.afterTaskId === null && { opacity: 0.45 }]}
+                onPress={saveBranch}
+                disabled={modal?.afterTaskId === null}
+              >
                 <Text style={s.modalOkText}>保存</Text>
               </TouchableOpacity>
             </View>
