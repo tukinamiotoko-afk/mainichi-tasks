@@ -24,6 +24,7 @@ export type FlowBranch = {
   yes_text: string | null;
   no_label: string;
   no_text: string | null;
+  branch_side: 'left' | 'right';
 };
 
 export async function migrateDb(db: SQLite.SQLiteDatabase): Promise<void> {
@@ -94,6 +95,7 @@ export async function migrateDb(db: SQLite.SQLiteDatabase): Promise<void> {
   try { await db.execAsync("ALTER TABLE tasks ADD COLUMN notify_type TEXT NOT NULL DEFAULT 'push'"); } catch {}
   try { await db.execAsync('ALTER TABLE tasks ADD COLUMN freq_dates TEXT'); } catch {}
   try { await db.execAsync('ALTER TABLE tasks ADD COLUMN note TEXT'); } catch {}
+  try { await db.execAsync("ALTER TABLE flow_branches ADD COLUMN branch_side TEXT NOT NULL DEFAULT 'left'"); } catch {}
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS flow_projects (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -412,16 +414,16 @@ export async function getFlowBranches(db: SQLite.SQLiteDatabase): Promise<FlowBr
 
 export async function addFlowBranch(db: SQLite.SQLiteDatabase, b: Omit<FlowBranch, 'id'>): Promise<number> {
   const r = await db.runAsync(
-    'INSERT INTO flow_branches (after_task_id, question, yes_label, yes_text, no_label, no_text) VALUES (?, ?, ?, ?, ?, ?)',
-    [b.after_task_id, b.question, b.yes_label, b.yes_text, b.no_label, b.no_text],
+    'INSERT INTO flow_branches (after_task_id, question, yes_label, yes_text, no_label, no_text, branch_side) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [b.after_task_id, b.question, b.yes_label, b.yes_text, b.no_label, b.no_text, b.branch_side ?? 'left'],
   );
   return r.lastInsertRowId;
 }
 
 export async function updateFlowBranch(db: SQLite.SQLiteDatabase, id: number, b: Omit<FlowBranch, 'id'>): Promise<void> {
   await db.runAsync(
-    'UPDATE flow_branches SET after_task_id=?, question=?, yes_label=?, yes_text=?, no_label=?, no_text=? WHERE id=?',
-    [b.after_task_id, b.question, b.yes_label, b.yes_text, b.no_label, b.no_text, id],
+    'UPDATE flow_branches SET after_task_id=?, question=?, yes_label=?, yes_text=?, no_label=?, no_text=?, branch_side=? WHERE id=?',
+    [b.after_task_id, b.question, b.yes_label, b.yes_text, b.no_label, b.no_text, b.branch_side ?? 'left', id],
   );
 }
 
