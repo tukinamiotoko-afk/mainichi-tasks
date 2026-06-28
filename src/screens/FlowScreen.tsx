@@ -165,8 +165,11 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   sheetTitle: { color: C.ink, fontSize: 16, fontWeight: '800', marginBottom: 2 },
   sheetLabel: { color: C.muted, fontSize: 11, fontWeight: '700', marginTop: 4, marginBottom: 2 },
   input: { borderWidth: 1.5, borderColor: C.grid, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: C.ink, fontSize: 14, backgroundColor: C.body },
-  // task picker list
-  taskPickerList: { borderWidth: 1.5, borderColor: C.grid, borderRadius: 10, overflow: 'hidden', marginBottom: 2 },
+  // task picker
+  taskPickerBtn: { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: C.grid, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 11, backgroundColor: C.body },
+  taskPickerBtnText: { flex: 1, color: C.ink, fontSize: 14, fontWeight: '600' },
+  taskPickerBtnArrow: { color: C.muted, fontSize: 11, marginLeft: 8 },
+  taskPickerList: { borderWidth: 1.5, borderColor: '#7c3aed', borderRadius: 10, overflow: 'hidden', marginTop: 4 },
   taskPickerRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 11, gap: 10, borderBottomWidth: 1, borderBottomColor: C.grid },
   taskPickerRowActive: { backgroundColor: '#ede9fe' },
   taskPickerRadio: { color: C.muted, fontSize: 14 },
@@ -223,6 +226,7 @@ export default function FlowScreen({ navigation }: Props) {
   const [completedIds, setCompletedIds] = useState<Set<number>>(new Set());
   const [branches, setBranches] = useState<FlowBranch[]>([]);
   const [modal, setModal] = useState<BranchModal | null>(null);
+  const [taskPickerOpen, setTaskPickerOpen] = useState(false);
 
   // ── task drag state ──
   const taskDragY = useRef(new Animated.Value(0)).current;
@@ -528,11 +532,15 @@ export default function FlowScreen({ navigation }: Props) {
   }, []);
 
   // ── branch modal helpers ──
-  const openAddBranch = (_afterTaskId: number | null = null) =>
+  const openAddBranch = (_afterTaskId: number | null = null) => {
+    setTaskPickerOpen(false);
     setModal({ mode: 'add', afterTaskId: ordered[0]?.id ?? null, editId: null, condition: '', stepText: '', side: 'left' });
+  };
 
-  const openEditBranch = (br: FlowBranch) =>
+  const openEditBranch = (br: FlowBranch) => {
+    setTaskPickerOpen(false);
     setModal({ mode: 'edit', afterTaskId: br.after_task_id, editId: br.id, condition: br.question, stepText: br.yes_text ?? '', side: br.branch_side ?? 'left' });
+  };
 
   const saveBranch = async () => {
     if (!modal || modal.afterTaskId === null) return;
@@ -758,27 +766,42 @@ export default function FlowScreen({ navigation }: Props) {
           <TouchableOpacity activeOpacity={1} style={s.sheet} onPress={() => {}}>
             <Text style={s.sheetTitle}>{modal?.mode === 'add' ? '◇ 分岐を追加' : '◇ 分岐を編集'}</Text>
 
-            {/* どのタスクの前に入れるか — 縦リストで順番を見ながら選ぶ */}
+            {/* どのタスクの前に入れるか — タップで一覧を開閉 */}
             <Text style={s.sheetLabel}>どのタスクの前に入れる？</Text>
-            <View style={s.taskPickerList}>
-              {ordered.map((t) => {
-                const active = modal?.afterTaskId === t.id;
-                return (
-                  <TouchableOpacity
-                    key={t.id}
-                    style={[s.taskPickerRow, active && s.taskPickerRowActive]}
-                    onPress={() => setModal((m) => m ? { ...m, afterTaskId: t.id } : m)}
-                  >
-                    <Text style={[s.taskPickerRadio, active && s.taskPickerRadioActive]}>{active ? '●' : '○'}</Text>
-                    <Text style={[s.taskPickerText, active && s.taskPickerTextActive]} numberOfLines={1}>
-                      {t.icon ? `${t.icon} ` : ''}{t.title}
+            {(() => {
+              const selected = ordered.find((t) => t.id === modal?.afterTaskId);
+              return (
+                <>
+                  <TouchableOpacity style={s.taskPickerBtn} onPress={() => setTaskPickerOpen((v) => !v)}>
+                    <Text style={s.taskPickerBtnText} numberOfLines={1}>
+                      {selected ? `${selected.icon ? `${selected.icon} ` : ''}${selected.title}` : 'タスクを選ぶ'}
                     </Text>
+                    <Text style={s.taskPickerBtnArrow}>{taskPickerOpen ? '▲' : '▼'}</Text>
                   </TouchableOpacity>
-                );
-              })}
-            </View>
+                  {taskPickerOpen && (
+                    <View style={s.taskPickerList}>
+                      {ordered.map((t) => {
+                        const active = modal?.afterTaskId === t.id;
+                        return (
+                          <TouchableOpacity
+                            key={t.id}
+                            style={[s.taskPickerRow, active && s.taskPickerRowActive]}
+                            onPress={() => { setModal((m) => m ? { ...m, afterTaskId: t.id } : m); setTaskPickerOpen(false); }}
+                          >
+                            <Text style={[s.taskPickerRadio, active && s.taskPickerRadioActive]}>{active ? '●' : '○'}</Text>
+                            <Text style={[s.taskPickerText, active && s.taskPickerTextActive]} numberOfLines={1}>
+                              {t.icon ? `${t.icon} ` : ''}{t.title}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  )}
+                </>
+              );
+            })()}
 
-            <Text style={s.sheetLabel}>◇ 条件（何をチェックする？）</Text>
+            <Text style={s.sheetLabel}>分岐する条件</Text>
             <TextInput
               style={s.input}
               placeholder="例：雨が降ってたら"
