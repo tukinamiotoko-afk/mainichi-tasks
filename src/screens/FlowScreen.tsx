@@ -1,7 +1,7 @@
-import React, { useState, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, StatusBar,
-  Modal, TextInput, Animated, PanResponder,
+  Modal, TextInput, Animated, PanResponder, Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSQLiteContext } from 'expo-sqlite';
@@ -11,7 +11,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { RootStackParamList } from '../../App';
 import {
   Task, FlowBranch, getToday, getTasks, getCompletedTaskIds,
-  markComplete, markIncomplete, updateTaskSortOrders,
+  markComplete, markIncomplete, updateTaskSortOrders, deleteTask,
   getFlowBranches, addFlowBranch, updateFlowBranch, deleteFlowBranch,
 } from '../db/database';
 import { isDueToday, WEEKDAYS } from '../constants/taskMeta';
@@ -23,7 +23,9 @@ const pad = (n: number) => String(n).padStart(2, '0');
 
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'Flow'> };
 
-type FlowNode = { type: 'task'; task: Task } | { type: 'branch'; branch: FlowBranch };
+type FlowNode =
+  | { type: 'task'; task: Task; taskIdx: number }
+  | { type: 'branch'; branch: FlowBranch };
 
 type BranchModal = {
   mode: 'add' | 'edit';
@@ -31,142 +33,172 @@ type BranchModal = {
   editId: number | null;
   condition: string;
   stepText: string;
+  side: 'left' | 'right';
 };
 
 function buildNodes(tasks: Task[], branches: FlowBranch[]): FlowNode[] {
   const nodes: FlowNode[] = [];
-  for (const task of tasks) {
-    nodes.push({ type: 'task', task });
+  for (let i = 0; i < tasks.length; i++) {
+    nodes.push({ type: 'task', task: tasks[i], taskIdx: i });
     branches
-      .filter((b) => b.after_task_id === task.id)
+      .filter((b) => b.after_task_id === tasks[i].id)
       .forEach((b) => nodes.push({ type: 'branch', branch: b }));
   }
   return nodes;
 }
 
-const downStyles = StyleSheet.create({
-  down: { alignItems: 'center', justifyContent: 'center' },
-  downLine: { width: 2 },
-  arrowHead: { width: 0, height: 0, borderLeftWidth: 6, borderRightWidth: 6, borderTopWidth: 9, borderLeftColor: 'transparent', borderRightColor: 'transparent', marginTop: -1 },
-});
-
 function Down({ color = '#64748b', h = 22 }: { color?: string; h?: number }) {
   return (
-    <View style={downStyles.down} pointerEvents="none">
-      <View style={[downStyles.downLine, { height: h, backgroundColor: color }]} />
-      <View style={[downStyles.arrowHead, { borderTopColor: color }]} />
+    <View style={{ alignItems: 'center' }} pointerEvents="none">
+      <View style={{ width: 2, height: h, backgroundColor: color }} />
+      <View style={{ width: 0, height: 0, borderLeftWidth: 6, borderRightWidth: 6, borderTopWidth: 9, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: color, marginTop: -1 }} />
     </View>
   );
 }
 
 const makeStyles = (C: ColorSet) => StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: C.body },
-  headerCard: { backgroundColor: C.primary, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16 },
-  dateNavRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  dateNavBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
-  dateNavArrow: { color: '#ffffff', fontSize: 24, fontWeight: '800', marginTop: -2 },
-  dateNavCenter: { flex: 1, alignItems: 'center' },
-  dateText: { color: '#ffffff', fontSize: 15, fontWeight: '800' },
-  dateTodayHint: { color: 'rgba(255,255,255,0.75)', fontSize: 10, fontWeight: '700', marginTop: 1 },
-  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  editBtn: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.22)' },
-  editBtnActive: { backgroundColor: '#ffffff' },
-  editBtnText: { color: '#ffffff', fontSize: 13, fontWeight: '800' },
-  editBtnTextActive: { color: C.primary },
-  branchHeaderBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
-  branchHeaderBtnText: { color: '#ffffff', fontSize: 16, fontWeight: '900', marginTop: -1 },
+  header: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16 },
+  navRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  navBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
+  navArrow: { color: '#ffffff', fontSize: 24, fontWeight: '800', marginTop: -2 },
+  navCenter: { flex: 1, alignItems: 'center' },
+  navDateText: { color: '#ffffff', fontSize: 15, fontWeight: '800' },
+  navTodayHint: { color: 'rgba(255,255,255,0.75)', fontSize: 10, fontWeight: '700', marginTop: 1 },
+  navRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  addBranchBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
+  addBranchBtnText: { color: '#ffffff', fontSize: 15, fontWeight: '900' },
 
-  bodyView: { flex: 1, backgroundColor: C.body },
+  body: { flex: 1, backgroundColor: C.body },
+  content: { padding: 16, paddingBottom: 60, alignItems: 'center' },
 
-  // ── flowchart ──
-  flowContent: { padding: 16, paddingBottom: 40, alignItems: 'center' },
+  // terminators
   terminator: { backgroundColor: C.termBg, borderWidth: 1.5, borderColor: C.termBorder, borderRadius: 22, paddingHorizontal: 30, paddingVertical: 10 },
   terminatorText: { color: C.termText, fontSize: 14, fontWeight: '800', letterSpacing: 1 },
-  terminatorEndText: { color: '#ffffff' },
   terminatorDone: { backgroundColor: C.doneBg, borderColor: C.doneBorder },
+  terminatorDoneText: { color: '#ffffff' },
+
+  // task process box
   stepWrap: { alignItems: 'center', width: '100%' },
-  process: { flexDirection: 'row', alignItems: 'center', gap: 10, width: '82%', backgroundColor: C.termBg, borderWidth: 1.5, borderColor: C.termBorder, borderRadius: 4, paddingHorizontal: 12, paddingVertical: 12 },
+  process: {
+    flexDirection: 'row', alignItems: 'stretch',
+    width: '92%', backgroundColor: C.termBg,
+    borderWidth: 1.5, borderColor: C.termBorder, borderRadius: 8, overflow: 'hidden',
+  },
   processDone: { backgroundColor: C.successBg, borderColor: C.doneBorder },
-  stepNo: { width: 22, height: 22, borderRadius: 4, backgroundColor: C.termBorder, alignItems: 'center', justifyContent: 'center' },
-  stepNoDone: { backgroundColor: C.doneBg },
-  stepNoText: { color: '#ffffff', fontSize: 12, fontWeight: '800' },
+  processDragging: {
+    shadowColor: '#000', shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2, shadowRadius: 12, elevation: 12,
+    borderColor: C.primary,
+  },
+  dragHandleArea: {
+    paddingHorizontal: 10, paddingVertical: 14,
+    backgroundColor: C.primarySoft,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  dragHandleText: { color: C.primary, fontSize: 14 },
+  processContent: {
+    flex: 1, flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 10, paddingVertical: 12, gap: 8,
+  },
   processText: { flex: 1, color: C.procText, fontSize: 13, fontWeight: '700' },
   processTextDone: { color: '#166534', textDecorationLine: 'line-through' },
-  processCheck: { color: C.doneBg, fontSize: 14, fontWeight: '900' },
-  diamond: { width: 96, height: 96, borderRadius: 8, borderWidth: 1.5, borderColor: C.diaBorder, backgroundColor: C.diaBg, alignItems: 'center', justifyContent: 'center', transform: [{ rotate: '45deg' }] },
-  diamondDone: { backgroundColor: '#86efac' },
-  diamondCustom: { borderColor: '#7c3aed', backgroundColor: '#ede9fe' },
+  processCheck: { color: C.doneBg, fontSize: 16, fontWeight: '900' },
+  nodeDeleteBtn: {
+    paddingHorizontal: 10, paddingVertical: 14,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  nodeDeleteText: { color: C.muted, fontSize: 20, fontWeight: '300', lineHeight: 22 },
+
+  // branch diamond
+  diamondWrap: { alignItems: 'center', position: 'relative' },
+  diamond: {
+    width: 96, height: 96, borderRadius: 8,
+    borderWidth: 1.5, borderColor: '#7c3aed', backgroundColor: '#ede9fe',
+    alignItems: 'center', justifyContent: 'center',
+    transform: [{ rotate: '45deg' }],
+  },
   diamondInner: { width: 140, alignItems: 'center', transform: [{ rotate: '-45deg' }] },
-  diamondText: { color: C.diaText, fontSize: 13, fontWeight: '800', textAlign: 'center' },
-  diamondTextDone: { color: '#14532d' },
-  diamondTextCustom: { color: '#4c1d95' },
+  diamondText: { color: '#4c1d95', fontSize: 12, fontWeight: '800', textAlign: 'center' },
+  diamondBadge: { color: '#7c3aed', fontSize: 10, fontWeight: '700', marginTop: 2 },
+  branchDeleteBubble: {
+    position: 'absolute', top: 2, right: 2,
+    width: 24, height: 24, borderRadius: 12,
+    backgroundColor: '#fef2f2', borderWidth: 1.5, borderColor: '#fca5a5',
+    alignItems: 'center', justifyContent: 'center', zIndex: 10,
+  },
+  branchDeleteBubbleText: { color: '#dc2626', fontSize: 13, fontWeight: '900', lineHeight: 16 },
+
+  // branch split row
   branchRow: { flexDirection: 'row', width: '100%', marginTop: 2 },
   branchCol: { flex: 1, alignItems: 'center' },
   branchLabel: { fontSize: 12, fontWeight: '800', marginBottom: -2 },
+  outBoxYes: { backgroundColor: '#f0fdf4', borderWidth: 1.5, borderColor: '#86efac', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8, minWidth: 88, alignItems: 'center' },
+  outYesText: { color: '#166534', fontSize: 13, fontWeight: '800' },
+  skipLine: { width: 2, height: 36, backgroundColor: '#cbd5e1', marginVertical: 4 },
+  mergeRailWrap: { width: '50%', alignItems: 'center', marginTop: 12 },
+  mergeRail: { width: '100%', height: 2, backgroundColor: C.line },
+  returnLabel: { color: C.muted, fontSize: 11, fontWeight: '700', marginTop: 3 },
+
+  // all-done diamond
+  finDiamond: {
+    width: 96, height: 96, borderRadius: 8,
+    borderWidth: 1.5, borderColor: C.diaBorder, backgroundColor: C.diaBg,
+    alignItems: 'center', justifyContent: 'center',
+    transform: [{ rotate: '45deg' }],
+  },
+  finDiamondDone: { backgroundColor: '#86efac' },
+  finDiamondInner: { width: 140, alignItems: 'center', transform: [{ rotate: '-45deg' }] },
+  finDiamondText: { color: C.diaText, fontSize: 13, fontWeight: '800', textAlign: 'center' },
+  finDiamondTextDone: { color: '#14532d' },
   outBox: { backgroundColor: C.termBg, borderWidth: 1.5, borderColor: C.termBorder, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 8, minWidth: 92, alignItems: 'center' },
   outBoxDone: { backgroundColor: C.doneBg, borderColor: C.doneBorder },
   outBoxNo: { backgroundColor: '#fef3c7', borderColor: '#d97706' },
-  outBoxYes: { backgroundColor: '#f0fdf4', borderColor: '#86efac' },
   outText: { color: C.termText, fontSize: 13, fontWeight: '800' },
   outTextDone: { color: '#ffffff' },
   outNoText: { color: '#92400e', fontSize: 13, fontWeight: '800' },
-  outYesText: { color: '#166534', fontSize: 13, fontWeight: '800' },
-  mergeRailWrap: { width: '50%', alignItems: 'center', marginTop: 14 },
-  mergeRail: { width: '100%', height: 2, backgroundColor: C.line },
-  // detour skip col
-  skipPassLine: { width: 2, flex: 1, backgroundColor: C.line, marginVertical: 4 },
 
-  // ── edit mode ──
-  editList: { paddingHorizontal: 12, paddingTop: 12, paddingBottom: 40 },
-  editHint: { color: C.muted, fontSize: 12, textAlign: 'center', marginBottom: 10 },
-  editTaskRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: C.card, borderRadius: 10, borderWidth: 1, borderColor: C.border,
-    paddingHorizontal: 12, paddingVertical: 10, marginBottom: 6,
-  },
-  editTaskRowDragging: {
-    shadowColor: '#000', shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.18, shadowRadius: 12, elevation: 10,
-    borderColor: C.primary,
-  },
-  editHandle: { fontSize: 18, color: C.muted, paddingHorizontal: 4, paddingVertical: 4 },
-  editStepNo: { width: 22, height: 22, borderRadius: 4, backgroundColor: C.termBorder, alignItems: 'center', justifyContent: 'center' },
-  editStepNoText: { color: '#ffffff', fontSize: 12, fontWeight: '800' },
-  editTaskTitle: { flex: 1, color: C.ink, fontSize: 13, fontWeight: '700' },
-  editBranchRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: '#faf5ff', borderRadius: 10, borderWidth: 1, borderColor: '#c4b5fd',
-    paddingHorizontal: 12, paddingVertical: 9, marginBottom: 4, marginLeft: 20,
-  },
-  editBranchIcon: { fontSize: 14, color: '#7c3aed' },
-  editBranchBody: { flex: 1 },
-  editBranchQuestion: { color: '#4c1d95', fontSize: 13, fontWeight: '800' },
-  editBranchStep: { color: '#7c3aed', fontSize: 11, marginTop: 1 },
-  editBranchActionBtn: { width: 28, height: 28, borderRadius: 8, backgroundColor: '#ede9fe', alignItems: 'center', justifyContent: 'center' },
-  editBranchActionText: { fontSize: 13, fontWeight: '800' },
-
-  // ── modal ──
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
-  modalCard: { backgroundColor: C.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 10 },
-  modalTitle: { color: C.ink, fontSize: 16, fontWeight: '800', marginBottom: 2 },
-  modalSection: { color: C.muted, fontSize: 11, fontWeight: '700', marginTop: 6, marginBottom: 2 },
-  modalInput: { borderWidth: 1.5, borderColor: C.grid, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: C.ink, fontSize: 14, backgroundColor: C.body },
-  modalActions: { flexDirection: 'row', gap: 10, marginTop: 6 },
-  modalCancel: { flex: 1, paddingVertical: 12, borderRadius: 10, borderWidth: 1.5, borderColor: C.grid, alignItems: 'center' },
-  modalCancelText: { color: C.muted, fontSize: 14, fontWeight: '700' },
-  modalOk: { flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: '#7c3aed', alignItems: 'center' },
-  modalOkText: { color: '#ffffff', fontSize: 14, fontWeight: '700' },
-  modalDelete: { paddingVertical: 12, borderRadius: 10, backgroundColor: '#fef2f2', borderWidth: 1.5, borderColor: '#fca5a5', alignItems: 'center', marginTop: 2 },
-  modalDeleteText: { color: '#dc2626', fontSize: 14, fontWeight: '700' },
+  // modal
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  sheet: { backgroundColor: C.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 10 },
+  sheetTitle: { color: C.ink, fontSize: 16, fontWeight: '800', marginBottom: 2 },
+  sheetLabel: { color: C.muted, fontSize: 11, fontWeight: '700', marginTop: 4, marginBottom: 2 },
+  input: { borderWidth: 1.5, borderColor: C.grid, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: C.ink, fontSize: 14, backgroundColor: C.body },
+  // side toggle
+  sideRow: { flexDirection: 'row', gap: 8 },
+  sideBtn: { flex: 1, paddingVertical: 10, borderRadius: 10, borderWidth: 1.5, borderColor: C.border, alignItems: 'center' },
+  sideBtnActive: { backgroundColor: '#ede9fe', borderColor: '#7c3aed' },
+  sideBtnText: { color: C.muted, fontSize: 13, fontWeight: '700' },
+  sideBtnTextActive: { color: '#4c1d95', fontSize: 13, fontWeight: '700' },
+  // picker
   pickerScroll: { marginVertical: 2 },
   pickerChip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, backgroundColor: C.body, borderWidth: 1.5, borderColor: C.border, marginRight: 8 },
   pickerChipActive: { backgroundColor: '#ede9fe', borderColor: '#7c3aed' },
   pickerChipText: { color: C.muted, fontSize: 12, fontWeight: '700' },
   pickerChipTextActive: { color: '#4c1d95', fontSize: 12, fontWeight: '700' },
+  // actions
+  actionRow: { flexDirection: 'row', gap: 10, marginTop: 4 },
+  cancelBtn: { flex: 1, paddingVertical: 12, borderRadius: 10, borderWidth: 1.5, borderColor: C.grid, alignItems: 'center' },
+  cancelText: { color: C.muted, fontSize: 14, fontWeight: '700' },
+  saveBtn: { flex: 1, paddingVertical: 12, borderRadius: 10, backgroundColor: '#7c3aed', alignItems: 'center' },
+  saveText: { color: '#ffffff', fontSize: 14, fontWeight: '700' },
+  deleteSheetBtn: { paddingVertical: 12, borderRadius: 10, backgroundColor: '#fef2f2', borderWidth: 1.5, borderColor: '#fca5a5', alignItems: 'center' },
+  deleteSheetText: { color: '#dc2626', fontSize: 14, fontWeight: '700' },
 
   empty: { paddingVertical: 60, alignItems: 'center', gap: 8 },
   emptyTitle: { color: C.ink, fontSize: 16, fontWeight: '700' },
   emptyBody: { color: C.muted, fontSize: 13, textAlign: 'center', paddingHorizontal: 24 },
+
+  // canvas reset button
+  resetBtn: {
+    position: 'absolute', right: 16, bottom: 80,
+    width: 44, height: 44, borderRadius: 22,
+    backgroundColor: C.card, borderWidth: 1.5, borderColor: C.border,
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15, shadowRadius: 6, elevation: 4,
+  },
+  resetBtnText: { color: C.ink, fontSize: 20 },
 });
 
 export default function FlowScreen({ navigation }: Props) {
@@ -180,82 +212,58 @@ export default function FlowScreen({ navigation }: Props) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [completedIds, setCompletedIds] = useState<Set<number>>(new Set());
   const [branches, setBranches] = useState<FlowBranch[]>([]);
-  const [editMode, setEditMode] = useState(false);
-  const [editOrdered, setEditOrdered] = useState<Task[]>([]);
   const [modal, setModal] = useState<BranchModal | null>(null);
 
-  // ── drag state ──
-  const dragY = useRef(new Animated.Value(0)).current;
-  const [draggingIdx, setDraggingIdx] = useState<number | null>(null);
-  const draggingIdxRef = useRef<number | null>(null);
-  const dropRef = useRef(0);
-  const slotH = useRef(56);
-  const shiftAnims = useRef<Animated.Value[]>([]);
-  const editOrderedRef = useRef<Task[]>([]);
-  const panMap = useRef<Map<number, ReturnType<typeof PanResponder.create>>>(new Map());
+  // ── task drag state ──
+  const taskDragY = useRef(new Animated.Value(0)).current;
+  const taskDragScale = useRef(new Animated.Value(1)).current;
+  const [activeDragId, setActiveDragId] = useState<number | null>(null);
+  const activeDragIdRef = useRef<number | null>(null);
+  const taskDragState = useRef({ startIdx: 0, currentIdx: 0, changed: false });
+  const taskDyRef = useRef(0);
+  const taskShiftAnims = useRef<Animated.Value[]>([]);
+  const taskSlotRef = useRef(72);
+  const taskYsByIdx = useRef<number[]>([]);
+  const taskPanMap = useRef<Map<number, ReturnType<typeof PanResponder.create>>>(new Map());
+  const orderedRef = useRef<Task[]>([]);
 
-  editOrderedRef.current = editOrdered;
+  // ── branch stamp drag state ──
+  const branchDragAnims = useRef<Map<number, Animated.Value>>(new Map());
+  const [activeBranchDragId, setActiveBranchDragId] = useState<number | null>(null);
+  const activeBranchDragIdRef = useRef<number | null>(null);
+  const branchPanMap = useRef<Map<number, ReturnType<typeof PanResponder.create>>>(new Map());
+  const branchYsById = useRef<Map<number, number>>(new Map());
+  const taskYsById = useRef<Map<number, number>>(new Map());
+  const branchesRef = useRef<FlowBranch[]>([]);
 
-  while (shiftAnims.current.length < editOrdered.length) {
-    shiftAnims.current.push(new Animated.Value(0));
-  }
-  if (shiftAnims.current.length > editOrdered.length) {
-    shiftAnims.current = shiftAnims.current.slice(0, editOrdered.length);
-  }
+  branchesRef.current = branches;
 
-  const getPan = (taskId: number) => {
-    if (!panMap.current.has(taskId)) {
-      panMap.current.set(taskId, PanResponder.create({
-        onStartShouldSetPanResponder: () => true,
-        onMoveShouldSetPanResponder: (_, { dy }) => Math.abs(dy) > 3,
-        onPanResponderGrant: () => {
-          const idx = editOrderedRef.current.findIndex((t) => t.id === taskId);
-          draggingIdxRef.current = idx;
-          dropRef.current = idx;
-          dragY.setValue(0);
-          shiftAnims.current.forEach((a) => a.setValue(0));
-          setDraggingIdx(idx);
-        },
-        onPanResponderMove: (_, { dy }) => {
-          const startIdx = draggingIdxRef.current ?? 0;
-          dragY.setValue(dy);
-          const slot = slotH.current;
-          const n = editOrderedRef.current.length;
-          const drop = Math.max(0, Math.min(n - 1, startIdx + Math.round(dy / slot)));
-          dropRef.current = drop;
-          shiftAnims.current.forEach((anim, i) => {
-            if (i === startIdx) return;
-            let shift = 0;
-            if (drop > startIdx && i > startIdx && i <= drop) shift = -slot;
-            else if (drop < startIdx && i < startIdx && i >= drop) shift = slot;
-            anim.setValue(shift);
-          });
-        },
-        onPanResponderRelease: () => {
-          const from = draggingIdxRef.current ?? 0;
-          const to = dropRef.current;
-          shiftAnims.current.forEach((a) => a.setValue(0));
-          dragY.setValue(0);
-          draggingIdxRef.current = null;
-          setDraggingIdx(null);
-          if (from !== to) {
-            setEditOrdered((prev) => {
-              const arr = [...prev];
-              const [item] = arr.splice(from, 1);
-              arr.splice(to, 0, item);
-              return arr;
-            });
-          }
-        },
-        onPanResponderTerminate: () => {
-          shiftAnims.current.forEach((a) => a.setValue(0));
-          dragY.setValue(0);
-          draggingIdxRef.current = null;
-          setDraggingIdx(null);
-        },
-      }));
-    }
-    return panMap.current.get(taskId)!;
+  // ── canvas pan / zoom state ──
+  const canvasXAnim = useRef(new Animated.Value(0)).current;
+  const canvasYAnim = useRef(new Animated.Value(0)).current;
+  const canvasScaleAnim = useRef(new Animated.Value(1)).current;
+  const canvasXRef = useRef(0);
+  const canvasYRef = useRef(0);
+  const canvasScaleRef = useRef(1);
+  const canvasPanStart = useRef({ x: 0, y: 0 });
+  const pinchRef = useRef<{ dist: number; scale: number } | null>(null);
+  const pinchModeRef = useRef(false);
+  const [canvasMoved, setCanvasMoved] = useState(false);
+
+  useEffect(() => {
+    const id1 = canvasXAnim.addListener(({ value }) => { canvasXRef.current = value; });
+    const id2 = canvasYAnim.addListener(({ value }) => { canvasYRef.current = value; });
+    const id3 = canvasScaleAnim.addListener(({ value }) => { canvasScaleRef.current = value; });
+    return () => {
+      canvasXAnim.removeListener(id1);
+      canvasYAnim.removeListener(id2);
+      canvasScaleAnim.removeListener(id3);
+    };
+  }, []);
+
+  const getBranchAnim = (id: number) => {
+    if (!branchDragAnims.current.has(id)) branchDragAnims.current.set(id, new Animated.Value(0));
+    return branchDragAnims.current.get(id)!;
   };
 
   const isToday = selectedDate === today;
@@ -270,9 +278,7 @@ export default function FlowScreen({ navigation }: Props) {
 
   const load = useCallback(async () => {
     const [ts, ids, brs] = await Promise.all([
-      getTasks(db),
-      getCompletedTaskIds(db, selectedDate),
-      getFlowBranches(db),
+      getTasks(db), getCompletedTaskIds(db, selectedDate), getFlowBranches(db),
     ]);
     setTasks(ts);
     setCompletedIds(new Set(ids));
@@ -289,14 +295,14 @@ export default function FlowScreen({ navigation }: Props) {
 
   const due = tasks.filter((t) => isDueToday(t, selDateObj));
   const ordered = [...due].sort((a, b) => {
-    const at = a.scheduled_time ?? '99:99';
-    const bt = b.scheduled_time ?? '99:99';
+    const at = a.scheduled_time ?? '99:99', bt = b.scheduled_time ?? '99:99';
     if (at !== bt) return at < bt ? -1 : 1;
     return a.sort_order - b.sort_order;
   });
-  const doneCount = due.filter((t) => completedIds.has(t.id)).length;
-  const remaining = due.length - doneCount;
-  const allDone = due.length > 0 && remaining === 0;
+  orderedRef.current = ordered;
+
+  const allDone = due.length > 0 && due.every((t) => completedIds.has(t.id));
+  const remaining = due.filter((t) => !completedIds.has(t.id)).length;
 
   const dueIds = useMemo(() => new Set(ordered.map((t) => t.id)), [ordered]);
   const flowNodes = useMemo(
@@ -304,30 +310,219 @@ export default function FlowScreen({ navigation }: Props) {
     [ordered, branches, dueIds],
   );
 
-  const enterEdit = () => {
-    setEditOrdered([...ordered]);
-    setEditMode(true);
+  // sync shift anims length
+  while (taskShiftAnims.current.length < ordered.length) taskShiftAnims.current.push(new Animated.Value(0));
+  if (taskShiftAnims.current.length > ordered.length) taskShiftAnims.current = taskShiftAnims.current.slice(0, ordered.length);
+
+  // ── task pan responder factory ──
+  const getTaskPan = (taskId: number) => {
+    if (!taskPanMap.current.has(taskId)) {
+      taskPanMap.current.set(taskId, PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: (_, { dy }) => Math.abs(dy) > 3,
+        onPanResponderGrant: () => {
+          const idx = orderedRef.current.findIndex((t) => t.id === taskId);
+          taskDragState.current = { startIdx: idx, currentIdx: idx, changed: false };
+          taskDyRef.current = 0;
+          taskDragY.setValue(0);
+          taskDragScale.setValue(1.04);
+          taskShiftAnims.current.forEach((a) => a.setValue(0));
+          activeDragIdRef.current = taskId;
+          setActiveDragId(taskId);
+          // compute slot from measured y positions
+          const y0 = taskYsByIdx.current[idx];
+          const y1 = taskYsByIdx.current[idx + 1] ?? taskYsByIdx.current[idx - 1];
+          if (y0 !== undefined && y1 !== undefined && Math.abs(y1 - y0) > 40) {
+            taskSlotRef.current = Math.abs(y1 - y0);
+          }
+        },
+        onPanResponderMove: (_, { dy }) => {
+          const cdy = dy / canvasScaleRef.current;
+          taskDragY.setValue(cdy);
+          taskDyRef.current = cdy;
+          const { startIdx } = taskDragState.current;
+          const n = orderedRef.current.length;
+          const slot = taskSlotRef.current;
+          const newIdx = Math.max(0, Math.min(n - 1, startIdx + Math.round(cdy / slot)));
+          if (newIdx !== taskDragState.current.currentIdx) {
+            taskDragState.current.currentIdx = newIdx;
+            taskDragState.current.changed = newIdx !== startIdx;
+            taskShiftAnims.current.forEach((anim, i) => {
+              if (i === startIdx) return;
+              let shift = 0;
+              if (newIdx > startIdx && i > startIdx && i <= newIdx) shift = -slot;
+              else if (newIdx < startIdx && i < startIdx && i >= newIdx) shift = slot;
+              anim.setValue(shift);
+            });
+          }
+        },
+        onPanResponderRelease: () => {
+          const { startIdx, currentIdx, changed } = taskDragState.current;
+          const dy = taskDyRef.current;
+          let pendingOrdered: Task[] | null = null;
+          if (changed) {
+            const arr = [...orderedRef.current];
+            const [item] = arr.splice(startIdx, 1);
+            arr.splice(currentIdx, 0, item);
+            pendingOrdered = arr;
+            updateTaskSortOrders(db, arr.map((t) => t.id));
+          }
+          const targetDy = (currentIdx - startIdx) * taskSlotRef.current;
+          taskDragY.setValue(dy);
+          const po = pendingOrdered;
+          Animated.parallel([
+            Animated.spring(taskDragY, { toValue: targetDy, useNativeDriver: true, tension: 220, friction: 14 }),
+            Animated.spring(taskDragScale, { toValue: 1, useNativeDriver: true, tension: 220, friction: 14 }),
+          ]).start(({ finished }) => {
+            if (!finished) return;
+            taskShiftAnims.current.forEach((a) => a.setValue(0));
+            taskDragY.setValue(0);
+            activeDragIdRef.current = null;
+            setActiveDragId(null);
+            if (po) {
+              setTasks((prev) => {
+                const next = [...prev];
+                po.forEach((t, i) => {
+                  const idx = next.findIndex((x) => x.id === t.id);
+                  if (idx >= 0) next[idx] = { ...next[idx], sort_order: i };
+                });
+                return next;
+              });
+            }
+          });
+        },
+        onPanResponderTerminate: () => {
+          taskShiftAnims.current.forEach((a) => a.setValue(0));
+          taskDragY.setValue(0);
+          taskDragScale.setValue(1);
+          activeDragIdRef.current = null;
+          setActiveDragId(null);
+        },
+      }));
+    }
+    return taskPanMap.current.get(taskId)!;
   };
 
-  const exitEdit = async () => {
-    await updateTaskSortOrders(db, editOrdered.map((t) => t.id));
-    setEditMode(false);
-    load();
+  // ── branch stamp pan responder factory ──
+  const getBranchPan = (branchId: number) => {
+    if (!branchPanMap.current.has(branchId)) {
+      branchPanMap.current.set(branchId, PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: (_, { dy }) => Math.abs(dy) > 6,
+        onPanResponderGrant: () => {
+          getBranchAnim(branchId).setValue(0);
+          activeBranchDragIdRef.current = branchId;
+          setActiveBranchDragId(branchId);
+        },
+        onPanResponderMove: (_, { dy }) => {
+          getBranchAnim(branchId).setValue(dy / canvasScaleRef.current);
+        },
+        onPanResponderRelease: (_, { dy }) => {
+          const branchInitialY = branchYsById.current.get(branchId) ?? 0;
+          const targetY = branchInitialY + dy / canvasScaleRef.current;
+          // find which task node is immediately above targetY
+          let anchorId: number | null = null;
+          let bestY = -Infinity;
+          for (const [tid, ty] of taskYsById.current.entries()) {
+            if (ty <= targetY && ty > bestY) { bestY = ty; anchorId = tid; }
+          }
+          // animate back to 0
+          Animated.spring(getBranchAnim(branchId), { toValue: 0, useNativeDriver: true, tension: 220, friction: 14 }).start(() => {
+            getBranchAnim(branchId).setValue(0);
+          });
+          activeBranchDragIdRef.current = null;
+          setActiveBranchDragId(null);
+          if (anchorId !== null) {
+            const br = branchesRef.current.find((b) => b.id === branchId);
+            if (br && anchorId !== br.after_task_id) {
+              updateFlowBranch(db, branchId, { ...br, after_task_id: anchorId });
+              load();
+            }
+          }
+        },
+        onPanResponderTerminate: () => {
+          getBranchAnim(branchId).setValue(0);
+          activeBranchDragIdRef.current = null;
+          setActiveBranchDragId(null);
+        },
+      }));
+    }
+    return branchPanMap.current.get(branchId)!;
   };
 
-  const openAddBranch = (afterTaskId: number | null = null) => {
-    setModal({ mode: 'add', afterTaskId, editId: null, condition: '', stepText: '' });
-  };
-
-  const openEditBranch = (branch: FlowBranch) => {
-    setModal({
-      mode: 'edit',
-      afterTaskId: branch.after_task_id,
-      editId: branch.id,
-      condition: branch.question,
-      stepText: branch.yes_text ?? '',
+  // ── canvas PanResponder ──
+  const canvasPanRef = useRef<ReturnType<typeof PanResponder.create> | null>(null);
+  if (!canvasPanRef.current) {
+    canvasPanRef.current = PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, { dx, dy }) => {
+        if (activeDragIdRef.current !== null || activeBranchDragIdRef.current !== null) return false;
+        return Math.abs(dx) > 4 || Math.abs(dy) > 4;
+      },
+      onPanResponderGrant: () => {
+        canvasPanStart.current = { x: canvasXRef.current, y: canvasYRef.current };
+        pinchModeRef.current = false;
+      },
+      onPanResponderMove: (evt, { dx, dy }) => {
+        const touches = evt.nativeEvent.touches;
+        if (touches.length >= 2) {
+          pinchModeRef.current = true;
+          const t0 = touches[0], t1 = touches[1];
+          const dist = Math.hypot(t0.pageX - t1.pageX, t0.pageY - t1.pageY);
+          if (!pinchRef.current) {
+            pinchRef.current = { dist, scale: canvasScaleRef.current };
+          } else {
+            const s = Math.max(0.3, Math.min(3, pinchRef.current.scale * dist / pinchRef.current.dist));
+            canvasScaleRef.current = s;
+            canvasScaleAnim.setValue(s);
+          }
+        } else if (!pinchModeRef.current) {
+          pinchRef.current = null;
+          canvasXAnim.setValue(canvasPanStart.current.x + dx);
+          canvasYAnim.setValue(canvasPanStart.current.y + dy);
+        }
+      },
+      onPanResponderRelease: (_, { dx, dy, vx, vy }) => {
+        pinchRef.current = null;
+        if (!pinchModeRef.current) {
+          const finalX = canvasPanStart.current.x + dx;
+          const finalY = canvasPanStart.current.y + dy;
+          canvasXRef.current = finalX;
+          canvasYRef.current = finalY;
+          Animated.parallel([
+            Animated.decay(canvasXAnim, { velocity: vx, deceleration: 0.995, useNativeDriver: false }),
+            Animated.decay(canvasYAnim, { velocity: vy, deceleration: 0.995, useNativeDriver: false }),
+          ]).start();
+        }
+        pinchModeRef.current = false;
+        setCanvasMoved(true);
+      },
+      onPanResponderTerminate: () => {
+        pinchRef.current = null;
+        pinchModeRef.current = false;
+      },
     });
-  };
+  }
+
+  const resetCanvas = useCallback(() => {
+    Animated.parallel([
+      Animated.spring(canvasXAnim, { toValue: 0, useNativeDriver: false, tension: 120, friction: 12 }),
+      Animated.spring(canvasYAnim, { toValue: 0, useNativeDriver: false, tension: 120, friction: 12 }),
+      Animated.spring(canvasScaleAnim, { toValue: 1, useNativeDriver: false, tension: 120, friction: 12 }),
+    ]).start(() => {
+      canvasXRef.current = 0;
+      canvasYRef.current = 0;
+      canvasScaleRef.current = 1;
+      setCanvasMoved(false);
+    });
+  }, []);
+
+  // ── branch modal helpers ──
+  const openAddBranch = (afterTaskId: number | null = null) =>
+    setModal({ mode: 'add', afterTaskId, editId: null, condition: '', stepText: '', side: 'left' });
+
+  const openEditBranch = (br: FlowBranch) =>
+    setModal({ mode: 'edit', afterTaskId: br.after_task_id, editId: br.id, condition: br.question, stepText: br.yes_text ?? '', side: br.branch_side ?? 'left' });
 
   const saveBranch = async () => {
     if (!modal || modal.afterTaskId === null) return;
@@ -338,6 +533,7 @@ export default function FlowScreen({ navigation }: Props) {
       yes_text: modal.stepText.trim() || null,
       no_label: 'スキップ',
       no_text: null,
+      branch_side: modal.side,
     };
     if (modal.mode === 'add') await addFlowBranch(db, data);
     else if (modal.editId !== null) await updateFlowBranch(db, modal.editId, data);
@@ -351,220 +547,223 @@ export default function FlowScreen({ navigation }: Props) {
     load();
   };
 
-  const editIds = useMemo(() => new Set(editOrdered.map((t) => t.id)), [editOrdered]);
-  const editBranches = useMemo(
-    () => branches.filter((b) => b.after_task_id !== null && editIds.has(b.after_task_id!)),
-    [branches, editIds],
-  );
+  const confirmDeleteTask = (task: Task) => {
+    Alert.alert('タスクを削除', `「${task.title}」を削除しますか？`, [
+      { text: 'キャンセル', style: 'cancel' },
+      { text: '削除', style: 'destructive', onPress: async () => { await deleteTask(db, task.id); load(); } },
+    ]);
+  };
 
-  const pickerTasks = editMode ? editOrdered : ordered;
+  // ── render task node ──
+  const renderTask = (node: Extract<FlowNode, { type: 'task' }>) => {
+    const { task, taskIdx } = node;
+    const isDone = completedIds.has(task.id);
+    const isActive = activeDragId === task.id;
+    const pan = getTaskPan(task.id);
+    const animStyle = isActive
+      ? { transform: [{ translateY: taskDragY }, { scale: taskDragScale }], zIndex: 99 }
+      : { transform: [{ translateY: taskShiftAnims.current[taskIdx] ?? new Animated.Value(0) }] };
 
-  let taskCounter = 0;
+    return (
+      <View
+        key={`task-${task.id}`}
+        style={s.stepWrap}
+        onLayout={(e) => {
+          taskYsByIdx.current[taskIdx] = e.nativeEvent.layout.y;
+          taskYsById.current.set(task.id, e.nativeEvent.layout.y);
+        }}
+      >
+        <Down color={isDone ? C.doneBg : C.line} />
+        <Animated.View style={[s.process, isDone && s.processDone, animStyle, isActive && s.processDragging]}>
+          {/* drag handle */}
+          <View {...pan.panHandlers} style={s.dragHandleArea}>
+            <Text style={s.dragHandleText}>☰</Text>
+          </View>
+          {/* content: tap to toggle */}
+          <TouchableOpacity style={s.processContent} onPress={() => toggle(task.id)} activeOpacity={0.7}>
+            <Text style={[s.processText, isDone && s.processTextDone]} numberOfLines={2}>
+              {task.icon ? `${task.icon} ` : ''}{task.title}
+              {task.scheduled_time ? `  (${task.scheduled_time})` : ''}
+            </Text>
+            {isDone && <Text style={s.processCheck}>✓</Text>}
+          </TouchableOpacity>
+          {/* delete */}
+          <TouchableOpacity style={s.nodeDeleteBtn} onPress={() => confirmDeleteTask(task)}>
+            <Text style={s.nodeDeleteText}>×</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      </View>
+    );
+  };
+
+  // ── render branch stamp ──
+  const renderBranch = (node: Extract<FlowNode, { type: 'branch' }>) => {
+    const { branch: br } = node;
+    const side = br.branch_side ?? 'left';
+    const isActiveBr = activeBranchDragId === br.id;
+    const branchPan = getBranchPan(br.id);
+    const branchAnim = getBranchAnim(br.id);
+
+    const doCol = (
+      <View style={s.branchCol}>
+        <Text style={[s.branchLabel, { color: '#7c3aed' }]}>する</Text>
+        <Down color={C.line} h={16} />
+        {br.yes_text
+          ? <View style={s.outBoxYes}><Text style={s.outYesText}>{br.yes_text}</Text></View>
+          : null}
+      </View>
+    );
+    const skipCol = (
+      <View style={[s.branchCol, { justifyContent: 'flex-start' }]}>
+        <Text style={[s.branchLabel, { color: C.muted }]}>スキップ</Text>
+        <View style={s.skipLine} />
+      </View>
+    );
+
+    return (
+      <View
+        key={`branch-${br.id}`}
+        style={s.stepWrap}
+        onLayout={(e) => { branchYsById.current.set(br.id, e.nativeEvent.layout.y); }}
+      >
+        <Down color={C.line} />
+        <Animated.View
+          style={[
+            s.diamondWrap,
+            isActiveBr && { zIndex: 99 },
+            { transform: [{ translateY: branchAnim }] },
+          ]}
+        >
+          {/* drag handle on diamond */}
+          <View {...branchPan.panHandlers}>
+            <TouchableOpacity style={s.diamond} onPress={() => openEditBranch(br)} activeOpacity={0.75}>
+              <View style={s.diamondInner}>
+                <Text style={s.diamondText} numberOfLines={3}>{br.question}</Text>
+                <Text style={s.diamondBadge}>{side === 'left' ? '← する' : 'する →'}</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+          {/* delete bubble */}
+          <TouchableOpacity style={s.branchDeleteBubble} onPress={() => removeBranch(br.id)}>
+            <Text style={s.branchDeleteBubbleText}>×</Text>
+          </TouchableOpacity>
+        </Animated.View>
+
+        {/* branch split: tap row to edit */}
+        <TouchableOpacity style={s.branchRow} onPress={() => openEditBranch(br)} activeOpacity={0.7}>
+          {side === 'left' ? doCol : skipCol}
+          {side === 'left' ? skipCol : doCol}
+        </TouchableOpacity>
+
+        {/* merge rail: tap to edit */}
+        <TouchableOpacity style={s.mergeRailWrap} onPress={() => openEditBranch(br)} activeOpacity={0.7}>
+          <View style={s.mergeRail} />
+        </TouchableOpacity>
+        <Text style={s.returnLabel}>本流に戻る</Text>
+      </View>
+    );
+  };
 
   return (
     <View style={s.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
-      <LinearGradient colors={grad.header} start={GRAD_START} end={GRAD_END} style={[s.headerCard, { paddingTop: insets.top + 12 }]}>
-        <View style={s.dateNavRow}>
-          <TouchableOpacity onPress={() => shiftSelected(-1)} style={s.dateNavBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} disabled={editMode}>
-            <Text style={[s.dateNavArrow, editMode && { opacity: 0.3 }]}>‹</Text>
+      <LinearGradient colors={grad.header} start={GRAD_START} end={GRAD_END} style={[s.header, { paddingTop: insets.top + 12 }]}>
+        <View style={s.navRow}>
+          <TouchableOpacity style={s.navBtn} onPress={() => shiftSelected(-1)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Text style={s.navArrow}>‹</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => setSelectedDate(today)} activeOpacity={0.7} style={s.dateNavCenter} disabled={editMode}>
-            <Text style={s.dateText}>{dateLabel}</Text>
-            {!isToday && <Text style={s.dateTodayHint}>タップで今日へ</Text>}
+          <TouchableOpacity style={s.navCenter} onPress={() => setSelectedDate(today)} activeOpacity={0.7}>
+            <Text style={s.navDateText}>{dateLabel}</Text>
+            {!isToday && <Text style={s.navTodayHint}>タップで今日へ</Text>}
           </TouchableOpacity>
-          <View style={s.headerRight}>
-            <TouchableOpacity onPress={() => shiftSelected(1)} style={s.dateNavBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} disabled={editMode}>
-              <Text style={[s.dateNavArrow, editMode && { opacity: 0.3 }]}>›</Text>
+          <View style={s.navRight}>
+            <TouchableOpacity style={s.navBtn} onPress={() => shiftSelected(1)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Text style={s.navArrow}>›</Text>
             </TouchableOpacity>
             {due.length > 0 && (
-              <>
-                <TouchableOpacity style={s.branchHeaderBtn} onPress={() => openAddBranch(null)}>
-                  <Text style={s.branchHeaderBtnText}>◇</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={[s.editBtn, editMode && s.editBtnActive]} onPress={editMode ? exitEdit : enterEdit}>
-                  <Text style={[s.editBtnText, editMode && s.editBtnTextActive]}>{editMode ? '完了' : '編集'}</Text>
-                </TouchableOpacity>
-              </>
+              <TouchableOpacity style={s.addBranchBtn} onPress={() => openAddBranch(null)}>
+                <Text style={s.addBranchBtnText}>◇</Text>
+              </TouchableOpacity>
             )}
           </View>
         </View>
       </LinearGradient>
 
-      {editMode ? (
-        /* ── edit mode ── */
-        <ScrollView style={s.bodyView} contentContainerStyle={s.editList} scrollEnabled={draggingIdx === null}>
-          <Text style={s.editHint}>☰ を押しながらなぞって並び替え</Text>
-          {editOrdered.map((task, i) => {
-            taskCounter += 1;
-            const isDragging = draggingIdx === i;
-            const taskBranches = editBranches.filter((b) => b.after_task_id === task.id);
-            const pan = getPan(task.id);
-            const animStyle = isDragging
-              ? { transform: [{ translateY: dragY }], zIndex: 99 }
-              : { transform: [{ translateY: shiftAnims.current[i] ?? new Animated.Value(0) }] };
-
-            return (
-              <View key={task.id}>
-                <Animated.View
-                  style={[s.editTaskRow, isDragging && s.editTaskRowDragging, animStyle]}
-                  onLayout={i === 0 ? (e) => { slotH.current = e.nativeEvent.layout.height + 6; } : undefined}
-                >
-                  <View {...pan.panHandlers}>
-                    <Text style={s.editHandle}>☰</Text>
+      <View style={[s.body, { overflow: 'hidden' }]} {...(canvasPanRef.current!.panHandlers)}>
+        <Animated.View style={{ transform: [{ translateX: canvasXAnim }, { translateY: canvasYAnim }, { scale: canvasScaleAnim }] }}>
+          <View style={s.content}>
+            {due.length === 0 ? (
+              <View style={s.empty}>
+                <Text style={s.emptyTitle}>この日のフローはありません</Text>
+                <Text style={s.emptyBody}>頻度がこの日に当たるタスクがワークフローになります</Text>
+              </View>
+            ) : (
+              <>
+                <View style={s.terminator}><Text style={s.terminatorText}>開始</Text></View>
+                {flowNodes.map((node) =>
+                  node.type === 'task' ? renderTask(node) : renderBranch(node),
+                )}
+                <Down color={allDone ? C.doneBg : C.line} />
+                <View style={[s.finDiamond, allDone && s.finDiamondDone]}>
+                  <View style={s.finDiamondInner}>
+                    <Text style={[s.finDiamondText, allDone && s.finDiamondTextDone]}>全部{'\n'}完了?</Text>
                   </View>
-                  <View style={s.editStepNo}><Text style={s.editStepNoText}>{taskCounter}</Text></View>
-                  <Text style={s.editTaskTitle} numberOfLines={2}>
-                    {task.icon ? `${task.icon} ` : ''}{task.title}{task.scheduled_time ? `  (${task.scheduled_time})` : ''}
-                  </Text>
-                </Animated.View>
-                {taskBranches.map((br) => (
-                  <View key={br.id} style={s.editBranchRow}>
-                    <Text style={s.editBranchIcon}>◇</Text>
-                    <View style={s.editBranchBody}>
-                      <Text style={s.editBranchQuestion}>{br.question}</Text>
-                      <Text style={s.editBranchStep}>{br.yes_text ? `→ ${br.yes_text}` : '追加ステップなし'}</Text>
+                </View>
+                <View style={s.branchRow}>
+                  <View style={s.branchCol}>
+                    <Text style={[s.branchLabel, { color: C.diaBorder }]}>はい</Text>
+                    <Down color={allDone ? C.doneBg : C.line} h={16} />
+                    <View style={[s.outBox, allDone && s.outBoxDone]}>
+                      <Text style={[s.outText, allDone && s.outTextDone]}>完了 🎉</Text>
                     </View>
-                    <TouchableOpacity style={s.editBranchActionBtn} onPress={() => openEditBranch(br)}>
-                      <Text style={s.editBranchActionText}>✎</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={s.editBranchActionBtn} onPress={() => removeBranch(br.id)}>
-                      <Text style={[s.editBranchActionText, { color: '#ef4444' }]}>×</Text>
-                    </TouchableOpacity>
                   </View>
-                ))}
-              </View>
-            );
-          })}
-        </ScrollView>
-      ) : (
-        /* ── flowchart view ── */
-        <ScrollView style={s.bodyView} contentContainerStyle={s.flowContent}>
-          {due.length === 0 ? (
-            <View style={s.empty}>
-              <Text style={s.emptyTitle}>この日のフローはありません</Text>
-              <Text style={s.emptyBody}>頻度がこの日に当たるタスクがワークフローになります</Text>
-            </View>
-          ) : (
-            <>
-              <View style={s.terminator}><Text style={s.terminatorText}>開始</Text></View>
-              {(() => {
-                let tIdx = 0;
-                return flowNodes.map((node) => {
-                  if (node.type === 'task') {
-                    tIdx += 1;
-                    const isDone = completedIds.has(node.task.id);
-                    return (
-                      <View key={`task-${node.task.id}`} style={s.stepWrap}>
-                        <Down color={isDone ? C.doneBg : C.line} />
-                        <TouchableOpacity style={[s.process, isDone && s.processDone]} onPress={() => toggle(node.task.id)} activeOpacity={0.8}>
-                          <View style={[s.stepNo, isDone && s.stepNoDone]}><Text style={s.stepNoText}>{tIdx}</Text></View>
-                          <Text style={[s.processText, isDone && s.processTextDone]} numberOfLines={2}>
-                            {node.task.icon ? `${node.task.icon} ` : ''}{node.task.title}{node.task.scheduled_time ? `  (${node.task.scheduled_time})` : ''}
-                          </Text>
-                          {isDone && <Text style={s.processCheck}>✓</Text>}
-                        </TouchableOpacity>
-                      </View>
-                    );
-                  }
-                  // detour branch
-                  const br = node.branch;
-                  return (
-                    <View key={`branch-${br.id}`} style={s.stepWrap}>
-                      <Down color={C.line} />
-                      <View style={[s.diamond, s.diamondCustom]}>
-                        <View style={s.diamondInner}>
-                          <Text style={[s.diamondText, s.diamondTextCustom]} numberOfLines={3}>{br.question}</Text>
-                        </View>
-                      </View>
-                      <View style={s.branchRow}>
-                        {/* LEFT: do the extra step */}
-                        <View style={s.branchCol}>
-                          <Text style={[s.branchLabel, { color: '#7c3aed' }]}>する</Text>
-                          <Down color={C.line} h={16} />
-                          {br.yes_text ? (
-                            <View style={s.outBoxYes}>
-                              <Text style={s.outYesText}>{br.yes_text}</Text>
-                            </View>
-                          ) : null}
-                        </View>
-                        {/* RIGHT: skip through */}
-                        <View style={[s.branchCol, { justifyContent: 'flex-start' }]}>
-                          <Text style={[s.branchLabel, { color: C.muted }]}>スキップ</Text>
-                          <View style={s.skipPassLine} />
-                        </View>
-                      </View>
-                      <View style={s.mergeRailWrap}><View style={s.mergeRail} /></View>
-                      <Text style={[s.branchLabel, { color: C.muted, marginTop: 4 }]}>本流に戻る</Text>
+                  <View style={s.branchCol}>
+                    <Text style={[s.branchLabel, { color: C.muted }]}>いいえ</Text>
+                    <Down color={C.line} h={16} />
+                    <View style={[s.outBox, s.outBoxNo]}>
+                      <Text style={s.outNoText}>残り {remaining} 件</Text>
                     </View>
-                  );
-                });
-              })()}
-              <Down color={allDone ? C.doneBg : C.line} />
-              <View style={[s.diamond, allDone && s.diamondDone]}>
-                <View style={s.diamondInner}>
-                  <Text style={[s.diamondText, allDone && s.diamondTextDone]}>全部{'\n'}完了?</Text>
-                </View>
-              </View>
-              <View style={s.branchRow}>
-                <View style={s.branchCol}>
-                  <Text style={[s.branchLabel, { color: C.diaBorder }]}>はい</Text>
-                  <Down color={allDone ? C.doneBg : C.line} h={16} />
-                  <View style={[s.outBox, allDone && s.outBoxDone]}>
-                    <Text style={[s.outText, allDone && s.outTextDone]}>完了 🎉</Text>
                   </View>
                 </View>
-                <View style={s.branchCol}>
-                  <Text style={[s.branchLabel, { color: C.muted }]}>いいえ</Text>
-                  <Down color={C.line} h={16} />
-                  <View style={[s.outBox, s.outBoxNo]}>
-                    <Text style={s.outNoText}>残り {remaining} 件</Text>
-                  </View>
+                <View style={s.mergeRailWrap}><View style={s.mergeRail} /></View>
+                <Down color={allDone ? C.doneBg : C.line} h={16} />
+                <View style={[s.terminator, allDone && s.terminatorDone]}>
+                  <Text style={[s.terminatorText, allDone && s.terminatorDoneText]}>終了</Text>
                 </View>
-              </View>
-              <View style={s.mergeRailWrap}><View style={s.mergeRail} /></View>
-              <Down color={allDone ? C.doneBg : C.line} h={16} />
-              <View style={[s.terminator, allDone && s.terminatorDone]}>
-                <Text style={[s.terminatorText, allDone && s.terminatorEndText]}>終了</Text>
-              </View>
-            </>
-          )}
-        </ScrollView>
-      )}
+              </>
+            )}
+          </View>
+        </Animated.View>
+        {canvasMoved && (
+          <TouchableOpacity style={s.resetBtn} onPress={resetCanvas}>
+            <Text style={s.resetBtnText}>⌂</Text>
+          </TouchableOpacity>
+        )}
+      </View>
 
       {/* ── branch modal ── */}
       <Modal visible={modal !== null} transparent animationType="slide" onRequestClose={() => setModal(null)}>
-        <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setModal(null)}>
-          <TouchableOpacity activeOpacity={1} style={s.modalCard} onPress={() => {}}>
-            <Text style={s.modalTitle}>{modal?.mode === 'add' ? '分岐を追加' : '分岐を編集'}</Text>
+        <TouchableOpacity style={s.overlay} activeOpacity={1} onPress={() => setModal(null)}>
+          <TouchableOpacity activeOpacity={1} style={s.sheet} onPress={() => {}}>
+            <Text style={s.sheetTitle}>{modal?.mode === 'add' ? '◇ 分岐を追加' : '◇ 分岐を編集'}</Text>
 
-            {/* task picker: only for add-from-header (afterTaskId is null initially) */}
-            {modal?.mode === 'add' && (
-              <>
-                <Text style={s.modalSection}>どのステップの後に入れる？</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.pickerScroll}>
-                  {pickerTasks.map((t) => {
-                    const active = modal.afterTaskId === t.id;
-                    return (
-                      <TouchableOpacity
-                        key={t.id}
-                        style={[s.pickerChip, active && s.pickerChipActive]}
-                        onPress={() => setModal((m) => m ? { ...m, afterTaskId: t.id } : m)}
-                      >
-                        <Text style={active ? s.pickerChipTextActive : s.pickerChipText}>
-                          {t.icon ? `${t.icon} ` : ''}{t.title}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-              </>
-            )}
+            {/* task picker */}
+            <Text style={s.sheetLabel}>どのステップの後に入れる？</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.pickerScroll}>
+              {ordered.map((t) => {
+                const active = modal?.afterTaskId === t.id;
+                return (
+                  <TouchableOpacity key={t.id} style={[s.pickerChip, active && s.pickerChipActive]} onPress={() => setModal((m) => m ? { ...m, afterTaskId: t.id } : m)}>
+                    <Text style={active ? s.pickerChipTextActive : s.pickerChipText}>{t.icon ? `${t.icon} ` : ''}{t.title}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
 
-            <Text style={s.modalSection}>◇ 条件（いつ分岐する？）</Text>
+            <Text style={s.sheetLabel}>◇ 条件（いつ分岐する？）</Text>
             <TextInput
-              style={s.modalInput}
+              style={s.input}
               placeholder="例：雨が降ってたら"
               placeholderTextColor={C.muted}
               value={modal?.condition ?? ''}
@@ -572,9 +771,9 @@ export default function FlowScreen({ navigation }: Props) {
               returnKeyType="next"
             />
 
-            <Text style={s.modalSection}>追加ステップ（分岐でやること）</Text>
+            <Text style={s.sheetLabel}>追加ステップ（分岐でやること）</Text>
             <TextInput
-              style={s.modalInput}
+              style={s.input}
               placeholder="例：傘を持っていく"
               placeholderTextColor={C.muted}
               value={modal?.stepText ?? ''}
@@ -582,22 +781,34 @@ export default function FlowScreen({ navigation }: Props) {
               returnKeyType="done"
             />
 
-            <View style={s.modalActions}>
-              <TouchableOpacity style={s.modalCancel} onPress={() => setModal(null)}>
-                <Text style={s.modalCancelText}>キャンセル</Text>
+            <Text style={s.sheetLabel}>追加ステップを置く側</Text>
+            <View style={s.sideRow}>
+              {(['left', 'right'] as const).map((side) => {
+                const active = modal?.side === side;
+                return (
+                  <TouchableOpacity key={side} style={[s.sideBtn, active && s.sideBtnActive]} onPress={() => setModal((m) => m ? { ...m, side } : m)}>
+                    <Text style={active ? s.sideBtnTextActive : s.sideBtnText}>{side === 'left' ? '← 左' : '右 →'}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <View style={s.actionRow}>
+              <TouchableOpacity style={s.cancelBtn} onPress={() => setModal(null)}>
+                <Text style={s.cancelText}>キャンセル</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[s.modalOk, modal?.afterTaskId === null && { opacity: 0.45 }]}
+                style={[s.saveBtn, modal?.afterTaskId === null && { opacity: 0.45 }]}
                 onPress={saveBranch}
                 disabled={modal?.afterTaskId === null}
               >
-                <Text style={s.modalOkText}>保存</Text>
+                <Text style={s.saveText}>保存</Text>
               </TouchableOpacity>
             </View>
 
             {modal?.mode === 'edit' && modal.editId !== null && (
-              <TouchableOpacity style={s.modalDelete} onPress={() => removeBranch(modal.editId!)}>
-                <Text style={s.modalDeleteText}>この分岐を削除</Text>
+              <TouchableOpacity style={s.deleteSheetBtn} onPress={() => removeBranch(modal.editId!)}>
+                <Text style={s.deleteSheetText}>この分岐を削除</Text>
               </TouchableOpacity>
             )}
           </TouchableOpacity>
