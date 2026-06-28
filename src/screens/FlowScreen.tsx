@@ -122,7 +122,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   diamondText: { color: '#4c1d95', fontSize: 12, fontWeight: '800', textAlign: 'center' },
   diamondBadge: { color: '#7c3aed', fontSize: 10, fontWeight: '700', marginTop: 2 },
   branchDeleteBubble: {
-    position: 'absolute', top: 2, right: 2,
+    position: 'absolute', bottom: 2, right: 2,
     width: 24, height: 24, borderRadius: 12,
     backgroundColor: '#fef2f2', borderWidth: 1.5, borderColor: '#fca5a5',
     alignItems: 'center', justifyContent: 'center', zIndex: 10,
