@@ -1,6 +1,7 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, StatusBar, Modal,
+  Animated, PanResponder,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSQLiteContext } from 'expo-sqlite';
@@ -46,19 +47,22 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   terminator: { backgroundColor: C.termBg, borderWidth: 1.5, borderColor: C.termBorder, borderRadius: 22, paddingHorizontal: 30, paddingVertical: 10 },
   terminatorText: { color: C.termText, fontSize: 14, fontWeight: '800', letterSpacing: 1 },
 
-  slotWrap: { width: '100%' },
+  slotWrap: { width: '100%', overflow: 'visible' },
   slotBase: { width: '100%', minHeight: 60, borderWidth: 2, borderRadius: 12, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 12 },
   slotEmpty: { borderColor: C.border, borderStyle: 'dashed', backgroundColor: C.card },
   slotTarget: { borderColor: '#7c3aed', borderStyle: 'solid', backgroundColor: '#ede9fe' },
   slotFilled: { borderColor: C.termBorder, borderStyle: 'solid', backgroundColor: C.termBg },
   slotFilledTarget: { borderColor: '#7c3aed', borderStyle: 'solid', backgroundColor: C.termBg },
-  slotNum: { width: 26, height: 26, borderRadius: 13, backgroundColor: C.primarySoft, alignItems: 'center', justifyContent: 'center', marginRight: 12, flexShrink: 0 },
+  slotDragging: { opacity: 0.55, borderColor: '#7c3aed', borderStyle: 'dashed' },
+  slotNum: { width: 26, height: 26, borderRadius: 13, backgroundColor: C.primarySoft, alignItems: 'center', justifyContent: 'center', marginRight: 10, flexShrink: 0 },
   slotNumText: { color: C.primary, fontSize: 12, fontWeight: '800' },
   slotEmptyText: { flex: 1, color: C.muted, fontSize: 13 },
   slotCardArea: { flex: 1, flexDirection: 'row', alignItems: 'center' },
   slotCardText: { flex: 1, color: C.ink, fontSize: 14, fontWeight: '700' },
-  slotRemoveBtn: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fca5a5', alignItems: 'center', justifyContent: 'center', marginLeft: 8 },
+  slotRemoveBtn: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fca5a5', alignItems: 'center', justifyContent: 'center', marginLeft: 6 },
   slotRemoveText: { color: '#dc2626', fontSize: 16, fontWeight: '700', lineHeight: 20 },
+  dragHandle: { paddingHorizontal: 8, paddingVertical: 10, marginLeft: -4, marginRight: 4 },
+  dragHandleText: { color: C.muted, fontSize: 16 },
 
   emptyFlow: { paddingTop: 60, alignItems: 'center', gap: 10 },
   emptyTitle: { color: C.ink, fontSize: 16, fontWeight: '700' },
@@ -108,6 +112,27 @@ export default function FlowScreen({ navigation }: Props) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  // ── drag-to-reorder state ──
+  const [draggingIdx, setDraggingIdx] = useState<number | null>(null);
+  const draggingIdxRef = useRef<number | null>(null);
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
+  const hoverIdxRef = useRef<number | null>(null);
+  const dragY = useRef(new Animated.Value(0)).current;
+  const dragScale = useRef(new Animated.Value(1)).current;
+  const shiftAnims = useRef<Animated.Value[]>([]);
+  const slotHRef = useRef(80);
+  const slotsRef = useRef(slots);
+  const panRespMap = useRef<Map<number, ReturnType<typeof PanResponder.create>>>(new Map());
+
+  slotsRef.current = slots;
+
+  // sync shiftAnims length with slots
+  while (shiftAnims.current.length < slots.length) shiftAnims.current.push(new Animated.Value(0));
+  if (shiftAnims.current.length > slots.length) shiftAnims.current = shiftAnims.current.slice(0, slots.length);
+
+  // clear cached pan responders when slot count changes
+  useEffect(() => { panRespMap.current.clear(); }, [slots.length]);
+
   const isToday = selectedDate === today;
   const selDateObj = useMemo(() => new Date(`${selectedDate}T00:00:00`), [selectedDate]);
   const dateLabel = `${selDateObj.getFullYear()}/${pad(selDateObj.getMonth() + 1)}/${pad(selDateObj.getDate())} (${WEEKDAYS[selDateObj.getDay()]})`;
@@ -129,6 +154,7 @@ export default function FlowScreen({ navigation }: Props) {
     setAddedIds(ids);
     setSlots([...ids]);
     setSelectedCardId(null);
+    panRespMap.current.clear();
   }, [db, selectedDate]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -136,6 +162,86 @@ export default function FlowScreen({ navigation }: Props) {
   const taskById = useMemo(() => new Map(dueTasks.map(t => [t.id, t])), [dueTasks]);
   const tray = useMemo(() => addedIds.filter(id => !slots.includes(id)), [addedIds, slots]);
   const hasSelection = selectedCardId !== null;
+
+  // ── drag pan responder factory (keyed by slot index) ──
+  const getSlotPan = useCallback((slotIdx: number) => {
+    if (panRespMap.current.has(slotIdx)) return panRespMap.current.get(slotIdx)!;
+
+    const pan = PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, { dy }) => Math.abs(dy) > 5,
+      onPanResponderGrant: () => {
+        draggingIdxRef.current = slotIdx;
+        setDraggingIdx(slotIdx);
+        hoverIdxRef.current = slotIdx;
+        setHoverIdx(slotIdx);
+        dragY.setValue(0);
+        dragScale.setValue(1.04);
+        shiftAnims.current.forEach(a => a.setValue(0));
+      },
+      onPanResponderMove: (_, { dy }) => {
+        dragY.setValue(dy);
+        const n = slotsRef.current.length;
+        const slotH = slotHRef.current;
+        const newHover = Math.max(0, Math.min(n - 1, slotIdx + Math.round(dy / slotH)));
+        if (newHover !== hoverIdxRef.current) {
+          hoverIdxRef.current = newHover;
+          setHoverIdx(newHover);
+          shiftAnims.current.forEach((anim, i) => {
+            if (i === slotIdx) return;
+            let shift = 0;
+            if (newHover > slotIdx && i > slotIdx && i <= newHover) shift = -slotH;
+            else if (newHover < slotIdx && i < slotIdx && i >= newHover) shift = slotH;
+            Animated.spring(anim, { toValue: shift, useNativeDriver: true, tension: 300, friction: 25 }).start();
+          });
+        }
+      },
+      onPanResponderRelease: (_, { dy }) => {
+        const from = slotIdx;
+        const n = slotsRef.current.length;
+        const slotH = slotHRef.current;
+        const to = Math.max(0, Math.min(n - 1, from + Math.round(dy / slotH)));
+        const snapDy = (to - from) * slotH;
+
+        Animated.parallel([
+          Animated.spring(dragY, { toValue: snapDy, useNativeDriver: true, tension: 220, friction: 14 }),
+          Animated.spring(dragScale, { toValue: 1, useNativeDriver: true, tension: 220, friction: 14 }),
+          ...shiftAnims.current.map(a =>
+            Animated.spring(a, { toValue: 0, useNativeDriver: true, tension: 220, friction: 14 })
+          ),
+        ]).start(() => {
+          dragY.setValue(0);
+          dragScale.setValue(1);
+          shiftAnims.current.forEach(a => a.setValue(0));
+          draggingIdxRef.current = null;
+          hoverIdxRef.current = null;
+          setDraggingIdx(null);
+          setHoverIdx(null);
+          if (from !== to) {
+            panRespMap.current.clear();
+            setSlots(prev => {
+              const arr = [...prev];
+              const [item] = arr.splice(from, 1);
+              arr.splice(to, 0, item);
+              return arr;
+            });
+          }
+        });
+      },
+      onPanResponderTerminate: () => {
+        dragY.setValue(0);
+        dragScale.setValue(1);
+        shiftAnims.current.forEach(a => a.setValue(0));
+        draggingIdxRef.current = null;
+        hoverIdxRef.current = null;
+        setDraggingIdx(null);
+        setHoverIdx(null);
+      },
+    });
+
+    panRespMap.current.set(slotIdx, pan);
+    return pan;
+  }, []);
 
   const togglePicker = (id: number) => {
     if (addedIds.includes(id)) {
@@ -160,17 +266,19 @@ export default function FlowScreen({ navigation }: Props) {
   };
 
   const tapSlot = (idx: number) => {
+    if (draggingIdxRef.current !== null) return;
     if (selectedCardId === null) return;
-    setSlots(prev => prev.map((s, i) => {
+    setSlots(prev => prev.map((sv, i) => {
       if (i === idx) return selectedCardId;
-      if (s === selectedCardId) return null;
-      return s;
+      if (sv === selectedCardId) return null;
+      return sv;
     }));
     setSelectedCardId(null);
   };
 
   const removeFromSlot = (idx: number) => {
-    setSlots(prev => prev.map((s, i) => i === idx ? null : s));
+    if (draggingIdxRef.current !== null) return;
+    setSlots(prev => prev.map((sv, i) => i === idx ? null : sv));
   };
 
   const saveOrder = async () => {
@@ -210,7 +318,11 @@ export default function FlowScreen({ navigation }: Props) {
         </View>
       </LinearGradient>
 
-      <ScrollView style={s.flowScroll} contentContainerStyle={s.flowContent}>
+      <ScrollView
+        style={s.flowScroll}
+        contentContainerStyle={s.flowContent}
+        scrollEnabled={draggingIdx === null}
+      >
         {dueTasks.length === 0 ? (
           <View style={s.emptyFlow}>
             <Text style={s.emptyTitle}>この日のフローはありません</Text>
@@ -232,11 +344,33 @@ export default function FlowScreen({ navigation }: Props) {
 
             {slots.map((taskId, idx) => {
               const task = taskId !== null ? taskById.get(taskId) : undefined;
+              const isThisDragging = draggingIdx === idx;
+              const shiftAnim = shiftAnims.current[idx] ?? new Animated.Value(0);
+              const pan = task ? getSlotPan(idx) : null;
+
               return (
-                <View key={idx} style={s.slotWrap}>
+                <Animated.View
+                  key={idx}
+                  style={[
+                    s.slotWrap,
+                    isThisDragging
+                      ? { transform: [{ translateY: dragY }, { scale: dragScale }], zIndex: 10, elevation: 8 }
+                      : { transform: [{ translateY: shiftAnim }] },
+                  ]}
+                  onLayout={(e) => {
+                    slotHRef.current = e.nativeEvent.layout.height;
+                  }}
+                >
                   <ArrowDown color={C.line} />
                   {task ? (
-                    <View style={[s.slotBase, hasSelection ? s.slotFilledTarget : s.slotFilled]}>
+                    <View style={[
+                      s.slotBase,
+                      hasSelection ? s.slotFilledTarget : s.slotFilled,
+                      isThisDragging && s.slotDragging,
+                    ]}>
+                      <View {...pan!.panHandlers} style={s.dragHandle} hitSlop={{ top: 12, bottom: 12, left: 4, right: 4 }}>
+                        <Text style={s.dragHandleText}>☰</Text>
+                      </View>
                       <TouchableOpacity style={s.slotCardArea} onPress={() => tapSlot(idx)} activeOpacity={0.7}>
                         <View style={s.slotNum}>
                           <Text style={s.slotNumText}>{idx + 1}</Text>
@@ -263,7 +397,7 @@ export default function FlowScreen({ navigation }: Props) {
                       </Text>
                     </TouchableOpacity>
                   )}
-                </View>
+                </Animated.View>
               );
             })}
 
