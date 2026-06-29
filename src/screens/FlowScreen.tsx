@@ -98,7 +98,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   slotDragging: { opacity: 0.55, borderColor: '#7c3aed', borderStyle: 'dashed' },
   slotNum: { width: 26, height: 26, borderRadius: 13, backgroundColor: C.primarySoft, alignItems: 'center', justifyContent: 'center', marginRight: 10, flexShrink: 0 },
   slotNumText: { color: C.primary, fontSize: 12, fontWeight: '800' },
-  slotEmptyText: { flex: 1, color: C.muted, fontSize: 13 },
+  slotEmptyText: { flex: 1, color: 'rgba(100,116,139,0.48)', fontSize: 13, fontWeight: '500' },
   slotCardArea: { flex: 1, flexDirection: 'row', alignItems: 'center' },
   slotCardText: { flex: 1, color: C.ink, fontSize: 13, fontWeight: '700', lineHeight: 17 },
   slotRemoveBtn: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fca5a5', alignItems: 'center', justifyContent: 'center', marginLeft: 6 },
@@ -150,7 +150,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
 
   // ── branch insertion slot ──
   insertSlot: { width: '100%', paddingVertical: 9, borderWidth: 1.5, borderColor: '#fb923c', borderStyle: 'dashed', borderRadius: 10, alignItems: 'center', backgroundColor: '#fff7ed' },
-  insertSlotText: { color: '#c2410c', fontSize: 12, fontWeight: '700' },
+  insertSlotText: { color: 'rgba(194,65,12,0.5)', fontSize: 12, fontWeight: '600' },
   gapWrap: { width: '100%', overflow: 'visible' },
 
   // ── branch node (edit) ──
