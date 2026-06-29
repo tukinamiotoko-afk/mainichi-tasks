@@ -265,6 +265,10 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   subRemoveBtn: { marginTop: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fca5a5', alignItems: 'center', alignSelf: 'flex-end' },
   subRemoveBtnText: { color: '#dc2626', fontSize: 11, fontWeight: '700' },
 
+  // ── no-route insert slots ──
+  noInsertSlot: { paddingVertical: 7, borderWidth: 1.5, borderColor: '#fb923c', borderStyle: 'dashed', borderRadius: 8, alignItems: 'center', backgroundColor: '#fff7ed' },
+  noInsertSlotText: { color: '#c2410c', fontSize: 11, fontWeight: '700' },
+
   // ── branch editor modal ──
   branchEditorSheet: { backgroundColor: C.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '85%' },
   branchEditorSection: { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 6 },
@@ -666,14 +670,18 @@ export default function FlowScreen({ navigation }: Props) {
     );
   };
 
-  const getBranchLayout = (b: BranchNode, compact = false) => {
-    const subExtra = b.no.sub ? (compact ? 80 : 100) : 0;
-    const itemCount = Math.max(1, b.no.notes.length + b.no.taskIds.length);
+  const getBranchLayout = (b: BranchNode, compact = false, insertMode = false) => {
+    const sub = b.no.sub;
+    const subExtra = sub ? (compact ? 80 : 100) : 0;
+    const rawItemCount = b.no.notes.length + b.no.taskIds.length;
+    const itemCount = Math.max(1, rawItemCount);
     const routeTop = compact ? 30 : 40;
     const itemHeight = compact ? 43 : 50;
     const itemGap = compact ? 5 : 6;
     const baseRouteHeight = compact ? 122 : 150;
-    const routeHeight = Math.max(baseRouteHeight, 30 + itemCount * itemHeight + (itemCount - 1) * itemGap + subExtra);
+    const slotCount = (insertMode && !compact) ? (rawItemCount + 1 + (sub ? 1 : 0)) : 0;
+    const slotExtra = slotCount * 44;
+    const routeHeight = Math.max(baseRouteHeight, 30 + itemCount * itemHeight + (itemCount - 1) * itemGap + subExtra + slotExtra);
     const flowHeight = routeTop + routeHeight + (compact ? 32 : 30);
     const yesHeight = compact ? Math.max(120, routeHeight) : Math.max(140, routeHeight);
     return { routeHeight, flowHeight, yesHeight };
@@ -719,6 +727,50 @@ export default function FlowScreen({ navigation }: Props) {
     </View>
   );
 
+  const renderNoRouteItems = (b: BranchNode) => {
+    const slot = (k: string) => (
+      <TouchableOpacity key={`sl${k}`} style={s.noInsertSlot} onPress={() => editBranch(b)} activeOpacity={0.75}>
+        <Text style={s.noInsertSlotText}>＋ ここに追加</Text>
+      </TouchableOpacity>
+    );
+
+    const noteNodes = b.no.notes.map((note, i): [string, React.ReactNode] => [`n${i}`, (
+      <View key={`n${i}`} style={s.branchPathNote}>
+        <Text style={s.branchPathNoteText} numberOfLines={2}>{note}</Text>
+      </View>
+    )]);
+    const taskNodes = b.no.taskIds.map((id, i): [string, React.ReactNode] => {
+      const t = taskById.get(id);
+      return [`t${id}`, t ? (
+        <View key={`t${id}`} style={s.branchPathTask}>
+          <Text style={s.branchPathTaskText} numberOfLines={2}>{t.icon ? `${t.icon} ` : ''}{t.title}</Text>
+        </View>
+      ) : null];
+    });
+    const allEntries = [...noteNodes, ...taskNodes];
+
+    if (!insertBranchMode) {
+      const hasAny = allEntries.length > 0;
+      return (
+        <>
+          {hasAny ? allEntries.map(([, node]) => node) : <Text style={s.branchPathEmpty}>なし</Text>}
+          {b.no.sub && renderSubDiamond(b.no.sub)}
+        </>
+      );
+    }
+
+    const out: React.ReactNode[] = [slot('pre')];
+    allEntries.forEach(([key, node]) => {
+      if (node) out.push(node);
+      out.push(slot(`post-${key}`));
+    });
+    if (b.no.sub) {
+      out.push(<React.Fragment key="sub">{renderSubDiamond(b.no.sub)}</React.Fragment>);
+      out.push(slot('post-sub'));
+    }
+    return <>{out}</>;
+  };
+
   const renderBranchViewNode = (b: BranchNode) => {
     const layout = getBranchLayout(b, true);
     return (
@@ -757,7 +809,7 @@ export default function FlowScreen({ navigation }: Props) {
   };
 
   const renderBranchEditNode = (b: BranchNode) => {
-    const layout = getBranchLayout(b);
+    const layout = getBranchLayout(b, false, insertBranchMode);
     return (
     <View key={`be${b.id}`} style={s.branchNode}>
       <View style={[s.branchFlow, { minHeight: layout.flowHeight }]}>
@@ -791,8 +843,7 @@ export default function FlowScreen({ navigation }: Props) {
           <View style={[s.branchNoRail, { height: layout.routeHeight }]} pointerEvents="none" />
           <Text style={s.branchNoLabel}>いいえ</Text>
           <View style={s.branchNoItems}>
-            {renderPathItems(b.no)}
-            {b.no.sub && renderSubDiamond(b.no.sub)}
+            {renderNoRouteItems(b)}
           </View>
         </View>
         <View style={s.branchNoMergeLine} pointerEvents="none" />
