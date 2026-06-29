@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, StatusBar, Modal,
-  Animated, PanResponder, Platform,
+  Animated, PanResponder, Platform, TextInput,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,7 +10,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import { RootStackParamList } from '../../App';
-import { Task, getToday, getTasks, updateTaskSortOrders } from '../db/database';
+import { Task, getToday, getTasks, updateTaskSortOrders, getFlowBranches, addFlowBranch, updateFlowBranch, deleteFlowBranch } from '../db/database';
 import { isDueToday, WEEKDAYS } from '../constants/taskMeta';
 import { GRAD_START, GRAD_END } from '../constants/theme';
 import TabBar from '../components/TabBar';
@@ -18,6 +18,7 @@ import { useTheme, ColorSet } from '../contexts/ThemeContext';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'Flow'> };
+type BranchNode = { id: number | null; insertAfterIdx: number; question: string; yesIds: number[]; noIds: number[] };
 
 function ArrowDown({ color, h = 18 }: { color: string; h?: number }) {
   return (
@@ -115,6 +116,58 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   editCard: { marginTop: 20, width: '100%', paddingVertical: 16, borderRadius: 14, borderWidth: 1.5, borderColor: C.primary, backgroundColor: C.primarySoft, alignItems: 'center', justifyContent: 'center' },
   editCardText: { color: C.primary, fontSize: 14, fontWeight: '800', letterSpacing: 0.5 },
   datePickerSheet: { backgroundColor: C.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 24 },
+
+  // ── branch button in header ──
+  branchBtn: { paddingHorizontal: 10, paddingVertical: 8, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.18)' },
+  branchBtnText: { color: '#ffffff', fontSize: 11, fontWeight: '800' },
+  branchBtnActive: { backgroundColor: 'rgba(255,237,213,0.9)' },
+  branchBtnActiveText: { color: '#c2410c', fontSize: 11, fontWeight: '900' },
+
+  // ── branch insertion slot ──
+  insertSlot: { width: '100%', paddingVertical: 9, borderWidth: 1.5, borderColor: '#fb923c', borderStyle: 'dashed', borderRadius: 10, alignItems: 'center', backgroundColor: '#fff7ed' },
+  insertSlotText: { color: '#c2410c', fontSize: 12, fontWeight: '700' },
+  gapWrap: { width: '100%' },
+
+  // ── branch node (edit) ──
+  branchNode: { width: '100%', borderWidth: 2, borderRadius: 12, borderColor: '#d97706', backgroundColor: '#fffbeb', padding: 12 },
+  branchNodeHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 6 },
+  branchNodeQ: { flex: 1, color: '#78350f', fontSize: 13, fontWeight: '800' },
+  branchNodeBtns: { flexDirection: 'row', gap: 6 },
+  branchEditBtn: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, backgroundColor: '#fef3c7', borderWidth: 1, borderColor: '#d97706' },
+  branchEditBtnText: { color: '#92400e', fontSize: 11, fontWeight: '700' },
+  branchDelBtn: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fca5a5' },
+  branchDelBtnText: { color: '#dc2626', fontSize: 13, fontWeight: '700', lineHeight: 16 },
+  branchPath: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 2 },
+  branchPathLabel: { color: '#92400e', fontSize: 11, fontWeight: '800', paddingTop: 3, minWidth: 30 },
+  branchPathTasks: { flex: 1, gap: 3 },
+  branchPathTask: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: '#d97706', backgroundColor: '#fff' },
+  branchPathTaskText: { color: '#78350f', fontSize: 12, fontWeight: '600' },
+  branchPathEmpty: { color: '#d97706', fontSize: 11, fontStyle: 'italic' },
+
+  // ── branch node (view) ──
+  viewBranch: { width: '100%', borderWidth: 1.5, borderRadius: 10, borderColor: '#d97706', backgroundColor: '#fffbeb', paddingHorizontal: 12, paddingVertical: 8 },
+  viewBranchQ: { color: '#78350f', fontSize: 12, fontWeight: '800', marginBottom: 5 },
+  viewBranchPath: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 2 },
+  viewBranchLabel: { color: '#92400e', fontSize: 10, fontWeight: '800', paddingTop: 2, minWidth: 26 },
+  viewBranchTask: { color: '#78350f', fontSize: 11, fontWeight: '600' },
+
+  // ── branch editor modal ──
+  branchEditorSheet: { backgroundColor: C.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '85%' },
+  branchEditorSection: { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 6 },
+  branchEditorLabel: { color: C.muted, fontSize: 11, fontWeight: '800', letterSpacing: 0.5, marginBottom: 6 },
+  branchEditorInput: { borderWidth: 1.5, borderColor: C.border, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, fontSize: 15, color: C.ink, backgroundColor: C.body },
+  branchTaskRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: C.grid, gap: 8 },
+  branchTaskText: { flex: 1, color: C.ink, fontSize: 14, fontWeight: '600' },
+  branchCheckY: { width: 28, height: 28, borderRadius: 14, borderWidth: 2, borderColor: '#16a34a', alignItems: 'center', justifyContent: 'center' },
+  branchCheckYOn: { backgroundColor: '#16a34a' },
+  branchCheckN: { width: 28, height: 28, borderRadius: 14, borderWidth: 2, borderColor: '#dc2626', alignItems: 'center', justifyContent: 'center' },
+  branchCheckNOn: { backgroundColor: '#dc2626' },
+  branchCheckText: { color: '#ffffff', fontSize: 13, fontWeight: '900' },
+  branchCheckLabels: { flexDirection: 'row', gap: 4, alignItems: 'center' },
+  branchCheckLabelY: { color: '#15803d', fontSize: 10, fontWeight: '700', width: 28, textAlign: 'center' },
+  branchCheckLabelN: { color: '#b91c1c', fontSize: 10, fontWeight: '700', width: 28, textAlign: 'center' },
+  branchSaveBtn: { margin: 16, paddingVertical: 14, borderRadius: 12, backgroundColor: '#d97706', alignItems: 'center' },
+  branchSaveBtnText: { color: '#ffffff', fontSize: 15, fontWeight: '800' },
 });
 
 export default function FlowScreen({ navigation }: Props) {
@@ -133,6 +186,10 @@ export default function FlowScreen({ navigation }: Props) {
   const [saving, setSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [branches, setBranches] = useState<BranchNode[]>([]);
+  const [insertBranchMode, setInsertBranchMode] = useState(false);
+  const [branchEditorOpen, setBranchEditorOpen] = useState(false);
+  const [branchDraft, setBranchDraft] = useState<BranchNode | null>(null);
 
   // ── drag-to-reorder state ──
   const [draggingIdx, setDraggingIdx] = useState<number | null>(null);
@@ -175,7 +232,16 @@ export default function FlowScreen({ navigation }: Props) {
     setSlots([...ids]);
     setSelectedCardId(null);
     setIsEditing(false);
+    setInsertBranchMode(false);
     panRespMap.current.clear();
+    const branchRows = await getFlowBranches(db);
+    setBranches(branchRows.map(b => ({
+      id: b.id,
+      insertAfterIdx: b.after_task_id ?? -1,
+      question: b.question,
+      yesIds: b.yes_text ? (JSON.parse(b.yes_text) as number[]) : [],
+      noIds: b.no_text ? (JSON.parse(b.no_text) as number[]) : [],
+    })));
   }, [db, selectedDate]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -308,10 +374,132 @@ export default function FlowScreen({ navigation }: Props) {
       const trayIds = addedIds.filter(id => !slots.includes(id));
       await updateTaskSortOrders(db, [...placedIds, ...trayIds]);
       setIsEditing(false);
+      setInsertBranchMode(false);
       setSelectedCardId(null);
     } finally {
       setSaving(false);
     }
+  };
+
+  const openBranchEditor = (afterIdx: number) => {
+    setBranchDraft({ id: null, insertAfterIdx: afterIdx, question: '', yesIds: [], noIds: [] });
+    setBranchEditorOpen(true);
+  };
+  const editBranch = (b: BranchNode) => { setBranchDraft({ ...b }); setBranchEditorOpen(true); };
+  const deleteBranch = async (id: number) => {
+    await deleteFlowBranch(db, id);
+    setBranches(prev => prev.filter(b => b.id !== id));
+  };
+  const saveBranchDraft = async () => {
+    if (!branchDraft) return;
+    const data = {
+      after_task_id: branchDraft.insertAfterIdx,
+      question: branchDraft.question || '確認',
+      yes_label: 'はい', yes_text: JSON.stringify(branchDraft.yesIds),
+      no_label: 'いいえ', no_text: JSON.stringify(branchDraft.noIds),
+      branch_side: 'left' as const,
+    };
+    if (branchDraft.id !== null) {
+      await updateFlowBranch(db, branchDraft.id, data);
+      setBranches(prev => prev.map(b => b.id === branchDraft!.id ? { ...branchDraft! } : b));
+    } else {
+      const newId = await addFlowBranch(db, data);
+      setBranches(prev => [...prev, { ...branchDraft!, id: newId }]);
+    }
+    setBranchEditorOpen(false);
+    setBranchDraft(null);
+    setInsertBranchMode(false);
+  };
+  const toggleBranchY = (id: number) => setBranchDraft(p => p ? ({
+    ...p, yesIds: p.yesIds.includes(id) ? p.yesIds.filter(x => x !== id) : [...p.yesIds, id],
+  }) : p);
+  const toggleBranchN = (id: number) => setBranchDraft(p => p ? ({
+    ...p, noIds: p.noIds.includes(id) ? p.noIds.filter(x => x !== id) : [...p.noIds, id],
+  }) : p);
+
+  // ── branch rendering helpers ──
+  const renderBranchViewNode = (b: BranchNode) => (
+    <View key={`bv${b.id}`} style={s.viewBranch}>
+      <Text style={s.viewBranchQ}>◇ {b.question || '確認'}</Text>
+      {([['はい', b.yesIds], ['いいえ', b.noIds]] as [string, number[]][]).map(([lbl, ids]) => (
+        <View key={lbl} style={s.viewBranchPath}>
+          <Text style={s.viewBranchLabel}>{lbl}</Text>
+          <View style={{ flex: 1 }}>
+            {ids.length === 0
+              ? <Text style={s.viewBranchTask}>—</Text>
+              : ids.map(id => { const t = taskById.get(id); return t ? <Text key={id} style={s.viewBranchTask} numberOfLines={1}>{t.icon ? `${t.icon} ` : ''}{t.title}</Text> : null; })}
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+
+  const renderBranchEditNode = (b: BranchNode) => (
+    <View key={`be${b.id}`} style={s.branchNode}>
+      <View style={s.branchNodeHeader}>
+        <Text style={s.branchNodeQ}>◇ {b.question || '確認'}</Text>
+        <View style={s.branchNodeBtns}>
+          <TouchableOpacity style={s.branchEditBtn} onPress={() => editBranch(b)}>
+            <Text style={s.branchEditBtnText}>編集</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={s.branchDelBtn} onPress={() => b.id !== null && deleteBranch(b.id)}>
+            <Text style={s.branchDelBtnText}>×</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+      {([['はい', b.yesIds], ['いいえ', b.noIds]] as [string, number[]][]).map(([lbl, ids]) => (
+        <View key={lbl} style={s.branchPath}>
+          <Text style={s.branchPathLabel}>{lbl}</Text>
+          <View style={s.branchPathTasks}>
+            {ids.length === 0
+              ? <Text style={s.branchPathEmpty}>タスクなし</Text>
+              : ids.map(id => { const t = taskById.get(id); return t ? (
+                <View key={id} style={s.branchPathTask}>
+                  <Text style={s.branchPathTaskText} numberOfLines={1}>{t.icon ? `${t.icon} ` : ''}{t.title}</Text>
+                </View>
+              ) : null; })}
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+
+  const renderGap = (afterIdx: number) => {
+    const here = branches.filter(b => b.insertAfterIdx === afterIdx);
+    if (here.length === 0 && !insertBranchMode) return null;
+    return (
+      <View style={s.gapWrap}>
+        {here.map(b => (
+          <React.Fragment key={`g${b.id}`}>
+            <ArrowDown color={C.line} h={12} />
+            {renderBranchEditNode(b)}
+          </React.Fragment>
+        ))}
+        {insertBranchMode && (
+          <>
+            <ArrowDown color="#fb923c" h={12} />
+            <TouchableOpacity style={s.insertSlot} onPress={() => openBranchEditor(afterIdx)}>
+              <Text style={s.insertSlotText}>＋ 分岐をここに追加</Text>
+            </TouchableOpacity>
+          </>
+        )}
+      </View>
+    );
+  };
+
+  const renderViewGap = (afterIdx: number) => {
+    const here = branches.filter(b => b.insertAfterIdx === afterIdx);
+    if (here.length === 0) return null;
+    return (
+      <View style={s.gapWrap}>
+        {here.map(b => (
+          <React.Fragment key={`gv${b.id}`}>
+            <ArrowDown color={C.line} h={12} />
+            {renderBranchViewNode(b)}
+          </React.Fragment>
+        ))}
+      </View>
+    );
   };
 
   // ── view mode flow ──
@@ -320,29 +508,33 @@ export default function FlowScreen({ navigation }: Props) {
       <View style={s.viewTerminator}>
         <Text style={s.viewTerminatorText}>開始</Text>
       </View>
+      {renderViewGap(-1)}
       {slots.map((taskId, idx) => {
         const task = taskId !== null ? taskById.get(taskId) : undefined;
         return (
-          <View key={idx} style={s.viewSlotWrap}>
-            <ArrowDown color={C.line} h={14} />
-            {task ? (
-              <View style={s.viewSlot}>
-                <View style={s.viewSlotNum}>
-                  <Text style={s.viewSlotNumText}>{idx + 1}</Text>
+          <React.Fragment key={idx}>
+            <View style={s.viewSlotWrap}>
+              <ArrowDown color={C.line} h={14} />
+              {task ? (
+                <View style={s.viewSlot}>
+                  <View style={s.viewSlotNum}>
+                    <Text style={s.viewSlotNumText}>{idx + 1}</Text>
+                  </View>
+                  <Text style={s.viewSlotText} numberOfLines={1}>
+                    {task.icon ? `${task.icon} ` : ''}{task.title}
+                  </Text>
                 </View>
-                <Text style={s.viewSlotText} numberOfLines={1}>
-                  {task.icon ? `${task.icon} ` : ''}{task.title}
-                </Text>
-              </View>
-            ) : (
-              <View style={[s.viewSlot, s.viewSlotEmpty]}>
-                <View style={s.viewSlotNum}>
-                  <Text style={s.viewSlotNumText}>{idx + 1}</Text>
+              ) : (
+                <View style={[s.viewSlot, s.viewSlotEmpty]}>
+                  <View style={s.viewSlotNum}>
+                    <Text style={s.viewSlotNumText}>{idx + 1}</Text>
+                  </View>
+                  <Text style={s.viewSlotEmptyText}>空き</Text>
                 </View>
-                <Text style={s.viewSlotEmptyText}>空き</Text>
-              </View>
-            )}
-          </View>
+              )}
+            </View>
+            {renderViewGap(idx)}
+          </React.Fragment>
         );
       })}
       <ArrowDown color={C.line} h={14} />
@@ -361,6 +553,7 @@ export default function FlowScreen({ navigation }: Props) {
       <View style={s.terminator}>
         <Text style={s.terminatorText}>開始</Text>
       </View>
+      {renderGap(-1)}
       {slots.map((taskId, idx) => {
         const task = taskId !== null ? taskById.get(taskId) : undefined;
         const isThisDragging = draggingIdx === idx;
@@ -368,53 +561,55 @@ export default function FlowScreen({ navigation }: Props) {
         const pan = task ? getSlotPan(idx) : null;
 
         return (
-          <Animated.View
-            key={idx}
-            style={[
-              s.slotWrap,
-              isThisDragging
-                ? { transform: [{ translateY: dragY }, { scale: dragScale }], zIndex: 10, elevation: 8 }
-                : { transform: [{ translateY: shiftAnim }] },
-            ]}
-            onLayout={(e) => { slotHRef.current = e.nativeEvent.layout.height; }}
-          >
-            <ArrowDown color={C.line} />
-            {task ? (
-              <View style={[
-                s.slotBase,
-                hasSelection ? s.slotFilledTarget : s.slotFilled,
-                isThisDragging && s.slotDragging,
-              ]}>
-                <View {...pan!.panHandlers} style={s.dragHandle} hitSlop={{ top: 12, bottom: 12, left: 4, right: 4 }}>
-                  <Text style={s.dragHandleText}>☰</Text>
+          <React.Fragment key={idx}>
+            <Animated.View
+              style={[
+                s.slotWrap,
+                isThisDragging
+                  ? { transform: [{ translateY: dragY }, { scale: dragScale }], zIndex: 10, elevation: 8 }
+                  : { transform: [{ translateY: shiftAnim }] },
+              ]}
+              onLayout={(e) => { slotHRef.current = e.nativeEvent.layout.height; }}
+            >
+              <ArrowDown color={C.line} />
+              {task ? (
+                <View style={[
+                  s.slotBase,
+                  hasSelection ? s.slotFilledTarget : s.slotFilled,
+                  isThisDragging && s.slotDragging,
+                ]}>
+                  <View {...pan!.panHandlers} style={s.dragHandle} hitSlop={{ top: 12, bottom: 12, left: 4, right: 4 }}>
+                    <Text style={s.dragHandleText}>☰</Text>
+                  </View>
+                  <TouchableOpacity style={s.slotCardArea} onPress={() => tapSlot(idx)} activeOpacity={0.7}>
+                    <View style={s.slotNum}>
+                      <Text style={s.slotNumText}>{idx + 1}</Text>
+                    </View>
+                    <Text style={s.slotCardText} numberOfLines={2}>
+                      {task.icon ? `${task.icon} ` : ''}{task.title}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={s.slotRemoveBtn} onPress={() => removeFromSlot(idx)}>
+                    <Text style={s.slotRemoveText}>×</Text>
+                  </TouchableOpacity>
                 </View>
-                <TouchableOpacity style={s.slotCardArea} onPress={() => tapSlot(idx)} activeOpacity={0.7}>
+              ) : (
+                <TouchableOpacity
+                  style={[s.slotBase, hasSelection ? s.slotTarget : s.slotEmpty]}
+                  onPress={() => tapSlot(idx)}
+                  activeOpacity={0.75}
+                >
                   <View style={s.slotNum}>
                     <Text style={s.slotNumText}>{idx + 1}</Text>
                   </View>
-                  <Text style={s.slotCardText} numberOfLines={2}>
-                    {task.icon ? `${task.icon} ` : ''}{task.title}
+                  <Text style={s.slotEmptyText}>
+                    {hasSelection ? 'ここに入れる' : 'カードを入れる'}
                   </Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={s.slotRemoveBtn} onPress={() => removeFromSlot(idx)}>
-                  <Text style={s.slotRemoveText}>×</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <TouchableOpacity
-                style={[s.slotBase, hasSelection ? s.slotTarget : s.slotEmpty]}
-                onPress={() => tapSlot(idx)}
-                activeOpacity={0.75}
-              >
-                <View style={s.slotNum}>
-                  <Text style={s.slotNumText}>{idx + 1}</Text>
-                </View>
-                <Text style={s.slotEmptyText}>
-                  {hasSelection ? 'ここに入れる' : 'カードを入れる'}
-                </Text>
-              </TouchableOpacity>
-            )}
-          </Animated.View>
+              )}
+            </Animated.View>
+            {renderGap(idx)}
+          </React.Fragment>
         );
       })}
       <ArrowDown color={C.line} />
@@ -439,9 +634,17 @@ export default function FlowScreen({ navigation }: Props) {
           </TouchableOpacity>
           <View style={s.navRight}>
             {isEditing && (
-              <TouchableOpacity style={s.saveBtn} onPress={saveOrder} disabled={saving}>
-                <Text style={s.saveBtnText}>{saving ? '…' : '保存'}</Text>
-              </TouchableOpacity>
+              <>
+                <TouchableOpacity
+                  style={[s.branchBtn, insertBranchMode && s.branchBtnActive]}
+                  onPress={() => setInsertBranchMode(p => !p)}
+                >
+                  <Text style={[s.branchBtnText, insertBranchMode && s.branchBtnActiveText]}>分岐</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={s.saveBtn} onPress={saveOrder} disabled={saving}>
+                  <Text style={s.saveBtnText}>{saving ? '…' : '保存'}</Text>
+                </TouchableOpacity>
+              </>
             )}
             <TouchableOpacity style={s.navBtn} onPress={() => shiftSelected(1)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Text style={s.navArrow}>›</Text>
@@ -539,6 +742,59 @@ export default function FlowScreen({ navigation }: Props) {
                   );
                 })
               )}
+            </ScrollView>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Branch editor modal */}
+      <Modal visible={branchEditorOpen} transparent animationType="slide" onRequestClose={() => { setBranchEditorOpen(false); setBranchDraft(null); }}>
+        <TouchableOpacity style={s.pickerOverlay} activeOpacity={1} onPress={() => { setBranchEditorOpen(false); setBranchDraft(null); }}>
+          <TouchableOpacity activeOpacity={1} style={s.branchEditorSheet} onPress={() => {}}>
+            <View style={s.pickerHeader}>
+              <Text style={s.pickerTitle}>分岐を設定</Text>
+              <TouchableOpacity onPress={saveBranchDraft}>
+                <Text style={s.pickerDone}>完了</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView keyboardShouldPersistTaps="handled" bounces={false}>
+              <View style={s.branchEditorSection}>
+                <Text style={s.branchEditorLabel}>条件</Text>
+                <TextInput
+                  style={s.branchEditorInput}
+                  value={branchDraft?.question ?? ''}
+                  onChangeText={t => setBranchDraft(p => p ? { ...p, question: t } : p)}
+                  placeholder="例: 完了した？"
+                  placeholderTextColor={C.muted}
+                />
+              </View>
+              <View style={s.branchEditorSection}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Text style={[s.branchEditorLabel, { flex: 1 }]}>タスクを各パスに追加</Text>
+                  <View style={s.branchCheckLabels}>
+                    <Text style={s.branchCheckLabelY}>はい</Text>
+                    <Text style={s.branchCheckLabelN}>いいえ</Text>
+                  </View>
+                </View>
+              </View>
+              {dueTasks.map(t => {
+                const inY = branchDraft?.yesIds.includes(t.id) ?? false;
+                const inN = branchDraft?.noIds.includes(t.id) ?? false;
+                return (
+                  <View key={t.id} style={s.branchTaskRow}>
+                    <Text style={s.branchTaskText} numberOfLines={2}>{t.icon ? `${t.icon} ` : ''}{t.title}</Text>
+                    <TouchableOpacity style={[s.branchCheckY, inY && s.branchCheckYOn]} onPress={() => toggleBranchY(t.id)}>
+                      {inY && <Text style={s.branchCheckText}>✓</Text>}
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[s.branchCheckN, inN && s.branchCheckNOn]} onPress={() => toggleBranchN(t.id)}>
+                      {inN && <Text style={s.branchCheckText}>✓</Text>}
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
+              <TouchableOpacity style={s.branchSaveBtn} onPress={saveBranchDraft}>
+                <Text style={s.branchSaveBtnText}>保存</Text>
+              </TouchableOpacity>
             </ScrollView>
           </TouchableOpacity>
         </TouchableOpacity>
