@@ -201,9 +201,9 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   branchYesLabel: { position: 'absolute', right: 34, top: 12, color: C.line, fontSize: 11, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 4 },
   branchYesItems: { width: 152, alignItems: 'center', gap: 5, display: 'none' },
   branchNoRoute: { position: 'absolute', top: 40, left: '50%', right: -86, height: 150, zIndex: 1 },
-  branchNoRail: { position: 'absolute', top: 0, right: 0, width: '100%', height: 150, borderTopWidth: 2, borderRightWidth: 2, borderBottomWidth: 2, borderColor: C.line },
+  branchNoRail: { position: 'absolute', top: 0, left: 0, right: 76, height: 150, borderTopWidth: 2, borderRightWidth: 2, borderBottomWidth: 2, borderColor: C.line },
   branchNoMergeLine: { display: 'none' },
-  branchNoLabel: { position: 'absolute', top: -20, left: 145, color: C.line, fontSize: 11, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 4 },
+  branchNoLabel: { position: 'absolute', top: -20, left: 143, color: C.line, fontSize: 11, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 4 },
   branchNoItems: { position: 'absolute', top: 30, right: -8, width: 168, alignItems: 'stretch', gap: 6 },
   branchPathTask: { width: 168, minHeight: 44, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8, borderWidth: 1.5, borderColor: C.line, backgroundColor: '#fff' },
   branchPathNote: { width: 168, minHeight: 44, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8, borderWidth: 1.5, borderColor: C.line, backgroundColor: '#fff' },
@@ -230,9 +230,9 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   viewBranchLabel: { position: 'absolute', right: 30, top: 10, color: C.line, fontSize: 10, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 4 },
   viewBranchYesItems: { width: 128, alignItems: 'center', gap: 4, display: 'none' },
   viewBranchNoRoute: { position: 'absolute', top: 30, left: '50%', right: -70, height: 122, zIndex: 1 },
-  viewBranchNoRail: { position: 'absolute', top: 0, right: 0, width: '100%', height: 122, borderTopWidth: 2, borderRightWidth: 2, borderBottomWidth: 2, borderColor: C.line },
+  viewBranchNoRail: { position: 'absolute', top: 0, left: 0, right: 69, height: 122, borderTopWidth: 2, borderRightWidth: 2, borderBottomWidth: 2, borderColor: C.line },
   viewBranchNoMergeLine: { display: 'none' },
-  viewBranchNoLabel: { position: 'absolute', top: -18, left: 115, color: C.line, fontSize: 10, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 4 },
+  viewBranchNoLabel: { position: 'absolute', top: -18, left: 105, color: C.line, fontSize: 10, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 4 },
   viewBranchNoItems: { position: 'absolute', top: 24, right: -6, width: 150, alignItems: 'stretch', gap: 5 },
   viewBranchTaskBox: { width: 150, minHeight: 38, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 7, borderWidth: 1.5, borderColor: C.line, backgroundColor: '#fff' },
   viewBranchNoteBox: { width: 150, minHeight: 38, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 7, borderWidth: 1.5, borderColor: C.line, backgroundColor: '#fff' },
@@ -560,6 +560,7 @@ export default function FlowScreen({ navigation }: Props) {
   const editBranch = (b: BranchNode) => {
     setBranchDraft({ id: b.id, insertAfterIdx: b.insertAfterIdx, question: b.question, yes: { ...b.yes }, no: { ...b.no } });
     setBranchNoteDraft({ yes: '', no: '' });
+    setSubNoteDraft({ yes: '', no: '' });
     setBranchEditorOpen(true);
   };
   const deleteBranch = async (id: number) => {
@@ -585,8 +586,9 @@ export default function FlowScreen({ navigation }: Props) {
       no_label: 'いいえ', no_text: stringifyBranchPath(branchDraft.no),
       branch_side: 'left' as const,
     };
-    if (branchDraft.id !== null) {
-      await updateFlowBranch(db, branchDraft.id, data);
+    const isNew = branchDraft.id === null;
+    if (!isNew) {
+      await updateFlowBranch(db, branchDraft.id!, data);
       setBranches(prev => prev.map(b => b.id === branchDraft!.id ? { ...branchDraft! } : b));
     } else {
       const newId = await addFlowBranch(db, data);
@@ -595,7 +597,8 @@ export default function FlowScreen({ navigation }: Props) {
     setBranchEditorOpen(false);
     setBranchDraft(null);
     setBranchNoteDraft({ yes: '', no: '' });
-    setInsertBranchMode(false);
+    setSubNoteDraft({ yes: '', no: '' });
+    if (isNew) setInsertBranchMode(false);
   };
   const toggleBranchY = (id: number) => setBranchDraft(p => p ? ({
     ...p, yes: { ...p.yes, taskIds: p.yes.taskIds.includes(id) ? p.yes.taskIds.filter(x => x !== id) : [...p.yes.taskIds, id] },
