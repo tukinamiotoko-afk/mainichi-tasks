@@ -269,13 +269,6 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   noInsertSlot: { paddingVertical: 7, borderWidth: 1.5, borderColor: '#fb923c', borderStyle: 'dashed', borderRadius: 8, alignItems: 'center', backgroundColor: '#fff7ed' },
   noInsertSlotText: { color: '#c2410c', fontSize: 11, fontWeight: '700' },
 
-  // ── quick-add modal ──
-  quickAddSheet: { backgroundColor: C.card, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
-  quickAddBody: { padding: 20 },
-  quickAddInput: { borderWidth: 1.5, borderColor: C.line, borderRadius: 10, padding: 12, minHeight: 80, fontSize: 14, color: C.ink, textAlignVertical: 'top', marginBottom: 12 },
-  quickAddBtn: { backgroundColor: '#d97706', borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
-  quickAddBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
-
   // ── branch editor modal ──
   branchEditorSheet: { backgroundColor: C.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '85%' },
   branchEditorSection: { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 6 },
@@ -325,9 +318,6 @@ export default function FlowScreen({ navigation }: Props) {
   const [branchDraft, setBranchDraft] = useState<BranchNode | null>(null);
   const [branchNoteDraft, setBranchNoteDraft] = useState({ yes: '', no: '' });
   const [subNoteDraft, setSubNoteDraft] = useState({ yes: '', no: '' });
-  const [quickAddOpen, setQuickAddOpen] = useState(false);
-  const [quickAddBranch, setQuickAddBranch] = useState<BranchNode | null>(null);
-  const [quickAddText, setQuickAddText] = useState('');
   const [manualFlowScale, setManualFlowScale] = useState<number | null>(null);
   const [isPinching, setIsPinching] = useState(false);
 
@@ -573,31 +563,20 @@ export default function FlowScreen({ navigation }: Props) {
     setSubNoteDraft({ yes: '', no: '' });
     setBranchEditorOpen(true);
   };
-  const openQuickAdd = (b: BranchNode) => {
-    setQuickAddBranch(b);
-    setQuickAddText('');
-    setQuickAddOpen(true);
-  };
-  const saveQuickAdd = async () => {
-    if (!quickAddBranch || !quickAddText.trim()) return;
-    const updated: BranchNode = {
-      ...quickAddBranch,
-      no: { ...quickAddBranch.no, notes: [...quickAddBranch.no.notes, quickAddText.trim()] },
-    };
-    const data = {
-      after_task_id: updated.insertAfterIdx,
-      question: updated.question || '確認',
-      yes_label: 'はい', yes_text: stringifyBranchPath(updated.yes),
-      no_label: 'いいえ', no_text: stringifyBranchPath(updated.no),
-      branch_side: 'left' as const,
-    };
-    if (updated.id !== null) {
-      await updateFlowBranch(db, updated.id!, data);
-      setBranches(prev => prev.map(b => b.id === updated.id ? updated : b));
-    }
-    setQuickAddOpen(false);
-    setQuickAddBranch(null);
-    setQuickAddText('');
+  const openNoRouteBranchEditor = (b: BranchNode) => {
+    setBranchDraft({
+      id: b.id,
+      insertAfterIdx: b.insertAfterIdx,
+      question: b.question,
+      yes: { ...b.yes },
+      no: {
+        ...b.no,
+        sub: b.no.sub ?? { question: '', yesReturns: true, yes: emptyItems(), no: emptyItems() },
+      },
+    });
+    setBranchNoteDraft({ yes: '', no: '' });
+    setSubNoteDraft({ yes: '', no: '' });
+    setBranchEditorOpen(true);
   };
   const deleteBranch = async (id: number) => {
     await deleteFlowBranch(db, id);
@@ -606,7 +585,7 @@ export default function FlowScreen({ navigation }: Props) {
   const saveBranchDraft = async () => {
     if (!branchDraft) return;
     const hasTaskBelow = slots.slice(branchDraft.insertAfterIdx + 1).some(id => id !== null);
-    const hasNoRoute = branchDraft.no.notes.length > 0 || branchDraft.no.taskIds.length > 0;
+    const hasNoRoute = branchDraft.no.notes.length > 0 || branchDraft.no.taskIds.length > 0 || !!branchDraft.no.sub;
     if (!hasTaskBelow) {
       Alert.alert('下にタスクが必要です', '分岐は、下に進むタスクがある場所に置いてください。');
       return;
@@ -768,8 +747,8 @@ export default function FlowScreen({ navigation }: Props) {
 
   const renderNoRouteItems = (b: BranchNode) => {
     const slot = (k: string) => (
-      <TouchableOpacity key={`sl${k}`} style={s.noInsertSlot} onPress={() => openQuickAdd(b)} activeOpacity={0.75}>
-        <Text style={s.noInsertSlotText}>＋ ここに追加</Text>
+      <TouchableOpacity key={`sl${k}`} style={s.noInsertSlot} onPress={() => openNoRouteBranchEditor(b)} activeOpacity={0.75}>
+        <Text style={s.noInsertSlotText}>＋ 分岐をここに追加</Text>
       </TouchableOpacity>
     );
 
@@ -1322,33 +1301,6 @@ export default function FlowScreen({ navigation }: Props) {
                 <Text style={s.branchSaveBtnText}>保存</Text>
               </TouchableOpacity>
             </ScrollView>
-          </TouchableOpacity>
-        </TouchableOpacity>
-      </Modal>
-
-      {/* Quick-add no-route note modal */}
-      <Modal visible={quickAddOpen} transparent animationType="slide" onRequestClose={() => setQuickAddOpen(false)}>
-        <TouchableOpacity style={s.pickerOverlay} activeOpacity={1} onPress={() => setQuickAddOpen(false)}>
-          <TouchableOpacity activeOpacity={1} style={s.quickAddSheet} onPress={() => {}}>
-            <View style={s.pickerHeader}>
-              <Text style={s.pickerTitle}>いいえルートに追加</Text>
-              <TouchableOpacity onPress={() => setQuickAddOpen(false)}>
-                <Text style={s.pickerDone}>✕</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={s.quickAddBody}>
-              <TextInput
-                style={s.quickAddInput}
-                value={quickAddText}
-                onChangeText={setQuickAddText}
-                placeholder="メモを入力…"
-                autoFocus
-                multiline
-              />
-              <TouchableOpacity style={s.quickAddBtn} onPress={saveQuickAdd}>
-                <Text style={s.quickAddBtnText}>追加</Text>
-              </TouchableOpacity>
-            </View>
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
