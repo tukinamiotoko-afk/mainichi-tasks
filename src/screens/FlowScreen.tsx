@@ -178,10 +178,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   branchYesLabel: { position: 'absolute', right: 34, top: 12, color: C.line, fontSize: 11, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 4 },
   branchYesItems: { width: 152, alignItems: 'center', gap: 5, display: 'none' },
   branchNoRoute: { position: 'absolute', top: 40, left: '50%', right: -86, height: 150, zIndex: 1 },
-  branchNoTopLine: { position: 'absolute', top: 0, left: 130, right: 0, height: 2, backgroundColor: C.line },
-  branchNoRightLine: { position: 'absolute', top: 0, right: 0, width: 2, height: 150, backgroundColor: C.line },
-  branchNoBottomLine: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, backgroundColor: C.line },
-  branchNoRail: { position: 'absolute', top: 0, right: 0, width: '100%', height: 150 },
+  branchNoRail: { position: 'absolute', top: 0, right: 0, width: '100%', height: 150, borderTopWidth: 2, borderRightWidth: 2, borderBottomWidth: 2, borderColor: C.line },
   branchNoMergeLine: { display: 'none' },
   branchNoLabel: { position: 'absolute', top: -20, left: 145, color: C.line, fontSize: 11, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 4 },
   branchNoItems: { position: 'absolute', top: 30, right: -8, width: 168, alignItems: 'stretch', gap: 6 },
@@ -210,10 +207,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   viewBranchLabel: { position: 'absolute', right: 30, top: 10, color: C.line, fontSize: 10, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 4 },
   viewBranchYesItems: { width: 128, alignItems: 'center', gap: 4, display: 'none' },
   viewBranchNoRoute: { position: 'absolute', top: 30, left: '50%', right: -70, height: 122, zIndex: 1 },
-  viewBranchNoTopLine: { position: 'absolute', top: 0, left: 100, right: 0, height: 1.5, backgroundColor: C.line },
-  viewBranchNoRightLine: { position: 'absolute', top: 0, right: 0, width: 1.5, height: 122, backgroundColor: C.line },
-  viewBranchNoBottomLine: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 1.5, backgroundColor: C.line },
-  viewBranchNoRail: { position: 'absolute', top: 0, right: 0, width: '100%', height: 122 },
+  viewBranchNoRail: { position: 'absolute', top: 0, right: 0, width: '100%', height: 122, borderTopWidth: 2, borderRightWidth: 2, borderBottomWidth: 2, borderColor: C.line },
   viewBranchNoMergeLine: { display: 'none' },
   viewBranchNoLabel: { position: 'absolute', top: -18, left: 115, color: C.line, fontSize: 10, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 4 },
   viewBranchNoItems: { position: 'absolute', top: 24, right: -6, width: 150, alignItems: 'stretch', gap: 5 },
@@ -610,11 +604,7 @@ export default function FlowScreen({ navigation }: Props) {
           </View>
         </View>
         <View style={s.viewBranchNoRoute}>
-          <View style={s.viewBranchNoRail} pointerEvents="none">
-            <View style={s.viewBranchNoTopLine} />
-            <View style={s.viewBranchNoRightLine} />
-            <View style={s.viewBranchNoBottomLine} />
-          </View>
+          <View style={s.viewBranchNoRail} pointerEvents="none" />
           <Text style={s.viewBranchNoLabel}>いいえ</Text>
           <View style={s.viewBranchNoItems}>{renderPathItems(b.no, true)}</View>
         </View>
@@ -653,11 +643,7 @@ export default function FlowScreen({ navigation }: Props) {
           </View>
         </View>
         <View style={s.branchNoRoute}>
-          <View style={s.branchNoRail} pointerEvents="none">
-            <View style={s.branchNoTopLine} />
-            <View style={s.branchNoRightLine} />
-            <View style={s.branchNoBottomLine} />
-          </View>
+          <View style={s.branchNoRail} pointerEvents="none" />
           <Text style={s.branchNoLabel}>いいえ</Text>
           <View style={s.branchNoItems}>{renderPathItems(b.no)}</View>
         </View>
