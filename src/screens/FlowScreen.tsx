@@ -152,23 +152,24 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
 
   // ── branch node (edit) ──
   branchNode: { width: '100%', alignItems: 'center', paddingVertical: 2 },
+  branchFlow: { width: '100%', minHeight: 172, alignItems: 'center', position: 'relative' },
+  branchMainColumn: { width: 170, alignItems: 'center', zIndex: 2 },
   branchDiamond: { width: 150, minHeight: 76, borderWidth: 2, borderRadius: 14, borderColor: '#d97706', backgroundColor: '#fffbeb', paddingHorizontal: 12, paddingVertical: 10, alignItems: 'center', justifyContent: 'center', transform: [{ scaleX: 1.18 }, { rotate: '45deg' }] },
   branchDiamondInner: { width: 116, alignItems: 'center', justifyContent: 'center', transform: [{ rotate: '-45deg' }, { scaleX: 0.85 }] },
   branchNodeHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 6 },
   branchNodeQ: { color: '#78350f', fontSize: 12, fontWeight: '800', textAlign: 'center' },
-  branchNodeBtns: { flexDirection: 'row', gap: 6, marginTop: 8 },
+  branchNodeBtns: { flexDirection: 'row', gap: 6, marginTop: 10 },
   branchEditBtn: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, backgroundColor: '#fef3c7', borderWidth: 1, borderColor: '#d97706' },
   branchEditBtnText: { color: '#92400e', fontSize: 11, fontWeight: '700' },
   branchDelBtn: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fca5a5' },
   branchDelBtnText: { color: '#dc2626', fontSize: 13, fontWeight: '700', lineHeight: 16 },
-  branchSplitWrap: { width: '100%', alignItems: 'center', marginTop: 3 },
-  branchSplitStem: { width: 2, height: 18, backgroundColor: '#d97706' },
-  branchSplitLine: { width: '66%', height: 2, backgroundColor: '#d97706' },
-  branchPathsRow: { width: '100%', flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
-  branchPath: { flex: 1, alignItems: 'center' },
-  branchPathStem: { width: 2, height: 16, backgroundColor: '#d97706' },
-  branchPathLabel: { color: '#92400e', fontSize: 11, fontWeight: '900', marginBottom: 5 },
-  branchPathTasks: { width: '100%', flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 5 },
+  branchYesLine: { width: 2, height: 20, backgroundColor: '#d97706', marginTop: 4 },
+  branchYesLabel: { color: '#92400e', fontSize: 11, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 4, marginTop: -2, marginBottom: 5 },
+  branchYesItems: { width: 152, alignItems: 'center', gap: 5 },
+  branchNoRoute: { position: 'absolute', top: 37, left: '50%', right: 8, height: 112, zIndex: 1 },
+  branchNoRail: { position: 'absolute', top: 0, right: 0, width: '100%', height: 112, borderTopWidth: 2, borderRightWidth: 2, borderBottomWidth: 2, borderColor: '#d97706' },
+  branchNoLabel: { position: 'absolute', top: -20, left: 22, color: '#92400e', fontSize: 11, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 4 },
+  branchNoItems: { position: 'absolute', top: 28, right: 8, width: '72%', alignItems: 'center', gap: 5 },
   branchPathTask: { maxWidth: 120, paddingHorizontal: 9, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: '#d97706', backgroundColor: '#fff' },
   branchPathNote: { maxWidth: 120, paddingHorizontal: 9, paddingVertical: 5, borderRadius: 999, borderWidth: 1, borderColor: '#fb923c', backgroundColor: '#fff7ed' },
   branchPathTaskText: { color: '#78350f', fontSize: 12, fontWeight: '600' },
@@ -177,13 +178,18 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
 
   // ── branch node (view) ──
   viewBranch: { width: '100%', alignItems: 'center', paddingVertical: 2 },
+  viewBranchFlow: { width: '100%', minHeight: 138, alignItems: 'center', position: 'relative' },
+  viewBranchMainColumn: { width: 140, alignItems: 'center', zIndex: 2 },
   viewBranchDiamond: { width: 126, minHeight: 58, borderWidth: 1.5, borderRadius: 12, borderColor: '#d97706', backgroundColor: '#fffbeb', paddingHorizontal: 10, paddingVertical: 8, alignItems: 'center', justifyContent: 'center', transform: [{ scaleX: 1.18 }, { rotate: '45deg' }] },
   viewBranchDiamondInner: { width: 98, alignItems: 'center', justifyContent: 'center', transform: [{ rotate: '-45deg' }, { scaleX: 0.85 }] },
   viewBranchQ: { color: '#78350f', fontSize: 11, fontWeight: '800', textAlign: 'center' },
-  viewBranchPath: { flex: 1, alignItems: 'center' },
-  viewBranchLabel: { color: '#92400e', fontSize: 10, fontWeight: '900', marginBottom: 4 },
-  viewBranchPathsRow: { width: '100%', flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
-  viewBranchPathItems: { width: '100%', flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 4 },
+  viewBranchYesLine: { width: 2, height: 16, backgroundColor: '#d97706', marginTop: 4 },
+  viewBranchLabel: { color: '#92400e', fontSize: 10, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 4, marginTop: -2, marginBottom: 4 },
+  viewBranchYesItems: { width: 128, alignItems: 'center', gap: 4 },
+  viewBranchNoRoute: { position: 'absolute', top: 29, left: '50%', right: 6, height: 88, zIndex: 1 },
+  viewBranchNoRail: { position: 'absolute', top: 0, right: 0, width: '100%', height: 88, borderTopWidth: 1.5, borderRightWidth: 1.5, borderBottomWidth: 1.5, borderColor: '#d97706' },
+  viewBranchNoLabel: { position: 'absolute', top: -18, left: 16, color: '#92400e', fontSize: 10, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 4 },
+  viewBranchNoItems: { position: 'absolute', top: 22, right: 6, width: '72%', alignItems: 'center', gap: 4 },
   viewBranchTaskBox: { maxWidth: 105, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 7, borderWidth: 1, borderColor: '#d97706', backgroundColor: '#fff' },
   viewBranchNoteBox: { maxWidth: 105, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, borderWidth: 1, borderColor: '#fb923c', backgroundColor: '#fff7ed' },
   viewBranchTask: { color: '#78350f', fontSize: 11, fontWeight: '600' },
@@ -504,56 +510,52 @@ export default function FlowScreen({ navigation }: Props) {
 
   const renderBranchViewNode = (b: BranchNode) => (
     <View key={`bv${b.id}`} style={s.viewBranch}>
-      <View style={s.viewBranchDiamond}>
-        <View style={s.viewBranchDiamondInner}>
-          <Text style={s.viewBranchQ}>{b.question || '確認'}</Text>
-        </View>
-      </View>
-      <View style={s.branchSplitWrap} pointerEvents="none">
-        <View style={s.branchSplitStem} />
-        <View style={s.branchSplitLine} />
-      </View>
-      <View style={s.viewBranchPathsRow}>
-        {([['はい', b.yes], ['いいえ', b.no]] as [string, BranchPathData][]).map(([lbl, path]) => (
-          <View key={lbl} style={s.viewBranchPath}>
-            <View style={s.branchPathStem} />
-            <Text style={s.viewBranchLabel}>{lbl}</Text>
-            <View style={s.viewBranchPathItems}>{renderPathItems(path, true)}</View>
+      <View style={s.viewBranchFlow}>
+        <View style={s.viewBranchMainColumn}>
+          <View style={s.viewBranchDiamond}>
+            <View style={s.viewBranchDiamondInner}>
+              <Text style={s.viewBranchQ}>{b.question || '確認'}</Text>
+            </View>
           </View>
-        ))}
+          <View style={s.viewBranchYesLine} />
+          <Text style={s.viewBranchLabel}>はい</Text>
+          <View style={s.viewBranchYesItems}>{renderPathItems(b.yes, true)}</View>
+        </View>
+        <View style={s.viewBranchNoRoute}>
+          <View style={s.viewBranchNoRail} pointerEvents="none" />
+          <Text style={s.viewBranchNoLabel}>いいえ</Text>
+          <View style={s.viewBranchNoItems}>{renderPathItems(b.no, true)}</View>
+        </View>
       </View>
     </View>
   );
 
   const renderBranchEditNode = (b: BranchNode) => (
     <View key={`be${b.id}`} style={s.branchNode}>
-      <View style={s.branchDiamond}>
-        <View style={s.branchDiamondInner}>
-          <Text style={s.branchNodeQ}>{b.question || '確認'}</Text>
-        </View>
-      </View>
-      <View style={s.branchNodeBtns}>
-        <TouchableOpacity style={s.branchEditBtn} onPress={() => editBranch(b)}>
-          <Text style={s.branchEditBtnText}>編集</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={s.branchDelBtn} onPress={() => b.id !== null && deleteBranch(b.id)}>
-          <Text style={s.branchDelBtnText}>×</Text>
-        </TouchableOpacity>
-      </View>
-      <View style={s.branchSplitWrap} pointerEvents="none">
-        <View style={s.branchSplitStem} />
-        <View style={s.branchSplitLine} />
-      </View>
-      <View style={s.branchPathsRow}>
-        {([['はい', b.yes], ['いいえ', b.no]] as [string, BranchPathData][]).map(([lbl, path]) => (
-          <View key={lbl} style={s.branchPath}>
-            <View style={s.branchPathStem} />
-            <Text style={s.branchPathLabel}>{lbl}</Text>
-            <View style={s.branchPathTasks}>
-              {renderPathItems(path)}
+      <View style={s.branchFlow}>
+        <View style={s.branchMainColumn}>
+          <View style={s.branchDiamond}>
+            <View style={s.branchDiamondInner}>
+              <Text style={s.branchNodeQ}>{b.question || '確認'}</Text>
             </View>
           </View>
-        ))}
+          <View style={s.branchNodeBtns}>
+            <TouchableOpacity style={s.branchEditBtn} onPress={() => editBranch(b)}>
+              <Text style={s.branchEditBtnText}>編集</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.branchDelBtn} onPress={() => b.id !== null && deleteBranch(b.id)}>
+              <Text style={s.branchDelBtnText}>×</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={s.branchYesLine} />
+          <Text style={s.branchYesLabel}>はい</Text>
+          <View style={s.branchYesItems}>{renderPathItems(b.yes)}</View>
+        </View>
+        <View style={s.branchNoRoute}>
+          <View style={s.branchNoRail} pointerEvents="none" />
+          <Text style={s.branchNoLabel}>いいえ</Text>
+          <View style={s.branchNoItems}>{renderPathItems(b.no)}</View>
+        </View>
       </View>
     </View>
   );
