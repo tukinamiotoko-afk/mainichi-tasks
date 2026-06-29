@@ -243,10 +243,12 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   // ── sub-branch (nested in no-path) ──
   subBranchWrap: { marginTop: 8, width: '100%', alignItems: 'center' },
   subDiamond: { width: 130, height: 40, alignItems: 'center', justifyContent: 'center', position: 'relative' },
-  subDiamondTB: { position: 'absolute', top: 0, width: 0, height: 0, borderLeftWidth: 65, borderRightWidth: 65, borderBottomWidth: 20, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderBottomColor: C.line },
-  subDiamondBB: { position: 'absolute', bottom: 0, width: 0, height: 0, borderLeftWidth: 65, borderRightWidth: 65, borderTopWidth: 20, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: C.line },
-  subDiamondTI: { position: 'absolute', top: 2, width: 0, height: 0, borderLeftWidth: 61, borderRightWidth: 61, borderBottomWidth: 17, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderBottomColor: '#fffbeb' },
-  subDiamondBI: { position: 'absolute', bottom: 2, width: 0, height: 0, borderLeftWidth: 61, borderRightWidth: 61, borderTopWidth: 17, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: '#fffbeb' },
+  subDiamondTop: { position: 'absolute', top: 1, width: 0, height: 0, borderLeftWidth: 64, borderRightWidth: 64, borderBottomWidth: 19, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderBottomColor: '#fffbeb' },
+  subDiamondBottom: { position: 'absolute', bottom: 1, width: 0, height: 0, borderLeftWidth: 64, borderRightWidth: 64, borderTopWidth: 19, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: '#fffbeb' },
+  subDiamondEdgeTL: { position: 'absolute', left: -2, top: 9, width: 68, height: 2, backgroundColor: C.line, transform: [{ rotate: '-16.7deg' }], zIndex: 2 },
+  subDiamondEdgeTR: { position: 'absolute', left: 62, top: 9, width: 68, height: 2, backgroundColor: C.line, transform: [{ rotate: '16.7deg' }], zIndex: 2 },
+  subDiamondEdgeBR: { position: 'absolute', left: 62, top: 29, width: 68, height: 2, backgroundColor: C.line, transform: [{ rotate: '-16.7deg' }], zIndex: 2 },
+  subDiamondEdgeBL: { position: 'absolute', left: -2, top: 29, width: 68, height: 2, backgroundColor: C.line, transform: [{ rotate: '16.7deg' }], zIndex: 2 },
   subDiamondSC: { position: 'absolute', top: 19, left: 6, right: 6, height: 3, backgroundColor: '#fffbeb', zIndex: 1 },
   subDiamondInner: { width: 96, alignItems: 'center', justifyContent: 'center', zIndex: 2 },
   subDiamondQ: { color: '#78350f', fontSize: 9, fontWeight: '800', textAlign: 'center' },
@@ -757,10 +759,12 @@ export default function FlowScreen({ navigation }: Props) {
     <View style={s.subBranchWrap}>
       <ArrowDown color={C.line} h={8} />
       <View style={s.subDiamond}>
-        <View style={s.subDiamondTB} />
-        <View style={s.subDiamondBB} />
-        <View style={s.subDiamondTI} />
-        <View style={s.subDiamondBI} />
+        <View style={s.subDiamondTop} />
+        <View style={s.subDiamondBottom} />
+        <View style={s.subDiamondEdgeTL} />
+        <View style={s.subDiamondEdgeTR} />
+        <View style={s.subDiamondEdgeBR} />
+        <View style={s.subDiamondEdgeBL} />
         <View style={s.subDiamondSC} />
         <View style={s.subDiamondInner}>
           <Text style={s.subDiamondQ}>{sub.question || '確認'}</Text>
