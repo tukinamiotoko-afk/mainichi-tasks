@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, StatusBar, Modal,
-  Animated, PanResponder, Platform, TextInput, Alert,
+  Animated, PanResponder, Platform, TextInput, Alert, GestureResponderEvent,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -71,6 +71,8 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
 
   // ── view mode (compact) ──
   viewContent: { alignItems: 'center', paddingTop: 20, paddingBottom: 24, paddingHorizontal: 40 },
+  viewContentZoomed: { paddingHorizontal: 14 },
+  flowZoomWrap: { width: '100%', alignItems: 'center' },
   viewTerminator: { backgroundColor: C.termBg, borderWidth: 1.5, borderColor: C.termBorder, borderRadius: 18, paddingHorizontal: 22, paddingVertical: 7 },
   viewTerminatorText: { color: C.termText, fontSize: 12, fontWeight: '800', letterSpacing: 1 },
   viewSlotWrap: { width: '100%' },
@@ -83,6 +85,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
 
   // ── edit mode (full size) ──
   editContent: { alignItems: 'center', paddingTop: 24, paddingBottom: 24, paddingHorizontal: 24 },
+  editContentZoomed: { paddingHorizontal: 12 },
   terminator: { backgroundColor: C.termBg, borderWidth: 1.5, borderColor: C.termBorder, borderRadius: 22, paddingHorizontal: 30, paddingVertical: 10 },
   terminatorText: { color: C.termText, fontSize: 14, fontWeight: '800', letterSpacing: 1 },
 
@@ -253,6 +256,8 @@ export default function FlowScreen({ navigation }: Props) {
   const [branchEditorOpen, setBranchEditorOpen] = useState(false);
   const [branchDraft, setBranchDraft] = useState<BranchNode | null>(null);
   const [branchNoteDraft, setBranchNoteDraft] = useState({ yes: '', no: '' });
+  const [manualFlowScale, setManualFlowScale] = useState<number | null>(null);
+  const [isPinching, setIsPinching] = useState(false);
 
   // ── drag-to-reorder state ──
   const [draggingIdx, setDraggingIdx] = useState<number | null>(null);
@@ -265,6 +270,8 @@ export default function FlowScreen({ navigation }: Props) {
   const slotHRef = useRef(80);
   const slotsRef = useRef(slots);
   const panRespMap = useRef<Map<number, ReturnType<typeof PanResponder.create>>>(new Map());
+  const pinchStartDistanceRef = useRef<number | null>(null);
+  const pinchStartScaleRef = useRef(1);
 
   slotsRef.current = slots;
 
@@ -272,6 +279,7 @@ export default function FlowScreen({ navigation }: Props) {
   if (shiftAnims.current.length > slots.length) shiftAnims.current = shiftAnims.current.slice(0, slots.length);
 
   useEffect(() => { panRespMap.current.clear(); }, [slots.length]);
+  useEffect(() => { setManualFlowScale(null); }, [selectedDate]);
 
   const isToday = selectedDate === today;
   const selDateObj = useMemo(() => new Date(`${selectedDate}T00:00:00`), [selectedDate]);
@@ -312,6 +320,44 @@ export default function FlowScreen({ navigation }: Props) {
   const taskById = useMemo(() => new Map(dueTasks.map(t => [t.id, t])), [dueTasks]);
   const tray = useMemo(() => addedIds.filter(id => !slots.includes(id)), [addedIds, slots]);
   const hasSelection = selectedCardId !== null;
+  const hasSideBranch = useMemo(
+    () => branches.some(b => b.no.notes.length > 0 || b.no.taskIds.length > 0),
+    [branches]
+  );
+  const autoFlowScale = hasSideBranch ? 0.82 : 1;
+  const flowScale = manualFlowScale ?? autoFlowScale;
+  const flowContentStyle = [
+    isEditing ? s.editContent : s.viewContent,
+    hasSideBranch && (isEditing ? s.editContentZoomed : s.viewContentZoomed),
+  ];
+
+  const getPinchDistance = (e: GestureResponderEvent) => {
+    const touches = e.nativeEvent.touches;
+    if (touches.length < 2) return null;
+    const [a, b] = touches;
+    return Math.hypot(a.pageX - b.pageX, a.pageY - b.pageY);
+  };
+
+  const startPinch = (e: GestureResponderEvent) => {
+    const distance = getPinchDistance(e);
+    if (!distance) return;
+    pinchStartDistanceRef.current = distance;
+    pinchStartScaleRef.current = flowScale;
+    setIsPinching(true);
+  };
+
+  const movePinch = (e: GestureResponderEvent) => {
+    const startDistance = pinchStartDistanceRef.current;
+    const distance = getPinchDistance(e);
+    if (!startDistance || !distance) return;
+    const nextScale = Math.max(0.58, Math.min(1.35, pinchStartScaleRef.current * (distance / startDistance)));
+    setManualFlowScale(nextScale);
+  };
+
+  const endPinch = () => {
+    pinchStartDistanceRef.current = null;
+    setIsPinching(false);
+  };
 
   const getSlotPan = useCallback((slotIdx: number) => {
     if (panRespMap.current.has(slotIdx)) return panRespMap.current.get(slotIdx)!;
@@ -791,29 +837,39 @@ export default function FlowScreen({ navigation }: Props) {
 
       <ScrollView
         style={s.flowScroll}
-        contentContainerStyle={isEditing ? s.editContent : s.viewContent}
-        scrollEnabled={draggingIdx === null}
+        contentContainerStyle={flowContentStyle}
+        scrollEnabled={draggingIdx === null && !isPinching}
       >
-        {dueTasks.length === 0 ? (
-          <View style={s.emptyFlow}>
-            <Text style={s.emptyTitle}>この日のフローはありません</Text>
-            <Text style={s.emptyBody}>頻度がこの日に当たるタスクがワークフローになります</Text>
-          </View>
-        ) : addedIds.length === 0 ? (
-          <View style={s.emptyFlow}>
-            <Text style={s.emptyTitle}>フローにタスクを追加しましょう</Text>
-            <Text style={s.emptyBody}>「編集」からタスクを追加できます</Text>
-            {isEditing ? (
-              <TouchableOpacity style={s.addFirstBtn} onPress={() => setPickerOpen(true)}>
-                <Text style={s.addFirstBtnText}>＋ タスクを追加</Text>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity style={[s.editCard, { marginTop: 16, paddingHorizontal: 40 }]} onPress={() => setIsEditing(true)} activeOpacity={0.8}>
-                <Text style={s.editCardText}>編集</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        ) : isEditing ? renderEditFlow() : renderViewFlow()}
+        <View
+          style={[s.flowZoomWrap, { transform: [{ scale: flowScale }] }]}
+          onStartShouldSetResponderCapture={(e) => e.nativeEvent.touches.length >= 2}
+          onMoveShouldSetResponderCapture={(e) => e.nativeEvent.touches.length >= 2}
+          onResponderGrant={startPinch}
+          onResponderMove={movePinch}
+          onResponderRelease={endPinch}
+          onResponderTerminate={endPinch}
+        >
+          {dueTasks.length === 0 ? (
+            <View style={s.emptyFlow}>
+              <Text style={s.emptyTitle}>この日のフローはありません</Text>
+              <Text style={s.emptyBody}>頻度がこの日に当たるタスクがワークフローになります</Text>
+            </View>
+          ) : addedIds.length === 0 ? (
+            <View style={s.emptyFlow}>
+              <Text style={s.emptyTitle}>フローにタスクを追加しましょう</Text>
+              <Text style={s.emptyBody}>「編集」からタスクを追加できます</Text>
+              {isEditing ? (
+                <TouchableOpacity style={s.addFirstBtn} onPress={() => setPickerOpen(true)}>
+                  <Text style={s.addFirstBtnText}>＋ タスクを追加</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity style={[s.editCard, { marginTop: 16, paddingHorizontal: 40 }]} onPress={() => setIsEditing(true)} activeOpacity={0.8}>
+                  <Text style={s.editCardText}>編集</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          ) : isEditing ? renderEditFlow() : renderViewFlow()}
+        </View>
       </ScrollView>
 
       {/* tray — edit mode only */}
