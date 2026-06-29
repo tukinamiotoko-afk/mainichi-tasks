@@ -2,6 +2,7 @@ import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, StatusBar, Modal,
   Animated, PanResponder, Platform, TextInput, Alert, GestureResponderEvent,
+  useWindowDimensions,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -92,6 +93,8 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   saveBtnText: { color: '#7c3aed', fontSize: 13, fontWeight: '900' },
 
   flowScroll: { flex: 1 },
+  flowHScroll: { flex: 1 },
+  flowHContent: { flexGrow: 1 },
 
   // ── view mode (compact) ──
   viewContent: { alignItems: 'center', paddingTop: 20, paddingBottom: 24, paddingHorizontal: 40 },
@@ -193,10 +196,10 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   branchDiamondInner: { width: 180, alignItems: 'center', justifyContent: 'center', zIndex: 2 },
   branchNodeHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 6 },
   branchNodeQ: { color: '#78350f', fontSize: 12, fontWeight: '800', textAlign: 'center' },
-  branchNodeBtns: { width: 262, alignItems: 'center', marginTop: -6, marginBottom: 12 },
-  branchEditBtn: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, backgroundColor: '#fef3c7', borderWidth: 1, borderColor: '#d97706' },
+  branchNodeBtns: { position: 'absolute', bottom: 0, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  branchEditBtn: { minWidth: 46, height: 24, paddingHorizontal: 10, borderRadius: 12, backgroundColor: '#fef3c7', borderWidth: 1, borderColor: '#d97706', alignItems: 'center', justifyContent: 'center' },
   branchEditBtnText: { color: '#92400e', fontSize: 11, fontWeight: '700' },
-  branchDelBtn: { position: 'absolute', bottom: 0, minWidth: 28, height: 24, paddingHorizontal: 8, borderRadius: 12, backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fca5a5', alignItems: 'center', justifyContent: 'center' },
+  branchDelBtn: { minWidth: 28, height: 24, paddingHorizontal: 8, borderRadius: 12, backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fca5a5', alignItems: 'center', justifyContent: 'center' },
   branchDelBtnText: { color: '#dc2626', fontSize: 13, fontWeight: '700', lineHeight: 16 },
   branchYesWrap: { width: 58, height: 140, alignItems: 'center', justifyContent: 'flex-start', position: 'relative' },
   branchYesLine: { width: 2, height: 140, backgroundColor: C.line, marginTop: 0 },
@@ -243,7 +246,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
 
   // ── sub-branch (nested in no-path) ──
   subBranchWrap: { marginTop: 8, width: '100%', alignItems: 'center' },
-  subDiamondShell: { width: 168, height: 60, alignItems: 'center', justifyContent: 'flex-start', position: 'relative' },
+  subDiamondShell: { width: 176, height: 60, alignItems: 'center', justifyContent: 'flex-start', position: 'relative' },
   subDiamond: { width: 130, height: 40, alignItems: 'center', justifyContent: 'center', position: 'relative' },
   subDiamondTop: { position: 'absolute', top: 1, width: 0, height: 0, borderLeftWidth: 64, borderRightWidth: 64, borderBottomWidth: 19, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderBottomColor: '#fffbeb' },
   subDiamondBottom: { position: 'absolute', bottom: 1, width: 0, height: 0, borderLeftWidth: 64, borderRightWidth: 64, borderTopWidth: 19, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: '#fffbeb' },
@@ -254,9 +257,10 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   subDiamondSC: { position: 'absolute', top: 19, left: 6, right: 6, height: 3, backgroundColor: '#fffbeb', zIndex: 1 },
   subDiamondInner: { width: 96, alignItems: 'center', justifyContent: 'center', zIndex: 2 },
   subDiamondQ: { color: '#78350f', fontSize: 9, fontWeight: '800', textAlign: 'center' },
-  subEditBtn: { position: 'absolute', left: 0, top: 16, paddingHorizontal: 9, paddingVertical: 4, borderRadius: 8, backgroundColor: '#fef3c7', borderWidth: 1, borderColor: '#d97706' },
+  subDiamondBtns: { position: 'absolute', bottom: 0, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  subEditBtn: { minWidth: 42, height: 22, paddingHorizontal: 9, borderRadius: 11, backgroundColor: '#fef3c7', borderWidth: 1, borderColor: '#d97706', alignItems: 'center', justifyContent: 'center' },
   subEditBtnText: { color: '#92400e', fontSize: 10, fontWeight: '700' },
-  subDelBtn: { position: 'absolute', bottom: 0, minWidth: 28, height: 22, paddingHorizontal: 7, borderRadius: 11, backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fca5a5', alignItems: 'center', justifyContent: 'center' },
+  subDelBtn: { minWidth: 28, height: 22, paddingHorizontal: 7, borderRadius: 11, backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fca5a5', alignItems: 'center', justifyContent: 'center' },
   subDelBtnText: { color: '#dc2626', fontSize: 12, fontWeight: '700', lineHeight: 14 },
   subPaths: { flexDirection: 'row', marginTop: 4, width: 130 },
   subYesCol: { flex: 1, alignItems: 'center', paddingHorizontal: 3 },
@@ -306,6 +310,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
 export default function FlowScreen({ navigation }: Props) {
   const db = useSQLiteContext();
   const insets = useSafeAreaInsets();
+  const { width: viewportWidth } = useWindowDimensions();
   const { C, grad } = useTheme();
   const s = useMemo(() => makeStyles(C), [C]);
   const today = getToday();
@@ -403,6 +408,7 @@ export default function FlowScreen({ navigation }: Props) {
     isEditing ? s.editContent : s.viewContent,
     hasSideBranch && (isEditing ? s.editContentZoomed : s.viewContentZoomed),
   ];
+  const flowCanvasWidth = hasSideBranch ? Math.max(viewportWidth + 220, isEditing ? 860 : 760) : viewportWidth;
 
   const getPinchDistance = (e: GestureResponderEvent) => {
     const touches = e.nativeEvent.touches;
@@ -782,11 +788,6 @@ export default function FlowScreen({ navigation }: Props) {
     <View style={s.subBranchWrap}>
       <ArrowDown color={C.line} h={8} />
       <View style={s.subDiamondShell}>
-        {parent ? (
-          <TouchableOpacity style={s.subEditBtn} onPress={() => openNoRouteBranchEditor(parent)}>
-            <Text style={s.subEditBtnText}>編集</Text>
-          </TouchableOpacity>
-        ) : null}
         <View style={s.subDiamond}>
           <View style={s.subDiamondTop} />
           <View style={s.subDiamondBottom} />
@@ -800,9 +801,14 @@ export default function FlowScreen({ navigation }: Props) {
           </View>
         </View>
         {parent ? (
-          <TouchableOpacity style={s.subDelBtn} onPress={() => deleteNoRouteSubBranch(parent)}>
-            <Text style={s.subDelBtnText}>×</Text>
-          </TouchableOpacity>
+          <View style={s.subDiamondBtns}>
+            <TouchableOpacity style={s.subEditBtn} onPress={() => openNoRouteBranchEditor(parent)}>
+              <Text style={s.subEditBtnText}>編集</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.subDelBtn} onPress={() => deleteNoRouteSubBranch(parent)}>
+              <Text style={s.subDelBtnText}>×</Text>
+            </TouchableOpacity>
+          </View>
         ) : null}
       </View>
       <View style={s.subPaths}>
@@ -921,14 +927,14 @@ export default function FlowScreen({ navigation }: Props) {
                 <Text style={s.branchNodeQ}>{b.question || '確認'}</Text>
               </View>
             </View>
-            <TouchableOpacity style={s.branchDelBtn} onPress={() => b.id !== null && deleteBranch(b.id)}>
-              <Text style={s.branchDelBtnText}>×</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={s.branchNodeBtns}>
-            <TouchableOpacity style={s.branchEditBtn} onPress={() => editBranch(b)}>
-              <Text style={s.branchEditBtnText}>編集</Text>
-            </TouchableOpacity>
+            <View style={s.branchNodeBtns}>
+              <TouchableOpacity style={s.branchEditBtn} onPress={() => editBranch(b)}>
+                <Text style={s.branchEditBtnText}>編集</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.branchDelBtn} onPress={() => b.id !== null && deleteBranch(b.id)}>
+                <Text style={s.branchDelBtnText}>×</Text>
+              </TouchableOpacity>
+            </View>
           </View>
           <View style={[s.branchYesWrap, { height: layout.yesHeight }]}>
             <View style={[s.branchYesLine, { height: layout.yesHeight }]} />
@@ -1142,40 +1148,49 @@ export default function FlowScreen({ navigation }: Props) {
       </LinearGradient>
 
       <ScrollView
-        style={s.flowScroll}
-        contentContainerStyle={flowContentStyle}
+        horizontal
+        style={s.flowHScroll}
+        contentContainerStyle={s.flowHContent}
         scrollEnabled={draggingIdx === null && !isPinching}
+        showsHorizontalScrollIndicator={false}
       >
-        <View
-          style={[s.flowZoomWrap, { transform: [{ scale: flowScale }] }]}
-          onStartShouldSetResponderCapture={(e) => e.nativeEvent.touches.length >= 2}
-          onMoveShouldSetResponderCapture={(e) => e.nativeEvent.touches.length >= 2}
-          onResponderGrant={startPinch}
-          onResponderMove={movePinch}
-          onResponderRelease={endPinch}
-          onResponderTerminate={endPinch}
+        <ScrollView
+          style={s.flowScroll}
+          contentContainerStyle={flowContentStyle}
+          scrollEnabled={draggingIdx === null && !isPinching}
+          showsVerticalScrollIndicator={false}
         >
-          {dueTasks.length === 0 ? (
-            <View style={s.emptyFlow}>
-              <Text style={s.emptyTitle}>この日のフローはありません</Text>
-              <Text style={s.emptyBody}>頻度がこの日に当たるタスクがワークフローになります</Text>
-            </View>
-          ) : addedIds.length === 0 ? (
-            <View style={s.emptyFlow}>
-              <Text style={s.emptyTitle}>フローにタスクを追加しましょう</Text>
-              <Text style={s.emptyBody}>「編集」からタスクを追加できます</Text>
-              {isEditing ? (
-                <TouchableOpacity style={s.addFirstBtn} onPress={() => setPickerOpen(true)}>
-                  <Text style={s.addFirstBtnText}>＋ タスクを追加</Text>
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity style={[s.editCard, { marginTop: 16, paddingHorizontal: 40 }]} onPress={() => setIsEditing(true)} activeOpacity={0.8}>
-                  <Text style={s.editCardText}>編集</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          ) : isEditing ? renderEditFlow() : renderViewFlow()}
-        </View>
+          <View
+            style={[s.flowZoomWrap, { width: flowCanvasWidth, transform: [{ scale: flowScale }] }]}
+            onStartShouldSetResponderCapture={(e) => e.nativeEvent.touches.length >= 2}
+            onMoveShouldSetResponderCapture={(e) => e.nativeEvent.touches.length >= 2}
+            onResponderGrant={startPinch}
+            onResponderMove={movePinch}
+            onResponderRelease={endPinch}
+            onResponderTerminate={endPinch}
+          >
+            {dueTasks.length === 0 ? (
+              <View style={s.emptyFlow}>
+                <Text style={s.emptyTitle}>この日のフローはありません</Text>
+                <Text style={s.emptyBody}>頻度がこの日に当たるタスクがワークフローになります</Text>
+              </View>
+            ) : addedIds.length === 0 ? (
+              <View style={s.emptyFlow}>
+                <Text style={s.emptyTitle}>フローにタスクを追加しましょう</Text>
+                <Text style={s.emptyBody}>「編集」からタスクを追加できます</Text>
+                {isEditing ? (
+                  <TouchableOpacity style={s.addFirstBtn} onPress={() => setPickerOpen(true)}>
+                    <Text style={s.addFirstBtnText}>＋ タスクを追加</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity style={[s.editCard, { marginTop: 16, paddingHorizontal: 40 }]} onPress={() => setIsEditing(true)} activeOpacity={0.8}>
+                    <Text style={s.editCardText}>編集</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            ) : isEditing ? renderEditFlow() : renderViewFlow()}
+          </View>
+        </ScrollView>
       </ScrollView>
 
       {/* tray — edit mode only */}
