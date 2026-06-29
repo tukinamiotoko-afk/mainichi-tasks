@@ -80,7 +80,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   viewSlotEmpty: { borderColor: C.border, borderStyle: 'dashed', backgroundColor: C.card },
   viewSlotNum: { width: 20, height: 20, borderRadius: 10, backgroundColor: C.primarySoft, alignItems: 'center', justifyContent: 'center', marginRight: 8, flexShrink: 0 },
   viewSlotNumText: { color: C.primary, fontSize: 10, fontWeight: '800' },
-  viewSlotText: { flex: 1, color: C.ink, fontSize: 13, fontWeight: '700' },
+  viewSlotText: { flex: 1, color: C.ink, fontSize: 12, fontWeight: '700', lineHeight: 16 },
   viewSlotEmptyText: { flex: 1, color: C.muted, fontSize: 12 },
 
   // ── edit mode (full size) ──
@@ -100,7 +100,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   slotNumText: { color: C.primary, fontSize: 12, fontWeight: '800' },
   slotEmptyText: { flex: 1, color: C.muted, fontSize: 13 },
   slotCardArea: { flex: 1, flexDirection: 'row', alignItems: 'center' },
-  slotCardText: { flex: 1, color: C.ink, fontSize: 14, fontWeight: '700' },
+  slotCardText: { flex: 1, color: C.ink, fontSize: 13, fontWeight: '700', lineHeight: 17 },
   slotRemoveBtn: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fca5a5', alignItems: 'center', justifyContent: 'center', marginLeft: 6 },
   slotRemoveText: { color: '#dc2626', fontSize: 16, fontWeight: '700', lineHeight: 20 },
   dragHandle: { paddingHorizontal: 8, paddingVertical: 10, marginLeft: -4, marginRight: 4 },
@@ -155,66 +155,58 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
 
   // ── branch node (edit) ──
   branchNode: { width: '100%', alignItems: 'center', paddingVertical: 2, overflow: 'visible' },
-  branchFlow: { width: '100%', minHeight: 212, alignItems: 'center', position: 'relative', overflow: 'visible' },
+  branchFlow: { width: '100%', minHeight: 220, alignItems: 'center', position: 'relative', overflow: 'visible' },
   branchMainColumn: { width: 190, alignItems: 'center', zIndex: 2 },
-  branchDiamond: { width: 188, height: 110, alignItems: 'center', justifyContent: 'center', position: 'relative' },
-  branchDiamondTopBorder: { position: 'absolute', top: 0, width: 0, height: 0, borderLeftWidth: 94, borderRightWidth: 94, borderBottomWidth: 55, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderBottomColor: C.line },
-  branchDiamondBottomBorder: { position: 'absolute', bottom: 0, width: 0, height: 0, borderLeftWidth: 94, borderRightWidth: 94, borderTopWidth: 55, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: C.line },
-  branchDiamondTop: { position: 'absolute', top: 3, width: 0, height: 0, borderLeftWidth: 88, borderRightWidth: 88, borderBottomWidth: 51, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderBottomColor: '#fffbeb' },
-  branchDiamondBottom: { position: 'absolute', bottom: 3, width: 0, height: 0, borderLeftWidth: 88, borderRightWidth: 88, borderTopWidth: 51, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: '#fffbeb' },
+  branchDiamond: { width: 152, height: 152, marginVertical: -20, borderWidth: 2, borderColor: C.line, backgroundColor: '#fffbeb', alignItems: 'center', justifyContent: 'center', transform: [{ rotate: '45deg' }] },
   branchDiamondInner: { width: 132, alignItems: 'center', justifyContent: 'center', zIndex: 2 },
   branchNodeHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 6 },
-  branchNodeQ: { color: '#78350f', fontSize: 12, fontWeight: '800', textAlign: 'center' },
+  branchNodeQ: { color: '#78350f', fontSize: 12, fontWeight: '800', textAlign: 'center', transform: [{ rotate: '-45deg' }] },
   branchNodeBtns: { flexDirection: 'row', gap: 6, marginTop: 10 },
   branchEditBtn: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, backgroundColor: '#fef3c7', borderWidth: 1, borderColor: '#d97706' },
   branchEditBtnText: { color: '#92400e', fontSize: 11, fontWeight: '700' },
   branchDelBtn: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fca5a5' },
   branchDelBtnText: { color: '#dc2626', fontSize: 13, fontWeight: '700', lineHeight: 16 },
   branchYesWrap: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'center' },
-  branchYesLine: { width: 2, height: 42, backgroundColor: C.line, marginTop: 0 },
-  branchYesLabel: { color: C.line, fontSize: 11, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 4, marginTop: 8, marginLeft: 5 },
+  branchYesLine: { width: 2, height: 52, backgroundColor: C.line, marginTop: 0 },
+  branchYesLabel: { color: C.line, fontSize: 11, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 4, marginTop: 12, marginLeft: 5 },
   branchYesItems: { width: 152, alignItems: 'center', gap: 5, display: 'none' },
-  branchNoRoute: { position: 'absolute', top: 55, left: '50%', right: -56, height: 150, zIndex: 1 },
-  branchNoTopLine: { position: 'absolute', top: 0, left: 94, right: 0, height: 2, backgroundColor: C.line },
+  branchNoRoute: { position: 'absolute', top: 56, left: '50%', right: -86, height: 150, zIndex: 1 },
+  branchNoTopLine: { position: 'absolute', top: 0, left: 76, right: 0, height: 2, backgroundColor: C.line },
   branchNoRightLine: { position: 'absolute', top: 0, right: 0, width: 2, height: 150, backgroundColor: C.line },
   branchNoBottomLine: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, backgroundColor: C.line },
   branchNoRail: { position: 'absolute', top: 0, right: 0, width: '100%', height: 150 },
   branchNoMergeLine: { position: 'absolute', top: 152, left: '50%', width: 2, height: 10, backgroundColor: C.line, zIndex: 1 },
-  branchNoLabel: { position: 'absolute', top: -20, left: 110, color: C.line, fontSize: 11, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 4 },
-  branchNoItems: { position: 'absolute', top: 30, right: -8, width: 158, alignItems: 'stretch', gap: 6 },
-  branchPathTask: { width: 158, minHeight: 42, paddingHorizontal: 11, paddingVertical: 8, borderRadius: 8, borderWidth: 1.5, borderColor: C.line, backgroundColor: '#fff' },
-  branchPathNote: { width: 158, minHeight: 42, paddingHorizontal: 11, paddingVertical: 8, borderRadius: 8, borderWidth: 1.5, borderColor: C.line, backgroundColor: '#fff' },
-  branchPathTaskText: { color: C.ink, fontSize: 13, fontWeight: '700', textAlign: 'center' },
-  branchPathNoteText: { color: C.ink, fontSize: 13, fontWeight: '700', textAlign: 'center' },
+  branchNoLabel: { position: 'absolute', top: -20, left: 92, color: C.line, fontSize: 11, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 4 },
+  branchNoItems: { position: 'absolute', top: 30, right: -8, width: 168, alignItems: 'stretch', gap: 6 },
+  branchPathTask: { width: 168, minHeight: 44, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8, borderWidth: 1.5, borderColor: C.line, backgroundColor: '#fff' },
+  branchPathNote: { width: 168, minHeight: 44, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8, borderWidth: 1.5, borderColor: C.line, backgroundColor: '#fff' },
+  branchPathTaskText: { color: C.ink, fontSize: 12, fontWeight: '700', textAlign: 'center', lineHeight: 16 },
+  branchPathNoteText: { color: C.ink, fontSize: 12, fontWeight: '700', textAlign: 'center', lineHeight: 16 },
   branchPathEmpty: { color: '#d97706', fontSize: 11, fontStyle: 'italic' },
 
   // ── branch node (view) ──
   viewBranch: { width: '100%', alignItems: 'center', paddingVertical: 2, overflow: 'visible' },
-  viewBranchFlow: { width: '100%', minHeight: 176, alignItems: 'center', position: 'relative', overflow: 'visible' },
+  viewBranchFlow: { width: '100%', minHeight: 184, alignItems: 'center', position: 'relative', overflow: 'visible' },
   viewBranchMainColumn: { width: 158, alignItems: 'center', zIndex: 2 },
-  viewBranchDiamond: { width: 154, height: 90, alignItems: 'center', justifyContent: 'center', position: 'relative' },
-  viewBranchDiamondTopBorder: { position: 'absolute', top: 0, width: 0, height: 0, borderLeftWidth: 77, borderRightWidth: 77, borderBottomWidth: 45, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderBottomColor: C.line },
-  viewBranchDiamondBottomBorder: { position: 'absolute', bottom: 0, width: 0, height: 0, borderLeftWidth: 77, borderRightWidth: 77, borderTopWidth: 45, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: C.line },
-  viewBranchDiamondTop: { position: 'absolute', top: 2, width: 0, height: 0, borderLeftWidth: 72, borderRightWidth: 72, borderBottomWidth: 42, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderBottomColor: '#fffbeb' },
-  viewBranchDiamondBottom: { position: 'absolute', bottom: 2, width: 0, height: 0, borderLeftWidth: 72, borderRightWidth: 72, borderTopWidth: 42, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: '#fffbeb' },
+  viewBranchDiamond: { width: 126, height: 126, marginVertical: -18, borderWidth: 1.5, borderColor: C.line, backgroundColor: '#fffbeb', alignItems: 'center', justifyContent: 'center', transform: [{ rotate: '45deg' }] },
   viewBranchDiamondInner: { width: 112, alignItems: 'center', justifyContent: 'center', zIndex: 2 },
-  viewBranchQ: { color: '#78350f', fontSize: 11, fontWeight: '800', textAlign: 'center' },
+  viewBranchQ: { color: '#78350f', fontSize: 11, fontWeight: '800', textAlign: 'center', transform: [{ rotate: '-45deg' }] },
   viewBranchYesWrap: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'center' },
-  viewBranchYesLine: { width: 2, height: 34, backgroundColor: C.line, marginTop: 0 },
-  viewBranchLabel: { color: C.line, fontSize: 10, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 4, marginTop: 7, marginLeft: 5 },
+  viewBranchYesLine: { width: 2, height: 40, backgroundColor: C.line, marginTop: 0 },
+  viewBranchLabel: { color: C.line, fontSize: 10, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 4, marginTop: 10, marginLeft: 5 },
   viewBranchYesItems: { width: 128, alignItems: 'center', gap: 4, display: 'none' },
-  viewBranchNoRoute: { position: 'absolute', top: 45, left: '50%', right: -44, height: 122, zIndex: 1 },
-  viewBranchNoTopLine: { position: 'absolute', top: 0, left: 77, right: 0, height: 1.5, backgroundColor: C.line },
+  viewBranchNoRoute: { position: 'absolute', top: 45, left: '50%', right: -70, height: 122, zIndex: 1 },
+  viewBranchNoTopLine: { position: 'absolute', top: 0, left: 63, right: 0, height: 1.5, backgroundColor: C.line },
   viewBranchNoRightLine: { position: 'absolute', top: 0, right: 0, width: 1.5, height: 122, backgroundColor: C.line },
   viewBranchNoBottomLine: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 1.5, backgroundColor: C.line },
   viewBranchNoRail: { position: 'absolute', top: 0, right: 0, width: '100%', height: 122 },
   viewBranchNoMergeLine: { position: 'absolute', top: 123, left: '50%', width: 1.5, height: 8, backgroundColor: C.line, zIndex: 1 },
-  viewBranchNoLabel: { position: 'absolute', top: -18, left: 92, color: C.line, fontSize: 10, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 4 },
-  viewBranchNoItems: { position: 'absolute', top: 24, right: -6, width: 138, alignItems: 'stretch', gap: 5 },
-  viewBranchTaskBox: { width: 138, minHeight: 36, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 7, borderWidth: 1.5, borderColor: C.line, backgroundColor: '#fff' },
-  viewBranchNoteBox: { width: 138, minHeight: 36, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 7, borderWidth: 1.5, borderColor: C.line, backgroundColor: '#fff' },
-  viewBranchTask: { color: C.ink, fontSize: 12, fontWeight: '700', textAlign: 'center' },
-  viewBranchNote: { color: C.ink, fontSize: 12, fontWeight: '700', textAlign: 'center' },
+  viewBranchNoLabel: { position: 'absolute', top: -18, left: 78, color: C.line, fontSize: 10, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 4 },
+  viewBranchNoItems: { position: 'absolute', top: 24, right: -6, width: 150, alignItems: 'stretch', gap: 5 },
+  viewBranchTaskBox: { width: 150, minHeight: 38, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 7, borderWidth: 1.5, borderColor: C.line, backgroundColor: '#fff' },
+  viewBranchNoteBox: { width: 150, minHeight: 38, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 7, borderWidth: 1.5, borderColor: C.line, backgroundColor: '#fff' },
+  viewBranchTask: { color: C.ink, fontSize: 11, fontWeight: '700', textAlign: 'center', lineHeight: 15 },
+  viewBranchNote: { color: C.ink, fontSize: 11, fontWeight: '700', textAlign: 'center', lineHeight: 15 },
 
   // ── branch editor modal ──
   branchEditorSheet: { backgroundColor: C.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '85%' },
@@ -587,10 +579,6 @@ export default function FlowScreen({ navigation }: Props) {
       <View style={s.viewBranchFlow}>
         <View style={s.viewBranchMainColumn}>
           <View style={s.viewBranchDiamond}>
-            <View style={s.viewBranchDiamondTopBorder} />
-            <View style={s.viewBranchDiamondBottomBorder} />
-            <View style={s.viewBranchDiamondTop} />
-            <View style={s.viewBranchDiamondBottom} />
             <View style={s.viewBranchDiamondInner}>
               <Text style={s.viewBranchQ}>{b.question || '確認'}</Text>
             </View>
@@ -619,10 +607,6 @@ export default function FlowScreen({ navigation }: Props) {
       <View style={s.branchFlow}>
         <View style={s.branchMainColumn}>
           <View style={s.branchDiamond}>
-            <View style={s.branchDiamondTopBorder} />
-            <View style={s.branchDiamondBottomBorder} />
-            <View style={s.branchDiamondTop} />
-            <View style={s.branchDiamondBottom} />
             <View style={s.branchDiamondInner}>
               <Text style={s.branchNodeQ}>{b.question || '確認'}</Text>
             </View>
@@ -710,7 +694,7 @@ export default function FlowScreen({ navigation }: Props) {
                   <View style={s.viewSlotNum}>
                     <Text style={s.viewSlotNumText}>{idx + 1}</Text>
                   </View>
-                  <Text style={s.viewSlotText} numberOfLines={1}>
+                  <Text style={s.viewSlotText} numberOfLines={2} ellipsizeMode="tail">
                     {task.icon ? `${task.icon} ` : ''}{task.title}
                   </Text>
                 </View>
@@ -775,7 +759,7 @@ export default function FlowScreen({ navigation }: Props) {
                     <View style={s.slotNum}>
                       <Text style={s.slotNumText}>{idx + 1}</Text>
                     </View>
-                    <Text style={s.slotCardText} numberOfLines={2}>
+                    <Text style={s.slotCardText} numberOfLines={2} ellipsizeMode="tail">
                       {task.icon ? `${task.icon} ` : ''}{task.title}
                     </Text>
                   </TouchableOpacity>
