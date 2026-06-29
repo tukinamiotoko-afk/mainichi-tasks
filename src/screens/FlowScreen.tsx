@@ -611,7 +611,7 @@ export default function FlowScreen({ navigation }: Props) {
           <>
             <ArrowDown color="#fb923c" h={12} />
             <TouchableOpacity style={s.insertSlot} onPress={() => openBranchEditor(afterIdx)}>
-              <Text style={s.insertSlotText}>＋ なぞるやつをここに追加</Text>
+              <Text style={s.insertSlotText}>＋ 分岐をここに追加</Text>
             </TouchableOpacity>
           </>
         )}
@@ -771,7 +771,7 @@ export default function FlowScreen({ navigation }: Props) {
                   style={[s.branchBtn, insertBranchMode && s.branchBtnActive]}
                   onPress={() => setInsertBranchMode(p => !p)}
                 >
-                  <Text style={[s.branchBtnText, insertBranchMode && s.branchBtnActiveText]}>なぞる</Text>
+                  <Text style={[s.branchBtnText, insertBranchMode && s.branchBtnActiveText]}>分岐</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={s.saveBtn} onPress={saveOrder} disabled={saving}>
                   <Text style={s.saveBtnText}>{saving ? '…' : '保存'}</Text>
@@ -888,14 +888,14 @@ export default function FlowScreen({ navigation }: Props) {
         <TouchableOpacity style={s.pickerOverlay} activeOpacity={1} onPress={() => { setBranchEditorOpen(false); setBranchDraft(null); }}>
           <TouchableOpacity activeOpacity={1} style={s.branchEditorSheet} onPress={() => {}}>
             <View style={s.pickerHeader}>
-              <Text style={s.pickerTitle}>なぞるやつを設定</Text>
+              <Text style={s.pickerTitle}>分岐を設定</Text>
               <TouchableOpacity onPress={saveBranchDraft}>
                 <Text style={s.pickerDone}>完了</Text>
               </TouchableOpacity>
             </View>
             <ScrollView keyboardShouldPersistTaps="handled" bounces={false}>
               <View style={s.branchEditorSection}>
-                <Text style={s.branchEditorLabel}>なぞる内容</Text>
+                <Text style={s.branchEditorLabel}>分岐の内容</Text>
                 <TextInput
                   style={s.branchEditorInput}
                   value={branchDraft?.question ?? ''}
