@@ -34,6 +34,7 @@ function ArrowDown({ color, h = 18 }: { color: string; h?: number }) {
 
 const emptyPath = (): BranchPathData => ({ taskIds: [], notes: [] });
 const emptyItems = (): SimpleItems => ({ taskIds: [], notes: [] });
+const emptySubBranch = (): SubBranch => ({ question: '', yesReturns: true, yes: emptyItems(), no: emptyItems() });
 
 const parseSimpleItems = (raw: unknown): SimpleItems => ({
   taskIds: Array.isArray((raw as any)?.taskIds) ? (raw as any).taskIds.filter((v: unknown): v is number => typeof v === 'number') : [],
@@ -318,6 +319,10 @@ export default function FlowScreen({ navigation }: Props) {
   const [branchDraft, setBranchDraft] = useState<BranchNode | null>(null);
   const [branchNoteDraft, setBranchNoteDraft] = useState({ yes: '', no: '' });
   const [subNoteDraft, setSubNoteDraft] = useState({ yes: '', no: '' });
+  const [noRouteBranchEditorOpen, setNoRouteBranchEditorOpen] = useState(false);
+  const [noRouteBranchParent, setNoRouteBranchParent] = useState<BranchNode | null>(null);
+  const [noRouteSubDraft, setNoRouteSubDraft] = useState<SubBranch | null>(null);
+  const [noRouteSubNoteDraft, setNoRouteSubNoteDraft] = useState({ yes: '', no: '' });
   const [manualFlowScale, setManualFlowScale] = useState<number | null>(null);
   const [isPinching, setIsPinching] = useState(false);
 
@@ -564,19 +569,33 @@ export default function FlowScreen({ navigation }: Props) {
     setBranchEditorOpen(true);
   };
   const openNoRouteBranchEditor = (b: BranchNode) => {
-    setBranchDraft({
-      id: b.id,
-      insertAfterIdx: b.insertAfterIdx,
-      question: b.question,
-      yes: { ...b.yes },
-      no: {
-        ...b.no,
-        sub: b.no.sub ?? { question: '', yesReturns: true, yes: emptyItems(), no: emptyItems() },
-      },
-    });
-    setBranchNoteDraft({ yes: '', no: '' });
-    setSubNoteDraft({ yes: '', no: '' });
-    setBranchEditorOpen(true);
+    setNoRouteBranchParent(b);
+    setNoRouteSubDraft(b.no.sub ? { ...b.no.sub, yes: { ...b.no.sub.yes }, no: { ...b.no.sub.no } } : emptySubBranch());
+    setNoRouteSubNoteDraft({ yes: '', no: '' });
+    setNoRouteBranchEditorOpen(true);
+  };
+  const closeNoRouteBranchEditor = () => {
+    setNoRouteBranchEditorOpen(false);
+    setNoRouteBranchParent(null);
+    setNoRouteSubDraft(null);
+    setNoRouteSubNoteDraft({ yes: '', no: '' });
+  };
+  const saveNoRouteBranchDraft = async () => {
+    if (!noRouteBranchParent || !noRouteSubDraft || noRouteBranchParent.id === null) return;
+    const updated: BranchNode = {
+      ...noRouteBranchParent,
+      no: { ...noRouteBranchParent.no, sub: noRouteSubDraft },
+    };
+    const data = {
+      after_task_id: updated.insertAfterIdx,
+      question: updated.question || '確認',
+      yes_label: 'はい', yes_text: stringifyBranchPath(updated.yes),
+      no_label: 'いいえ', no_text: stringifyBranchPath(updated.no),
+      branch_side: 'left' as const,
+    };
+    await updateFlowBranch(db, noRouteBranchParent.id, data);
+    setBranches(prev => prev.map(b => b.id === noRouteBranchParent.id ? updated : b));
+    closeNoRouteBranchEditor();
   };
   const deleteBranch = async (id: number) => {
     await deleteFlowBranch(db, id);
@@ -663,6 +682,26 @@ export default function FlowScreen({ navigation }: Props) {
       if (!p?.no.sub) return p;
       return { ...p, no: { ...p.no, sub: { ...p.no.sub, [path]: { ...p.no.sub[path], notes: p.no.sub[path].notes.filter((_, i) => i !== idx) } } } };
     });
+  };
+  const setNoRouteSubQ = (q: string) => {
+    setNoRouteSubDraft(p => p ? { ...p, question: q } : p);
+  };
+  const toggleNoRouteSubTask = (path: 'yes' | 'no', id: number) => {
+    setNoRouteSubDraft(p => {
+      if (!p) return p;
+      const cur = p[path].taskIds;
+      const next = cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id];
+      return { ...p, [path]: { ...p[path], taskIds: next } };
+    });
+  };
+  const addNoRouteSubNote = (path: 'yes' | 'no') => {
+    const note = noRouteSubNoteDraft[path].trim();
+    if (!note) return;
+    setNoRouteSubDraft(p => p ? { ...p, [path]: { ...p[path], notes: [...p[path].notes, note] } } : p);
+    setNoRouteSubNoteDraft(prev => ({ ...prev, [path]: '' }));
+  };
+  const removeNoRouteSubNote = (path: 'yes' | 'no', idx: number) => {
+    setNoRouteSubDraft(p => p ? { ...p, [path]: { ...p[path], notes: p[path].notes.filter((_, i) => i !== idx) } } : p);
   };
 
   // ── branch rendering helpers ──
@@ -1298,6 +1337,106 @@ export default function FlowScreen({ navigation }: Props) {
               </View>
 
               <TouchableOpacity style={s.branchSaveBtn} onPress={saveBranchDraft}>
+                <Text style={s.branchSaveBtnText}>保存</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* No-route branch editor modal */}
+      <Modal visible={noRouteBranchEditorOpen} transparent animationType="slide" onRequestClose={closeNoRouteBranchEditor}>
+        <TouchableOpacity style={s.pickerOverlay} activeOpacity={1} onPress={closeNoRouteBranchEditor}>
+          <TouchableOpacity activeOpacity={1} style={s.branchEditorSheet} onPress={() => {}}>
+            <View style={s.pickerHeader}>
+              <Text style={s.pickerTitle}>{noRouteBranchParent?.no.sub ? '右側分岐を編集' : '右側分岐を追加'}</Text>
+              <TouchableOpacity onPress={saveNoRouteBranchDraft}>
+                <Text style={s.pickerDone}>完了</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView keyboardShouldPersistTaps="handled" bounces={false}>
+              <View style={s.branchEditorSection}>
+                <Text style={s.branchEditorLabel}>分岐の内容</Text>
+                <TextInput
+                  style={s.branchEditorInput}
+                  value={noRouteSubDraft?.question ?? ''}
+                  onChangeText={setNoRouteSubQ}
+                  placeholder="例: やり直す？"
+                  placeholderTextColor={C.muted}
+                />
+              </View>
+
+              <View style={s.branchEditorSection}>
+                <Text style={[s.branchEditorLabel, { color: '#15803d' }]}>はいで左に戻る（メインフローへ）</Text>
+                <View style={s.branchNoteList}>
+                  {(noRouteSubDraft?.yes.notes ?? []).map((note, idx) => (
+                    <TouchableOpacity key={`nry${note}${idx}`} style={s.branchNoteChip} onPress={() => removeNoRouteSubNote('yes', idx)} activeOpacity={0.75}>
+                      <Text style={s.branchNoteChipText} numberOfLines={1}>{note}</Text>
+                      <Text style={s.branchNoteChipX}>×</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <View style={s.branchNoteAddRow}>
+                  <TextInput
+                    style={s.branchNoteInput}
+                    value={noRouteSubNoteDraft.yes}
+                    onChangeText={t => setNoRouteSubNoteDraft(p => ({ ...p, yes: t }))}
+                    placeholder="はいルートの内容"
+                    placeholderTextColor={C.muted}
+                    returnKeyType="done"
+                    onSubmitEditing={() => addNoRouteSubNote('yes')}
+                  />
+                  <TouchableOpacity style={s.branchNoteAddBtn} onPress={() => addNoRouteSubNote('yes')}>
+                    <Text style={s.branchNoteAddText}>追加</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <View style={s.branchEditorSection}>
+                <Text style={[s.branchEditorLabel, { color: '#b91c1c' }]}>いいえで続けるカード</Text>
+                <View style={s.branchNoteList}>
+                  {(noRouteSubDraft?.no.notes ?? []).map((note, idx) => (
+                    <TouchableOpacity key={`nrn${note}${idx}`} style={s.branchNoteChip} onPress={() => removeNoRouteSubNote('no', idx)} activeOpacity={0.75}>
+                      <Text style={s.branchNoteChipText} numberOfLines={1}>{note}</Text>
+                      <Text style={s.branchNoteChipX}>×</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <View style={s.branchNoteAddRow}>
+                  <TextInput
+                    style={s.branchNoteInput}
+                    value={noRouteSubNoteDraft.no}
+                    onChangeText={t => setNoRouteSubNoteDraft(p => ({ ...p, no: t }))}
+                    placeholder="いいえルートの内容"
+                    placeholderTextColor={C.muted}
+                    returnKeyType="done"
+                    onSubmitEditing={() => addNoRouteSubNote('no')}
+                  />
+                  <TouchableOpacity style={s.branchNoteAddBtn} onPress={() => addNoRouteSubNote('no')}>
+                    <Text style={s.branchNoteAddText}>追加</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <View style={[s.branchEditorSection, { paddingBottom: 0 }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Text style={[s.branchEditorLabel, { flex: 1 }]}>タスク（いいえルート）</Text>
+                  <View style={s.branchCheckLabels}><Text style={s.branchCheckLabelN}>いいえ</Text></View>
+                </View>
+              </View>
+              {dueTasks.map(t => {
+                const inNoRouteSub = noRouteSubDraft?.no.taskIds.includes(t.id) ?? false;
+                return (
+                  <View key={`nrt${t.id}`} style={s.branchTaskRow}>
+                    <Text style={s.branchTaskText} numberOfLines={2}>{t.icon ? `${t.icon} ` : ''}{t.title}</Text>
+                    <TouchableOpacity style={[s.branchCheckN, inNoRouteSub && s.branchCheckNOn]} onPress={() => toggleNoRouteSubTask('no', t.id)}>
+                      {inNoRouteSub && <Text style={s.branchCheckText}>✓</Text>}
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
+
+              <TouchableOpacity style={s.branchSaveBtn} onPress={saveNoRouteBranchDraft}>
                 <Text style={s.branchSaveBtnText}>保存</Text>
               </TouchableOpacity>
             </ScrollView>
