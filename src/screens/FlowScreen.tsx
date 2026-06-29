@@ -200,11 +200,11 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   branchYesLine: { width: 2, height: 140, backgroundColor: C.line, marginTop: 0 },
   branchYesLabel: { position: 'absolute', right: 34, top: 12, color: C.line, fontSize: 11, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 4 },
   branchYesItems: { width: 152, alignItems: 'center', gap: 5, display: 'none' },
-  branchNoRoute: { position: 'absolute', top: 40, left: '50%', right: -86, height: 150, zIndex: 1 },
-  branchNoRail: { position: 'absolute', top: 0, left: 0, right: 76, height: 150, borderTopWidth: 2, borderRightWidth: 2, borderBottomWidth: 2, borderColor: C.line },
+  branchNoRoute: { position: 'absolute', top: 40, right: '50%', left: -10, height: 150, zIndex: 1 },
+  branchNoRail: { position: 'absolute', top: 0, left: 76, right: 0, height: 150, borderTopWidth: 2, borderLeftWidth: 2, borderBottomWidth: 2, borderColor: C.line },
   branchNoMergeLine: { display: 'none' },
-  branchNoLabel: { position: 'absolute', top: -20, left: 143, color: C.line, fontSize: 11, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 4 },
-  branchNoItems: { position: 'absolute', top: 30, right: -8, width: 168, alignItems: 'stretch', gap: 6 },
+  branchNoLabel: { position: 'absolute', top: -20, left: 78, color: C.line, fontSize: 11, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 4 },
+  branchNoItems: { position: 'absolute', top: 30, left: -8, width: 168, alignItems: 'stretch', gap: 6 },
   branchPathTask: { width: 168, minHeight: 44, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8, borderWidth: 1.5, borderColor: C.line, backgroundColor: '#fff' },
   branchPathNote: { width: 168, minHeight: 44, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8, borderWidth: 1.5, borderColor: C.line, backgroundColor: '#fff' },
   branchPathTaskText: { color: C.ink, fontSize: 12, fontWeight: '700', textAlign: 'center', lineHeight: 16 },
@@ -229,18 +229,18 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   viewBranchYesLine: { width: 1.5, height: 120, backgroundColor: C.line, marginTop: 0 },
   viewBranchLabel: { position: 'absolute', right: 30, top: 10, color: C.line, fontSize: 10, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 4 },
   viewBranchYesItems: { width: 128, alignItems: 'center', gap: 4, display: 'none' },
-  viewBranchNoRoute: { position: 'absolute', top: 30, left: '50%', right: -70, height: 122, zIndex: 1 },
-  viewBranchNoRail: { position: 'absolute', top: 0, left: 0, right: 69, height: 122, borderTopWidth: 2, borderRightWidth: 2, borderBottomWidth: 2, borderColor: C.line },
+  viewBranchNoRoute: { position: 'absolute', top: 30, right: '50%', left: -5, height: 122, zIndex: 1 },
+  viewBranchNoRail: { position: 'absolute', top: 0, left: 69, right: 0, height: 122, borderTopWidth: 2, borderLeftWidth: 2, borderBottomWidth: 2, borderColor: C.line },
   viewBranchNoMergeLine: { display: 'none' },
-  viewBranchNoLabel: { position: 'absolute', top: -18, left: 105, color: C.line, fontSize: 10, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 4 },
-  viewBranchNoItems: { position: 'absolute', top: 24, right: -6, width: 150, alignItems: 'stretch', gap: 5 },
+  viewBranchNoLabel: { position: 'absolute', top: -18, left: 71, color: C.line, fontSize: 10, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 4 },
+  viewBranchNoItems: { position: 'absolute', top: 24, left: -6, width: 150, alignItems: 'stretch', gap: 5 },
   viewBranchTaskBox: { width: 150, minHeight: 38, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 7, borderWidth: 1.5, borderColor: C.line, backgroundColor: '#fff' },
   viewBranchNoteBox: { width: 150, minHeight: 38, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 7, borderWidth: 1.5, borderColor: C.line, backgroundColor: '#fff' },
   viewBranchTask: { color: C.ink, fontSize: 11, fontWeight: '700', textAlign: 'center', lineHeight: 15 },
   viewBranchNote: { color: C.ink, fontSize: 11, fontWeight: '700', textAlign: 'center', lineHeight: 15 },
 
   // ── sub-branch (nested in no-path) ──
-  subBranchWrap: { marginTop: 8, width: '100%', alignItems: 'center', paddingLeft: 38 },
+  subBranchWrap: { marginTop: 8, width: '100%', alignItems: 'center' },
   subDiamond: { width: 130, height: 40, alignItems: 'center', justifyContent: 'center', position: 'relative' },
   subDiamondTB: { position: 'absolute', top: 0, width: 0, height: 0, borderLeftWidth: 65, borderRightWidth: 65, borderBottomWidth: 20, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderBottomColor: C.line },
   subDiamondBB: { position: 'absolute', bottom: 0, width: 0, height: 0, borderLeftWidth: 65, borderRightWidth: 65, borderTopWidth: 20, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: C.line },
@@ -268,6 +268,13 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   // ── no-route insert slots ──
   noInsertSlot: { paddingVertical: 7, borderWidth: 1.5, borderColor: '#fb923c', borderStyle: 'dashed', borderRadius: 8, alignItems: 'center', backgroundColor: '#fff7ed' },
   noInsertSlotText: { color: '#c2410c', fontSize: 11, fontWeight: '700' },
+
+  // ── quick-add modal ──
+  quickAddSheet: { backgroundColor: C.card, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
+  quickAddBody: { padding: 20 },
+  quickAddInput: { borderWidth: 1.5, borderColor: C.line, borderRadius: 10, padding: 12, minHeight: 80, fontSize: 14, color: C.ink, textAlignVertical: 'top', marginBottom: 12 },
+  quickAddBtn: { backgroundColor: '#d97706', borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
+  quickAddBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
 
   // ── branch editor modal ──
   branchEditorSheet: { backgroundColor: C.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '85%' },
@@ -318,6 +325,9 @@ export default function FlowScreen({ navigation }: Props) {
   const [branchDraft, setBranchDraft] = useState<BranchNode | null>(null);
   const [branchNoteDraft, setBranchNoteDraft] = useState({ yes: '', no: '' });
   const [subNoteDraft, setSubNoteDraft] = useState({ yes: '', no: '' });
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [quickAddBranch, setQuickAddBranch] = useState<BranchNode | null>(null);
+  const [quickAddText, setQuickAddText] = useState('');
   const [manualFlowScale, setManualFlowScale] = useState<number | null>(null);
   const [isPinching, setIsPinching] = useState(false);
 
@@ -563,6 +573,32 @@ export default function FlowScreen({ navigation }: Props) {
     setSubNoteDraft({ yes: '', no: '' });
     setBranchEditorOpen(true);
   };
+  const openQuickAdd = (b: BranchNode) => {
+    setQuickAddBranch(b);
+    setQuickAddText('');
+    setQuickAddOpen(true);
+  };
+  const saveQuickAdd = async () => {
+    if (!quickAddBranch || !quickAddText.trim()) return;
+    const updated: BranchNode = {
+      ...quickAddBranch,
+      no: { ...quickAddBranch.no, notes: [...quickAddBranch.no.notes, quickAddText.trim()] },
+    };
+    const data = {
+      after_task_id: updated.insertAfterIdx,
+      question: updated.question || '確認',
+      yes_label: 'はい', yes_text: stringifyBranchPath(updated.yes),
+      no_label: 'いいえ', no_text: stringifyBranchPath(updated.no),
+      branch_side: 'left' as const,
+    };
+    if (updated.id !== null) {
+      await updateFlowBranch(db, updated.id!, data);
+      setBranches(prev => prev.map(b => b.id === updated.id ? updated : b));
+    }
+    setQuickAddOpen(false);
+    setQuickAddBranch(null);
+    setQuickAddText('');
+  };
   const deleteBranch = async (id: number) => {
     await deleteFlowBranch(db, id);
     setBranches(prev => prev.filter(b => b.id !== id));
@@ -732,7 +768,7 @@ export default function FlowScreen({ navigation }: Props) {
 
   const renderNoRouteItems = (b: BranchNode) => {
     const slot = (k: string) => (
-      <TouchableOpacity key={`sl${k}`} style={s.noInsertSlot} onPress={() => editBranch(b)} activeOpacity={0.75}>
+      <TouchableOpacity key={`sl${k}`} style={s.noInsertSlot} onPress={() => openQuickAdd(b)} activeOpacity={0.75}>
         <Text style={s.noInsertSlotText}>＋ ここに追加</Text>
       </TouchableOpacity>
     );
@@ -1286,6 +1322,33 @@ export default function FlowScreen({ navigation }: Props) {
                 <Text style={s.branchSaveBtnText}>保存</Text>
               </TouchableOpacity>
             </ScrollView>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Quick-add no-route note modal */}
+      <Modal visible={quickAddOpen} transparent animationType="slide" onRequestClose={() => setQuickAddOpen(false)}>
+        <TouchableOpacity style={s.pickerOverlay} activeOpacity={1} onPress={() => setQuickAddOpen(false)}>
+          <TouchableOpacity activeOpacity={1} style={s.quickAddSheet} onPress={() => {}}>
+            <View style={s.pickerHeader}>
+              <Text style={s.pickerTitle}>いいえルートに追加</Text>
+              <TouchableOpacity onPress={() => setQuickAddOpen(false)}>
+                <Text style={s.pickerDone}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={s.quickAddBody}>
+              <TextInput
+                style={s.quickAddInput}
+                value={quickAddText}
+                onChangeText={setQuickAddText}
+                placeholder="メモを入力…"
+                autoFocus
+                multiline
+              />
+              <TouchableOpacity style={s.quickAddBtn} onPress={saveQuickAdd}>
+                <Text style={s.quickAddBtnText}>追加</Text>
+              </TouchableOpacity>
+            </View>
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
