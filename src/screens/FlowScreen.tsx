@@ -358,11 +358,6 @@ export default function FlowScreen({ navigation }: Props) {
   if (shiftAnims.current.length > slots.length) shiftAnims.current = shiftAnims.current.slice(0, slots.length);
 
   useEffect(() => { panRespMap.current.clear(); }, [slots.length]);
-  useEffect(() => {
-    setManualFlowScale(null);
-    flowPan.setValue({ x: 0, y: 0 });
-    flowPanOffsetRef.current = { x: 0, y: 0 };
-  }, [selectedDate, flowPan]);
 
   const isToday = selectedDate === today;
   const selDateObj = useMemo(() => new Date(`${selectedDate}T00:00:00`), [selectedDate]);
@@ -414,10 +409,22 @@ export default function FlowScreen({ navigation }: Props) {
     Math.min(viewportWidth - (isEditing ? 48 : 80), isEditing ? 420 : 360)
   );
   const flowCanvasWidth = flowLaneWidth + (hasSideBranch ? (isEditing ? 280 : 240) : 0);
+  const defaultFlowPanX = Math.round((flowCanvasWidth - flowLaneWidth) / 2);
   const flowContentStyle = [
     isEditing ? s.editContent : s.viewContent,
     hasSideBranch && (isEditing ? s.editContentZoomed : s.viewContentZoomed),
   ];
+  useEffect(() => {
+    setManualFlowScale(null);
+    flowPan.setValue({ x: defaultFlowPanX, y: 0 });
+    flowPanOffsetRef.current = { x: defaultFlowPanX, y: 0 };
+  }, [selectedDate, defaultFlowPanX, flowPan]);
+  useEffect(() => {
+    if (flowPanOffsetRef.current.x === 0 && flowPanOffsetRef.current.y === 0) {
+      flowPan.setValue({ x: defaultFlowPanX, y: 0 });
+      flowPanOffsetRef.current = { x: defaultFlowPanX, y: 0 };
+    }
+  }, [defaultFlowPanX, flowPan]);
   const getPinchDistance = (e: GestureResponderEvent) => {
     const touches = e.nativeEvent.touches;
     if (touches.length < 2) return null;
