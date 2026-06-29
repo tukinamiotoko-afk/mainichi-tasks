@@ -18,11 +18,11 @@ import { useTheme, ColorSet } from '../contexts/ThemeContext';
 const pad = (n: number) => String(n).padStart(2, '0');
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'Flow'> };
 
-function ArrowDown({ color }: { color: string }) {
+function ArrowDown({ color, h = 18 }: { color: string; h?: number }) {
   return (
-    <View style={{ alignItems: 'center', marginVertical: 4 }} pointerEvents="none">
-      <View style={{ width: 2, height: 20, backgroundColor: color }} />
-      <View style={{ width: 0, height: 0, borderLeftWidth: 6, borderRightWidth: 6, borderTopWidth: 9, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: color }} />
+    <View style={{ alignItems: 'center', marginVertical: 2 }} pointerEvents="none">
+      <View style={{ width: 2, height: h, backgroundColor: color }} />
+      <View style={{ width: 0, height: 0, borderLeftWidth: 5, borderRightWidth: 5, borderTopWidth: 8, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: color }} />
     </View>
   );
 }
@@ -38,12 +38,27 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   navDateText: { color: '#ffffff', fontSize: 15, fontWeight: '800' },
   navTodayHint: { color: 'rgba(255,255,255,0.75)', fontSize: 10, fontWeight: '700', marginTop: 1 },
   navRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  saveBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.25)' },
-  saveBtnText: { color: '#ffffff', fontSize: 13, fontWeight: '800' },
+  editBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.18)' },
+  editBtnText: { color: '#ffffff', fontSize: 13, fontWeight: '800' },
+  saveBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.9)' },
+  saveBtnText: { color: '#7c3aed', fontSize: 13, fontWeight: '900' },
 
   flowScroll: { flex: 1 },
-  flowContent: { alignItems: 'center', paddingTop: 24, paddingBottom: 24, paddingHorizontal: 24 },
 
+  // ── view mode (compact) ──
+  viewContent: { alignItems: 'center', paddingTop: 20, paddingBottom: 24, paddingHorizontal: 40 },
+  viewTerminator: { backgroundColor: C.termBg, borderWidth: 1.5, borderColor: C.termBorder, borderRadius: 18, paddingHorizontal: 22, paddingVertical: 7 },
+  viewTerminatorText: { color: C.termText, fontSize: 12, fontWeight: '800', letterSpacing: 1 },
+  viewSlotWrap: { width: '100%' },
+  viewSlot: { width: '100%', minHeight: 44, borderWidth: 1.5, borderRadius: 10, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderColor: C.termBorder, backgroundColor: C.termBg },
+  viewSlotEmpty: { borderColor: C.border, borderStyle: 'dashed', backgroundColor: C.card },
+  viewSlotNum: { width: 20, height: 20, borderRadius: 10, backgroundColor: C.primarySoft, alignItems: 'center', justifyContent: 'center', marginRight: 8, flexShrink: 0 },
+  viewSlotNumText: { color: C.primary, fontSize: 10, fontWeight: '800' },
+  viewSlotText: { flex: 1, color: C.ink, fontSize: 13, fontWeight: '700' },
+  viewSlotEmptyText: { flex: 1, color: C.muted, fontSize: 12 },
+
+  // ── edit mode (full size) ──
+  editContent: { alignItems: 'center', paddingTop: 24, paddingBottom: 24, paddingHorizontal: 24 },
   terminator: { backgroundColor: C.termBg, borderWidth: 1.5, borderColor: C.termBorder, borderRadius: 22, paddingHorizontal: 30, paddingVertical: 10 },
   terminatorText: { color: C.termText, fontSize: 14, fontWeight: '800', letterSpacing: 1 },
 
@@ -111,6 +126,7 @@ export default function FlowScreen({ navigation }: Props) {
   const [selectedCardId, setSelectedCardId] = useState<number | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
 
   // ── drag-to-reorder state ──
   const [draggingIdx, setDraggingIdx] = useState<number | null>(null);
@@ -126,11 +142,9 @@ export default function FlowScreen({ navigation }: Props) {
 
   slotsRef.current = slots;
 
-  // sync shiftAnims length with slots
   while (shiftAnims.current.length < slots.length) shiftAnims.current.push(new Animated.Value(0));
   if (shiftAnims.current.length > slots.length) shiftAnims.current = shiftAnims.current.slice(0, slots.length);
 
-  // clear cached pan responders when slot count changes
   useEffect(() => { panRespMap.current.clear(); }, [slots.length]);
 
   const isToday = selectedDate === today;
@@ -154,6 +168,7 @@ export default function FlowScreen({ navigation }: Props) {
     setAddedIds(ids);
     setSlots([...ids]);
     setSelectedCardId(null);
+    setIsEditing(false);
     panRespMap.current.clear();
   }, [db, selectedDate]);
 
@@ -163,7 +178,6 @@ export default function FlowScreen({ navigation }: Props) {
   const tray = useMemo(() => addedIds.filter(id => !slots.includes(id)), [addedIds, slots]);
   const hasSelection = selectedCardId !== null;
 
-  // ── drag pan responder factory (keyed by slot index) ──
   const getSlotPan = useCallback((slotIdx: number) => {
     if (panRespMap.current.has(slotIdx)) return panRespMap.current.get(slotIdx)!;
 
@@ -287,10 +301,119 @@ export default function FlowScreen({ navigation }: Props) {
       const placedIds = slots.filter((id): id is number => id !== null);
       const trayIds = addedIds.filter(id => !slots.includes(id));
       await updateTaskSortOrders(db, [...placedIds, ...trayIds]);
+      setIsEditing(false);
+      setSelectedCardId(null);
     } finally {
       setSaving(false);
     }
   };
+
+  // ── view mode flow ──
+  const renderViewFlow = () => (
+    <>
+      <View style={s.viewTerminator}>
+        <Text style={s.viewTerminatorText}>開始</Text>
+      </View>
+      {slots.map((taskId, idx) => {
+        const task = taskId !== null ? taskById.get(taskId) : undefined;
+        return (
+          <View key={idx} style={s.viewSlotWrap}>
+            <ArrowDown color={C.line} h={14} />
+            {task ? (
+              <View style={s.viewSlot}>
+                <View style={s.viewSlotNum}>
+                  <Text style={s.viewSlotNumText}>{idx + 1}</Text>
+                </View>
+                <Text style={s.viewSlotText} numberOfLines={1}>
+                  {task.icon ? `${task.icon} ` : ''}{task.title}
+                </Text>
+              </View>
+            ) : (
+              <View style={[s.viewSlot, s.viewSlotEmpty]}>
+                <View style={s.viewSlotNum}>
+                  <Text style={s.viewSlotNumText}>{idx + 1}</Text>
+                </View>
+                <Text style={s.viewSlotEmptyText}>空き</Text>
+              </View>
+            )}
+          </View>
+        );
+      })}
+      <ArrowDown color={C.line} h={14} />
+      <View style={s.viewTerminator}>
+        <Text style={s.viewTerminatorText}>終了</Text>
+      </View>
+    </>
+  );
+
+  // ── edit mode flow ──
+  const renderEditFlow = () => (
+    <>
+      <View style={s.terminator}>
+        <Text style={s.terminatorText}>開始</Text>
+      </View>
+      {slots.map((taskId, idx) => {
+        const task = taskId !== null ? taskById.get(taskId) : undefined;
+        const isThisDragging = draggingIdx === idx;
+        const shiftAnim = shiftAnims.current[idx] ?? new Animated.Value(0);
+        const pan = task ? getSlotPan(idx) : null;
+
+        return (
+          <Animated.View
+            key={idx}
+            style={[
+              s.slotWrap,
+              isThisDragging
+                ? { transform: [{ translateY: dragY }, { scale: dragScale }], zIndex: 10, elevation: 8 }
+                : { transform: [{ translateY: shiftAnim }] },
+            ]}
+            onLayout={(e) => { slotHRef.current = e.nativeEvent.layout.height; }}
+          >
+            <ArrowDown color={C.line} />
+            {task ? (
+              <View style={[
+                s.slotBase,
+                hasSelection ? s.slotFilledTarget : s.slotFilled,
+                isThisDragging && s.slotDragging,
+              ]}>
+                <View {...pan!.panHandlers} style={s.dragHandle} hitSlop={{ top: 12, bottom: 12, left: 4, right: 4 }}>
+                  <Text style={s.dragHandleText}>☰</Text>
+                </View>
+                <TouchableOpacity style={s.slotCardArea} onPress={() => tapSlot(idx)} activeOpacity={0.7}>
+                  <View style={s.slotNum}>
+                    <Text style={s.slotNumText}>{idx + 1}</Text>
+                  </View>
+                  <Text style={s.slotCardText} numberOfLines={2}>
+                    {task.icon ? `${task.icon} ` : ''}{task.title}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={s.slotRemoveBtn} onPress={() => removeFromSlot(idx)}>
+                  <Text style={s.slotRemoveText}>×</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={[s.slotBase, hasSelection ? s.slotTarget : s.slotEmpty]}
+                onPress={() => tapSlot(idx)}
+                activeOpacity={0.75}
+              >
+                <View style={s.slotNum}>
+                  <Text style={s.slotNumText}>{idx + 1}</Text>
+                </View>
+                <Text style={s.slotEmptyText}>
+                  {hasSelection ? 'ここに入れる' : 'カードを入れる'}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </Animated.View>
+        );
+      })}
+      <ArrowDown color={C.line} />
+      <View style={s.terminator}>
+        <Text style={s.terminatorText}>終了</Text>
+      </View>
+    </>
+  );
 
   return (
     <View style={[s.root, { paddingBottom: insets.bottom }]}>
@@ -306,9 +429,13 @@ export default function FlowScreen({ navigation }: Props) {
             {!isToday && <Text style={s.navTodayHint}>タップで今日へ</Text>}
           </TouchableOpacity>
           <View style={s.navRight}>
-            {addedIds.length > 0 && (
+            {isEditing ? (
               <TouchableOpacity style={s.saveBtn} onPress={saveOrder} disabled={saving}>
                 <Text style={s.saveBtnText}>{saving ? '…' : '保存'}</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity style={s.editBtn} onPress={() => setIsEditing(true)}>
+                <Text style={s.editBtnText}>編集</Text>
               </TouchableOpacity>
             )}
             <TouchableOpacity style={s.navBtn} onPress={() => shiftSelected(1)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -320,7 +447,7 @@ export default function FlowScreen({ navigation }: Props) {
 
       <ScrollView
         style={s.flowScroll}
-        contentContainerStyle={s.flowContent}
+        contentContainerStyle={isEditing ? s.editContent : s.viewContent}
         scrollEnabled={draggingIdx === null}
       >
         {dueTasks.length === 0 ? (
@@ -331,85 +458,18 @@ export default function FlowScreen({ navigation }: Props) {
         ) : addedIds.length === 0 ? (
           <View style={s.emptyFlow}>
             <Text style={s.emptyTitle}>フローにタスクを追加しましょう</Text>
-            <Text style={s.emptyBody}>下のボタンからタスクを選んでフローを組み立ててください</Text>
-            <TouchableOpacity style={s.addFirstBtn} onPress={() => setPickerOpen(true)}>
-              <Text style={s.addFirstBtnText}>＋ タスクを追加</Text>
-            </TouchableOpacity>
+            <Text style={s.emptyBody}>右上の「編集」からタスクを追加できます</Text>
+            {isEditing && (
+              <TouchableOpacity style={s.addFirstBtn} onPress={() => setPickerOpen(true)}>
+                <Text style={s.addFirstBtnText}>＋ タスクを追加</Text>
+              </TouchableOpacity>
+            )}
           </View>
-        ) : (
-          <>
-            <View style={s.terminator}>
-              <Text style={s.terminatorText}>開始</Text>
-            </View>
-
-            {slots.map((taskId, idx) => {
-              const task = taskId !== null ? taskById.get(taskId) : undefined;
-              const isThisDragging = draggingIdx === idx;
-              const shiftAnim = shiftAnims.current[idx] ?? new Animated.Value(0);
-              const pan = task ? getSlotPan(idx) : null;
-
-              return (
-                <Animated.View
-                  key={idx}
-                  style={[
-                    s.slotWrap,
-                    isThisDragging
-                      ? { transform: [{ translateY: dragY }, { scale: dragScale }], zIndex: 10, elevation: 8 }
-                      : { transform: [{ translateY: shiftAnim }] },
-                  ]}
-                  onLayout={(e) => {
-                    slotHRef.current = e.nativeEvent.layout.height;
-                  }}
-                >
-                  <ArrowDown color={C.line} />
-                  {task ? (
-                    <View style={[
-                      s.slotBase,
-                      hasSelection ? s.slotFilledTarget : s.slotFilled,
-                      isThisDragging && s.slotDragging,
-                    ]}>
-                      <View {...pan!.panHandlers} style={s.dragHandle} hitSlop={{ top: 12, bottom: 12, left: 4, right: 4 }}>
-                        <Text style={s.dragHandleText}>☰</Text>
-                      </View>
-                      <TouchableOpacity style={s.slotCardArea} onPress={() => tapSlot(idx)} activeOpacity={0.7}>
-                        <View style={s.slotNum}>
-                          <Text style={s.slotNumText}>{idx + 1}</Text>
-                        </View>
-                        <Text style={s.slotCardText} numberOfLines={2}>
-                          {task.icon ? `${task.icon} ` : ''}{task.title}
-                        </Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity style={s.slotRemoveBtn} onPress={() => removeFromSlot(idx)}>
-                        <Text style={s.slotRemoveText}>×</Text>
-                      </TouchableOpacity>
-                    </View>
-                  ) : (
-                    <TouchableOpacity
-                      style={[s.slotBase, hasSelection ? s.slotTarget : s.slotEmpty]}
-                      onPress={() => tapSlot(idx)}
-                      activeOpacity={0.75}
-                    >
-                      <View style={s.slotNum}>
-                        <Text style={s.slotNumText}>{idx + 1}</Text>
-                      </View>
-                      <Text style={s.slotEmptyText}>
-                        {hasSelection ? 'ここに入れる' : 'カードを入れる'}
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-                </Animated.View>
-              );
-            })}
-
-            <ArrowDown color={C.line} />
-            <View style={s.terminator}>
-              <Text style={s.terminatorText}>終了</Text>
-            </View>
-          </>
-        )}
+        ) : isEditing ? renderEditFlow() : renderViewFlow()}
       </ScrollView>
 
-      {dueTasks.length > 0 && (
+      {/* tray — edit mode only */}
+      {isEditing && dueTasks.length > 0 && (
         <View style={s.tray}>
           {hasSelection ? (
             <Text style={s.trayHint}>カードを選択中 — 枠をタップして入れる</Text>
