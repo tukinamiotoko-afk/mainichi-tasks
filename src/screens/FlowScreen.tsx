@@ -18,7 +18,9 @@ import { useTheme, ColorSet } from '../contexts/ThemeContext';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'Flow'> };
-type BranchPathData = { taskIds: number[]; notes: string[] };
+type SimpleItems = { taskIds: number[]; notes: string[] };
+type SubBranch = { question: string; yes: SimpleItems; no: SimpleItems; yesReturns: boolean };
+type BranchPathData = { taskIds: number[]; notes: string[]; sub?: SubBranch };
 type BranchNode = { id: number | null; insertAfterIdx: number; question: string; yes: BranchPathData; no: BranchPathData };
 
 function ArrowDown({ color, h = 18 }: { color: string; h?: number }) {
@@ -31,16 +33,31 @@ function ArrowDown({ color, h = 18 }: { color: string; h?: number }) {
 }
 
 const emptyPath = (): BranchPathData => ({ taskIds: [], notes: [] });
+const emptyItems = (): SimpleItems => ({ taskIds: [], notes: [] });
+
+const parseSimpleItems = (raw: unknown): SimpleItems => ({
+  taskIds: Array.isArray((raw as any)?.taskIds) ? (raw as any).taskIds.filter((v: unknown): v is number => typeof v === 'number') : [],
+  notes: Array.isArray((raw as any)?.notes) ? (raw as any).notes.filter((v: unknown): v is string => typeof v === 'string' && v.trim().length > 0) : [],
+});
 
 const parseBranchPath = (raw: string | null): BranchPathData => {
   if (!raw) return emptyPath();
   try {
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) return { taskIds: parsed.filter(v => typeof v === 'number'), notes: [] };
-    return {
+    const base: BranchPathData = {
       taskIds: Array.isArray(parsed?.taskIds) ? parsed.taskIds.filter((v: unknown): v is number => typeof v === 'number') : [],
       notes: Array.isArray(parsed?.notes) ? parsed.notes.filter((v: unknown): v is string => typeof v === 'string' && v.trim().length > 0) : [],
     };
+    if (parsed?.sub) {
+      base.sub = {
+        question: typeof parsed.sub.question === 'string' ? parsed.sub.question : '',
+        yesReturns: parsed.sub.yesReturns !== false,
+        yes: parseSimpleItems(parsed.sub.yes),
+        no: parseSimpleItems(parsed.sub.no),
+      };
+    }
+    return base;
   } catch {
     return { taskIds: [], notes: raw.trim() ? [raw.trim()] : [] };
   }
@@ -49,6 +66,12 @@ const parseBranchPath = (raw: string | null): BranchPathData => {
 const stringifyBranchPath = (path: BranchPathData) => JSON.stringify({
   taskIds: path.taskIds,
   notes: path.notes.map(n => n.trim()).filter(Boolean),
+  ...(path.sub ? { sub: {
+    question: path.sub.question,
+    yesReturns: path.sub.yesReturns,
+    yes: { taskIds: path.sub.yes.taskIds, notes: path.sub.yes.notes.map(n => n.trim()).filter(Boolean) },
+    no: { taskIds: path.sub.no.taskIds, notes: path.sub.no.notes.map(n => n.trim()).filter(Boolean) },
+  }} : {}),
 });
 
 const makeStyles = (C: ColorSet) => StyleSheet.create({
@@ -216,6 +239,32 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   viewBranchTask: { color: C.ink, fontSize: 11, fontWeight: '700', textAlign: 'center', lineHeight: 15 },
   viewBranchNote: { color: C.ink, fontSize: 11, fontWeight: '700', textAlign: 'center', lineHeight: 15 },
 
+  // ── sub-branch (nested in no-path) ──
+  subBranchWrap: { marginTop: 8, width: '100%', alignItems: 'center' },
+  subDiamond: { width: 130, height: 40, alignItems: 'center', justifyContent: 'center', position: 'relative' },
+  subDiamondTB: { position: 'absolute', top: 0, width: 0, height: 0, borderLeftWidth: 65, borderRightWidth: 65, borderBottomWidth: 20, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderBottomColor: C.line },
+  subDiamondBB: { position: 'absolute', bottom: 0, width: 0, height: 0, borderLeftWidth: 65, borderRightWidth: 65, borderTopWidth: 20, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: C.line },
+  subDiamondTI: { position: 'absolute', top: 2, width: 0, height: 0, borderLeftWidth: 61, borderRightWidth: 61, borderBottomWidth: 17, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderBottomColor: '#fffbeb' },
+  subDiamondBI: { position: 'absolute', bottom: 2, width: 0, height: 0, borderLeftWidth: 61, borderRightWidth: 61, borderTopWidth: 17, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: '#fffbeb' },
+  subDiamondSC: { position: 'absolute', top: 19, left: 6, right: 6, height: 3, backgroundColor: '#fffbeb', zIndex: 1 },
+  subDiamondInner: { width: 96, alignItems: 'center', justifyContent: 'center', zIndex: 2 },
+  subDiamondQ: { color: '#78350f', fontSize: 9, fontWeight: '800', textAlign: 'center' },
+  subPaths: { flexDirection: 'row', marginTop: 4, width: 130 },
+  subYesCol: { flex: 1, alignItems: 'center', paddingHorizontal: 3 },
+  subNoCol: { flex: 1, alignItems: 'center', paddingHorizontal: 3 },
+  subPathDiv: { width: 1, backgroundColor: C.line, alignSelf: 'stretch', marginVertical: 2 },
+  subPathYesLbl: { color: '#16a34a', fontSize: 9, fontWeight: '900', marginBottom: 3 },
+  subPathNoLbl: { color: '#b91c1c', fontSize: 9, fontWeight: '900', marginBottom: 3 },
+  subReturnBox: { backgroundColor: '#f0fdf4', borderWidth: 1, borderColor: '#86efac', borderRadius: 6, paddingHorizontal: 5, paddingVertical: 4, alignItems: 'center' },
+  subReturnText: { color: '#15803d', fontSize: 9, fontWeight: '700', textAlign: 'center' },
+  subItemBox: { backgroundColor: '#fff', borderWidth: 1, borderColor: C.line, borderRadius: 5, paddingHorizontal: 4, paddingVertical: 3, marginBottom: 3, width: '100%', alignItems: 'center' },
+  subItemText: { color: C.ink, fontSize: 9, fontWeight: '700', textAlign: 'center' },
+  subItemEmpty: { color: C.muted, fontSize: 9, fontStyle: 'italic', textAlign: 'center' },
+  subAddBtn: { marginTop: 10, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, borderWidth: 1.5, borderStyle: 'dashed', borderColor: '#fb923c', alignItems: 'center', backgroundColor: '#fff7ed' },
+  subAddBtnText: { color: '#c2410c', fontSize: 11, fontWeight: '700' },
+  subRemoveBtn: { marginTop: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fca5a5', alignItems: 'center', alignSelf: 'flex-end' },
+  subRemoveBtnText: { color: '#dc2626', fontSize: 11, fontWeight: '700' },
+
   // ── branch editor modal ──
   branchEditorSheet: { backgroundColor: C.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '85%' },
   branchEditorSection: { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 6 },
@@ -264,6 +313,7 @@ export default function FlowScreen({ navigation }: Props) {
   const [branchEditorOpen, setBranchEditorOpen] = useState(false);
   const [branchDraft, setBranchDraft] = useState<BranchNode | null>(null);
   const [branchNoteDraft, setBranchNoteDraft] = useState({ yes: '', no: '' });
+  const [subNoteDraft, setSubNoteDraft] = useState({ yes: '', no: '' });
   const [manualFlowScale, setManualFlowScale] = useState<number | null>(null);
   const [isPinching, setIsPinching] = useState(false);
 
@@ -559,8 +609,42 @@ export default function FlowScreen({ navigation }: Props) {
     setBranchDraft(p => p ? ({ ...p, [path]: { ...p[path], notes: p[path].notes.filter((_, i) => i !== idx) } }) : p);
   };
 
+  const addSubBranch = () => {
+    setBranchDraft(p => p ? { ...p, no: { ...p.no, sub: { question: '', yesReturns: true, yes: emptyItems(), no: emptyItems() } } } : p);
+    setSubNoteDraft({ yes: '', no: '' });
+  };
+  const removeSubBranch = () => {
+    setBranchDraft(p => p ? { ...p, no: { ...p.no, sub: undefined } } : p);
+  };
+  const setSubQ = (q: string) => {
+    setBranchDraft(p => p?.no.sub ? { ...p, no: { ...p.no, sub: { ...p.no.sub, question: q } } } : p);
+  };
+  const toggleSubTask = (path: 'yes' | 'no', id: number) => {
+    setBranchDraft(p => {
+      if (!p?.no.sub) return p;
+      const cur = p.no.sub[path].taskIds;
+      const next = cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id];
+      return { ...p, no: { ...p.no, sub: { ...p.no.sub, [path]: { ...p.no.sub[path], taskIds: next } } } };
+    });
+  };
+  const addSubNote = (path: 'yes' | 'no') => {
+    const note = subNoteDraft[path].trim();
+    if (!note) return;
+    setBranchDraft(p => {
+      if (!p?.no.sub) return p;
+      return { ...p, no: { ...p.no, sub: { ...p.no.sub, [path]: { ...p.no.sub[path], notes: [...p.no.sub[path].notes, note] } } } };
+    });
+    setSubNoteDraft(prev => ({ ...prev, [path]: '' }));
+  };
+  const removeSubNote = (path: 'yes' | 'no', idx: number) => {
+    setBranchDraft(p => {
+      if (!p?.no.sub) return p;
+      return { ...p, no: { ...p.no, sub: { ...p.no.sub, [path]: { ...p.no.sub[path], notes: p.no.sub[path].notes.filter((_, i) => i !== idx) } } } };
+    });
+  };
+
   // ── branch rendering helpers ──
-  const renderPathItems = (path: BranchPathData, compact = false) => {
+  const renderPathItems = (path: { taskIds: number[]; notes: string[] }, compact = false) => {
     const hasAny = path.notes.length > 0 || path.taskIds.length > 0;
     if (!hasAny) return <Text style={compact ? s.viewBranchTask : s.branchPathEmpty}>なし</Text>;
     return (
@@ -583,16 +667,57 @@ export default function FlowScreen({ navigation }: Props) {
   };
 
   const getBranchLayout = (b: BranchNode, compact = false) => {
+    const subExtra = b.no.sub ? (compact ? 80 : 100) : 0;
     const itemCount = Math.max(1, b.no.notes.length + b.no.taskIds.length);
     const routeTop = compact ? 30 : 40;
     const itemHeight = compact ? 43 : 50;
     const itemGap = compact ? 5 : 6;
     const baseRouteHeight = compact ? 122 : 150;
-    const routeHeight = Math.max(baseRouteHeight, 30 + itemCount * itemHeight + (itemCount - 1) * itemGap);
+    const routeHeight = Math.max(baseRouteHeight, 30 + itemCount * itemHeight + (itemCount - 1) * itemGap + subExtra);
     const flowHeight = routeTop + routeHeight + (compact ? 32 : 30);
     const yesHeight = compact ? Math.max(120, routeHeight) : Math.max(140, routeHeight);
     return { routeHeight, flowHeight, yesHeight };
   };
+
+  const renderSubItems = (items: SimpleItems) => {
+    const has = items.notes.length > 0 || items.taskIds.length > 0;
+    if (!has) return <Text style={s.subItemEmpty}>なし</Text>;
+    return (
+      <>
+        {items.notes.map((n, i) => <View key={`sn${i}`} style={s.subItemBox}><Text style={s.subItemText} numberOfLines={2}>{n}</Text></View>)}
+        {items.taskIds.map(id => { const t = taskById.get(id); return t ? <View key={`st${id}`} style={s.subItemBox}><Text style={s.subItemText} numberOfLines={2}>{t.icon ? `${t.icon} ` : ''}{t.title}</Text></View> : null; })}
+      </>
+    );
+  };
+
+  const renderSubDiamond = (sub: SubBranch) => (
+    <View style={s.subBranchWrap}>
+      <ArrowDown color={C.line} h={8} />
+      <View style={s.subDiamond}>
+        <View style={s.subDiamondTB} />
+        <View style={s.subDiamondBB} />
+        <View style={s.subDiamondTI} />
+        <View style={s.subDiamondBI} />
+        <View style={s.subDiamondSC} />
+        <View style={s.subDiamondInner}>
+          <Text style={s.subDiamondQ}>{sub.question || '確認'}</Text>
+        </View>
+      </View>
+      <View style={s.subPaths}>
+        <View style={s.subYesCol}>
+          <Text style={s.subPathYesLbl}>はい</Text>
+          {sub.yesReturns
+            ? <View style={s.subReturnBox}><Text style={s.subReturnText}>← メインへ</Text></View>
+            : renderSubItems(sub.yes)}
+        </View>
+        <View style={s.subPathDiv} />
+        <View style={s.subNoCol}>
+          <Text style={s.subPathNoLbl}>いいえ</Text>
+          {renderSubItems(sub.no)}
+        </View>
+      </View>
+    </View>
+  );
 
   const renderBranchViewNode = (b: BranchNode) => {
     const layout = getBranchLayout(b, true);
@@ -620,7 +745,10 @@ export default function FlowScreen({ navigation }: Props) {
         <View style={[s.viewBranchNoRoute, { height: layout.routeHeight }]}>
           <View style={[s.viewBranchNoRail, { height: layout.routeHeight }]} pointerEvents="none" />
           <Text style={s.viewBranchNoLabel}>いいえ</Text>
-          <View style={s.viewBranchNoItems}>{renderPathItems(b.no, true)}</View>
+          <View style={s.viewBranchNoItems}>
+            {renderPathItems(b.no, true)}
+            {b.no.sub && renderSubDiamond(b.no.sub)}
+          </View>
         </View>
         <View style={s.viewBranchNoMergeLine} pointerEvents="none" />
       </View>
@@ -662,7 +790,10 @@ export default function FlowScreen({ navigation }: Props) {
         <View style={[s.branchNoRoute, { height: layout.routeHeight }]}>
           <View style={[s.branchNoRail, { height: layout.routeHeight }]} pointerEvents="none" />
           <Text style={s.branchNoLabel}>いいえ</Text>
-          <View style={s.branchNoItems}>{renderPathItems(b.no)}</View>
+          <View style={s.branchNoItems}>
+            {renderPathItems(b.no)}
+            {b.no.sub && renderSubDiamond(b.no.sub)}
+          </View>
         </View>
         <View style={s.branchNoMergeLine} pointerEvents="none" />
       </View>
@@ -1032,6 +1163,71 @@ export default function FlowScreen({ navigation }: Props) {
                   </View>
                 );
               })}
+
+              {/* Sub-branch section */}
+              <View style={[s.branchEditorSection, { borderTopWidth: 1, borderTopColor: '#fed7aa', marginTop: 8, paddingTop: 16 }]}>
+                <Text style={s.branchEditorLabel}>いいえルートにサブ分岐を追加</Text>
+                {branchDraft?.no.sub ? (
+                  <>
+                    <TextInput
+                      style={s.branchEditorInput}
+                      value={branchDraft.no.sub.question}
+                      onChangeText={setSubQ}
+                      placeholder="サブ分岐の内容（例: やり直す？）"
+                      placeholderTextColor="#9ca3af"
+                    />
+                    <Text style={[s.branchEditorLabel, { marginTop: 12, color: '#15803d' }]}>はいで左に戻る（メインフローへ）</Text>
+                    <View style={s.branchNoteList}>
+                      {(branchDraft.no.sub.yes.notes ?? []).map((note, idx) => (
+                        <TouchableOpacity key={`sy${note}${idx}`} style={s.branchNoteChip} onPress={() => removeSubNote('yes', idx)} activeOpacity={0.75}>
+                          <Text style={s.branchNoteChipText} numberOfLines={1}>{note}</Text>
+                          <Text style={s.branchNoteChipX}>×</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                    <View style={s.branchNoteAddRow}>
+                      <TextInput style={s.branchNoteInput} value={subNoteDraft.yes} onChangeText={t => setSubNoteDraft(p => ({ ...p, yes: t }))} placeholder="はいルートの内容" placeholderTextColor="#9ca3af" returnKeyType="done" onSubmitEditing={() => addSubNote('yes')} />
+                      <TouchableOpacity style={s.branchNoteAddBtn} onPress={() => addSubNote('yes')}><Text style={s.branchNoteAddText}>追加</Text></TouchableOpacity>
+                    </View>
+                    <Text style={[s.branchEditorLabel, { marginTop: 12, color: '#b91c1c' }]}>いいえで続けるカード</Text>
+                    <View style={s.branchNoteList}>
+                      {(branchDraft.no.sub.no.notes ?? []).map((note, idx) => (
+                        <TouchableOpacity key={`sn${note}${idx}`} style={s.branchNoteChip} onPress={() => removeSubNote('no', idx)} activeOpacity={0.75}>
+                          <Text style={s.branchNoteChipText} numberOfLines={1}>{note}</Text>
+                          <Text style={s.branchNoteChipX}>×</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                    <View style={s.branchNoteAddRow}>
+                      <TextInput style={s.branchNoteInput} value={subNoteDraft.no} onChangeText={t => setSubNoteDraft(p => ({ ...p, no: t }))} placeholder="いいえルートの内容" placeholderTextColor="#9ca3af" returnKeyType="done" onSubmitEditing={() => addSubNote('no')} />
+                      <TouchableOpacity style={s.branchNoteAddBtn} onPress={() => addSubNote('no')}><Text style={s.branchNoteAddText}>追加</Text></TouchableOpacity>
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
+                      <Text style={[s.branchEditorLabel, { flex: 1 }]}>タスク（いいえルート）</Text>
+                      <View style={s.branchCheckLabels}><Text style={s.branchCheckLabelN}>いいえ</Text></View>
+                    </View>
+                    {dueTasks.map(t => {
+                      const inSN = branchDraft?.no.sub?.no.taskIds.includes(t.id) ?? false;
+                      return (
+                        <View key={`st${t.id}`} style={s.branchTaskRow}>
+                          <Text style={s.branchTaskText} numberOfLines={2}>{t.icon ? `${t.icon} ` : ''}{t.title}</Text>
+                          <TouchableOpacity style={[s.branchCheckN, inSN && s.branchCheckNOn]} onPress={() => toggleSubTask('no', t.id)}>
+                            {inSN && <Text style={s.branchCheckText}>✓</Text>}
+                          </TouchableOpacity>
+                        </View>
+                      );
+                    })}
+                    <TouchableOpacity style={s.subRemoveBtn} onPress={removeSubBranch}>
+                      <Text style={s.subRemoveBtnText}>サブ分岐を削除</Text>
+                    </TouchableOpacity>
+                  </>
+                ) : (
+                  <TouchableOpacity style={s.subAddBtn} onPress={addSubBranch}>
+                    <Text style={s.subAddBtnText}>＋ サブ分岐を追加（はいで左に戻る）</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
               <TouchableOpacity style={s.branchSaveBtn} onPress={saveBranchDraft}>
                 <Text style={s.branchSaveBtnText}>保存</Text>
               </TouchableOpacity>
