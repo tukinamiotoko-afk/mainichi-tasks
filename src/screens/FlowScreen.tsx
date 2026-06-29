@@ -633,7 +633,7 @@ export default function FlowScreen({ navigation }: Props) {
             <Text style={s.navTodayHint}>タップで日付変更</Text>
           </TouchableOpacity>
           <View style={s.navRight}>
-            {isEditing && (
+            {isEditing ? (
               <>
                 <TouchableOpacity
                   style={[s.branchBtn, insertBranchMode && s.branchBtnActive]}
@@ -645,6 +645,10 @@ export default function FlowScreen({ navigation }: Props) {
                   <Text style={s.saveBtnText}>{saving ? '…' : '保存'}</Text>
                 </TouchableOpacity>
               </>
+            ) : (
+              <TouchableOpacity style={s.editBtn} onPress={() => setIsEditing(true)}>
+                <Text style={s.editBtnText}>編集</Text>
+              </TouchableOpacity>
             )}
             <TouchableOpacity style={s.navBtn} onPress={() => shiftSelected(1)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Text style={s.navArrow}>›</Text>
