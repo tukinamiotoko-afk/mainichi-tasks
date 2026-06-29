@@ -181,6 +181,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   branchNode: { width: '100%', alignItems: 'center', paddingVertical: 2, overflow: 'visible' },
   branchFlow: { width: '100%', minHeight: 200, alignItems: 'center', position: 'relative', overflow: 'visible' },
   branchMainColumn: { width: 262, alignItems: 'center', zIndex: 2 },
+  branchDiamondShell: { width: 262, height: 108, alignItems: 'center', position: 'relative' },
   branchDiamond: { width: 260, height: 80, alignItems: 'center', justifyContent: 'center', position: 'relative' },
   branchDiamondTop: { position: 'absolute', top: 1, width: 0, height: 0, borderLeftWidth: 129, borderRightWidth: 129, borderBottomWidth: 39, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderBottomColor: '#fffbeb' },
   branchDiamondBottom: { position: 'absolute', bottom: 1, width: 0, height: 0, borderLeftWidth: 129, borderRightWidth: 129, borderTopWidth: 39, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: '#fffbeb' },
@@ -192,10 +193,10 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   branchDiamondInner: { width: 180, alignItems: 'center', justifyContent: 'center', zIndex: 2 },
   branchNodeHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 6 },
   branchNodeQ: { color: '#78350f', fontSize: 12, fontWeight: '800', textAlign: 'center' },
-  branchNodeBtns: { flexDirection: 'row', gap: 6, marginTop: 10 },
+  branchNodeBtns: { width: 262, alignItems: 'flex-start', marginTop: 2, marginBottom: 4 },
   branchEditBtn: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, backgroundColor: '#fef3c7', borderWidth: 1, borderColor: '#d97706' },
   branchEditBtnText: { color: '#92400e', fontSize: 11, fontWeight: '700' },
-  branchDelBtn: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fca5a5' },
+  branchDelBtn: { position: 'absolute', bottom: 0, minWidth: 28, height: 24, paddingHorizontal: 8, borderRadius: 12, backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fca5a5', alignItems: 'center', justifyContent: 'center' },
   branchDelBtnText: { color: '#dc2626', fontSize: 13, fontWeight: '700', lineHeight: 16 },
   branchYesWrap: { width: 58, height: 140, alignItems: 'center', justifyContent: 'flex-start', position: 'relative' },
   branchYesLine: { width: 2, height: 140, backgroundColor: C.line, marginTop: 0 },
@@ -242,6 +243,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
 
   // ── sub-branch (nested in no-path) ──
   subBranchWrap: { marginTop: 8, width: '100%', alignItems: 'center' },
+  subDiamondShell: { width: 168, height: 60, alignItems: 'center', justifyContent: 'flex-start', position: 'relative' },
   subDiamond: { width: 130, height: 40, alignItems: 'center', justifyContent: 'center', position: 'relative' },
   subDiamondTop: { position: 'absolute', top: 1, width: 0, height: 0, borderLeftWidth: 64, borderRightWidth: 64, borderBottomWidth: 19, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderBottomColor: '#fffbeb' },
   subDiamondBottom: { position: 'absolute', bottom: 1, width: 0, height: 0, borderLeftWidth: 64, borderRightWidth: 64, borderTopWidth: 19, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: '#fffbeb' },
@@ -252,6 +254,10 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   subDiamondSC: { position: 'absolute', top: 19, left: 6, right: 6, height: 3, backgroundColor: '#fffbeb', zIndex: 1 },
   subDiamondInner: { width: 96, alignItems: 'center', justifyContent: 'center', zIndex: 2 },
   subDiamondQ: { color: '#78350f', fontSize: 9, fontWeight: '800', textAlign: 'center' },
+  subEditBtn: { position: 'absolute', left: 0, top: 8, paddingHorizontal: 9, paddingVertical: 4, borderRadius: 8, backgroundColor: '#fef3c7', borderWidth: 1, borderColor: '#d97706' },
+  subEditBtnText: { color: '#92400e', fontSize: 10, fontWeight: '700' },
+  subDelBtn: { position: 'absolute', bottom: 0, minWidth: 28, height: 22, paddingHorizontal: 7, borderRadius: 11, backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fca5a5', alignItems: 'center', justifyContent: 'center' },
+  subDelBtnText: { color: '#dc2626', fontSize: 12, fontWeight: '700', lineHeight: 14 },
   subPaths: { flexDirection: 'row', marginTop: 4, width: 130 },
   subYesCol: { flex: 1, alignItems: 'center', paddingHorizontal: 3 },
   subNoCol: { flex: 1, alignItems: 'center', paddingHorizontal: 3 },
@@ -597,6 +603,23 @@ export default function FlowScreen({ navigation }: Props) {
     setBranches(prev => prev.map(b => b.id === noRouteBranchParent.id ? updated : b));
     closeNoRouteBranchEditor();
   };
+  const deleteNoRouteSubBranch = async (parent: BranchNode) => {
+    if (parent.id === null) return;
+    const updated: BranchNode = {
+      ...parent,
+      no: { ...parent.no, sub: undefined },
+    };
+    const data = {
+      after_task_id: updated.insertAfterIdx,
+      question: updated.question || '確認',
+      yes_label: 'はい', yes_text: stringifyBranchPath(updated.yes),
+      no_label: 'いいえ', no_text: stringifyBranchPath(updated.no),
+      branch_side: 'left' as const,
+    };
+    await updateFlowBranch(db, parent.id, data);
+    setBranches(prev => prev.map(b => b.id === parent.id ? updated : b));
+    if (noRouteBranchParent?.id === parent.id) closeNoRouteBranchEditor();
+  };
   const deleteBranch = async (id: number) => {
     await deleteFlowBranch(db, id);
     setBranches(prev => prev.filter(b => b.id !== id));
@@ -755,20 +778,32 @@ export default function FlowScreen({ navigation }: Props) {
     );
   };
 
-  const renderSubDiamond = (sub: SubBranch) => (
+  const renderSubDiamond = (sub: SubBranch, parent?: BranchNode) => (
     <View style={s.subBranchWrap}>
       <ArrowDown color={C.line} h={8} />
-      <View style={s.subDiamond}>
-        <View style={s.subDiamondTop} />
-        <View style={s.subDiamondBottom} />
-        <View style={s.subDiamondEdgeTL} />
-        <View style={s.subDiamondEdgeTR} />
-        <View style={s.subDiamondEdgeBR} />
-        <View style={s.subDiamondEdgeBL} />
-        <View style={s.subDiamondSC} />
-        <View style={s.subDiamondInner}>
-          <Text style={s.subDiamondQ}>{sub.question || '確認'}</Text>
+      <View style={s.subDiamondShell}>
+        {parent ? (
+          <TouchableOpacity style={s.subEditBtn} onPress={() => openNoRouteBranchEditor(parent)}>
+            <Text style={s.subEditBtnText}>編集</Text>
+          </TouchableOpacity>
+        ) : null}
+        <View style={s.subDiamond}>
+          <View style={s.subDiamondTop} />
+          <View style={s.subDiamondBottom} />
+          <View style={s.subDiamondEdgeTL} />
+          <View style={s.subDiamondEdgeTR} />
+          <View style={s.subDiamondEdgeBR} />
+          <View style={s.subDiamondEdgeBL} />
+          <View style={s.subDiamondSC} />
+          <View style={s.subDiamondInner}>
+            <Text style={s.subDiamondQ}>{sub.question || '確認'}</Text>
+          </View>
         </View>
+        {parent ? (
+          <TouchableOpacity style={s.subDelBtn} onPress={() => deleteNoRouteSubBranch(parent)}>
+            <Text style={s.subDelBtnText}>×</Text>
+          </TouchableOpacity>
+        ) : null}
       </View>
       <View style={s.subPaths}>
         <View style={s.subYesCol}>
@@ -813,7 +848,7 @@ export default function FlowScreen({ navigation }: Props) {
       return (
         <>
           {hasAny ? allEntries.map(([, node]) => node) : <Text style={s.branchPathEmpty}>なし</Text>}
-          {b.no.sub && renderSubDiamond(b.no.sub)}
+          {b.no.sub && renderSubDiamond(b.no.sub, b)}
         </>
       );
     }
@@ -824,7 +859,7 @@ export default function FlowScreen({ navigation }: Props) {
       out.push(slot(`post-${key}`));
     });
     if (b.no.sub) {
-      out.push(<React.Fragment key="sub">{renderSubDiamond(b.no.sub)}</React.Fragment>);
+      out.push(<React.Fragment key="sub">{renderSubDiamond(b.no.sub, b)}</React.Fragment>);
       out.push(slot('post-sub'));
     }
     return <>{out}</>;
@@ -873,24 +908,26 @@ export default function FlowScreen({ navigation }: Props) {
     <View key={`be${b.id}`} style={s.branchNode}>
       <View style={[s.branchFlow, { minHeight: layout.flowHeight }]}>
         <View style={s.branchMainColumn}>
-          <View style={s.branchDiamond}>
-            <View style={s.branchDiamondTop} />
-            <View style={s.branchDiamondBottom} />
-            <View style={s.branchDiamondEdgeTL} />
-            <View style={s.branchDiamondEdgeTR} />
-            <View style={s.branchDiamondEdgeBR} />
-            <View style={s.branchDiamondEdgeBL} />
-            <View style={s.branchDiamondSeamCover} />
-            <View style={s.branchDiamondInner}>
-              <Text style={s.branchNodeQ}>{b.question || '確認'}</Text>
+          <View style={s.branchDiamondShell}>
+            <View style={s.branchDiamond}>
+              <View style={s.branchDiamondTop} />
+              <View style={s.branchDiamondBottom} />
+              <View style={s.branchDiamondEdgeTL} />
+              <View style={s.branchDiamondEdgeTR} />
+              <View style={s.branchDiamondEdgeBR} />
+              <View style={s.branchDiamondEdgeBL} />
+              <View style={s.branchDiamondSeamCover} />
+              <View style={s.branchDiamondInner}>
+                <Text style={s.branchNodeQ}>{b.question || '確認'}</Text>
+              </View>
             </View>
+            <TouchableOpacity style={s.branchDelBtn} onPress={() => b.id !== null && deleteBranch(b.id)}>
+              <Text style={s.branchDelBtnText}>×</Text>
+            </TouchableOpacity>
           </View>
           <View style={s.branchNodeBtns}>
             <TouchableOpacity style={s.branchEditBtn} onPress={() => editBranch(b)}>
               <Text style={s.branchEditBtnText}>編集</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={s.branchDelBtn} onPress={() => b.id !== null && deleteBranch(b.id)}>
-              <Text style={s.branchDelBtnText}>×</Text>
             </TouchableOpacity>
           </View>
           <View style={[s.branchYesWrap, { height: layout.yesHeight }]}>
