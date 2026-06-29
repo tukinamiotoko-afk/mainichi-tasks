@@ -256,20 +256,22 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   subDiamondSC: { position: 'absolute', top: 19, left: 6, right: 6, height: 3, backgroundColor: '#fffbeb', zIndex: 1 },
   subDiamondInner: { width: 96, alignItems: 'center', justifyContent: 'center', zIndex: 2 },
   subDiamondQ: { color: '#78350f', fontSize: 9, fontWeight: '800', textAlign: 'center' },
-  subYesReturnLine: { position: 'absolute', left: -54, top: 20, width: 77, height: 2, backgroundColor: C.line, zIndex: 1 },
+  subYesReturnLine: { position: 'absolute', left: -88, top: 20, width: 111, height: 2, backgroundColor: C.line, zIndex: 1 },
+  subYesReturnLabel: { position: 'absolute', left: -44, top: 8, color: C.line, fontSize: 9, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 4, zIndex: 2 },
   subDiamondBtns: { position: 'absolute', bottom: 0, flexDirection: 'row', alignItems: 'center', gap: 6 },
   subEditBtn: { minWidth: 42, height: 22, paddingHorizontal: 9, borderRadius: 11, backgroundColor: '#fef3c7', borderWidth: 1, borderColor: '#d97706', alignItems: 'center', justifyContent: 'center' },
   subEditBtnText: { color: '#92400e', fontSize: 10, fontWeight: '700' },
   subDelBtn: { minWidth: 28, height: 22, paddingHorizontal: 7, borderRadius: 11, backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fca5a5', alignItems: 'center', justifyContent: 'center' },
   subDelBtnText: { color: '#dc2626', fontSize: 12, fontWeight: '700', lineHeight: 14 },
   subPaths: { flexDirection: 'row', marginTop: 4, width: 130, position: 'relative' },
+  subPathsNoReturn: { width: 68, alignSelf: 'flex-end', justifyContent: 'flex-end' },
   subYesCol: { flex: 1, alignItems: 'center', paddingHorizontal: 3 },
   subNoCol: { flex: 1, alignItems: 'center', paddingHorizontal: 3 },
   subPathDiv: { width: 1, backgroundColor: C.line, alignSelf: 'stretch', marginVertical: 2 },
   subPathYesLbl: { color: C.line, fontSize: 9, fontWeight: '900', marginBottom: 3 },
   subPathNoLbl: { color: C.line, fontSize: 9, fontWeight: '900', marginBottom: 3 },
-  subItemBox: { backgroundColor: '#fff', borderWidth: 1, borderColor: C.line, borderRadius: 5, paddingHorizontal: 4, paddingVertical: 3, marginBottom: 3, width: '100%', alignItems: 'center' },
-  subItemText: { color: C.ink, fontSize: 9, fontWeight: '700', textAlign: 'center' },
+  subItemBox: { backgroundColor: '#f0fdf4', borderWidth: 1, borderColor: '#22c55e', borderRadius: 5, paddingHorizontal: 4, paddingVertical: 3, marginBottom: 3, width: '100%', alignItems: 'center' },
+  subItemText: { color: '#166534', fontSize: 9, fontWeight: '700', textAlign: 'center' },
   subItemEmpty: { color: C.muted, fontSize: 9, fontStyle: 'italic', textAlign: 'center' },
   subAddBtn: { marginTop: 10, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, borderWidth: 1.5, borderStyle: 'dashed', borderColor: '#fb923c', alignItems: 'center', backgroundColor: '#fff7ed' },
   subAddBtnText: { color: '#c2410c', fontSize: 11, fontWeight: '700' },
@@ -829,7 +831,12 @@ export default function FlowScreen({ navigation }: Props) {
       <ArrowDown color={C.line} h={8} />
       <View style={s.subDiamondShell}>
         <View style={s.subDiamond}>
-          {sub.yesReturns ? <View style={s.subYesReturnLine} /> : null}
+          {sub.yesReturns ? (
+            <>
+              <View style={s.subYesReturnLine} />
+              <Text style={s.subYesReturnLabel}>はい</Text>
+            </>
+          ) : null}
           <View style={s.subDiamondTop} />
           <View style={s.subDiamondBottom} />
           <View style={s.subDiamondEdgeTL} />
@@ -852,19 +859,26 @@ export default function FlowScreen({ navigation }: Props) {
           </View>
         ) : null}
       </View>
-      <View style={s.subPaths}>
-        <View style={s.subYesCol}>
-          <Text style={s.subPathYesLbl}>はい</Text>
-          {sub.yesReturns
-            ? null
-            : renderSubItems(sub.yes)}
+      {sub.yesReturns ? (
+        <View style={[s.subPaths, s.subPathsNoReturn]}>
+          <View style={s.subNoCol}>
+            <Text style={s.subPathNoLbl}>いいえ</Text>
+            {renderSubItems(sub.no)}
+          </View>
         </View>
-        <View style={s.subPathDiv} />
-        <View style={s.subNoCol}>
-          <Text style={s.subPathNoLbl}>いいえ</Text>
-          {renderSubItems(sub.no)}
+      ) : (
+        <View style={s.subPaths}>
+          <View style={s.subYesCol}>
+            <Text style={s.subPathYesLbl}>はい</Text>
+            {renderSubItems(sub.yes)}
+          </View>
+          <View style={s.subPathDiv} />
+          <View style={s.subNoCol}>
+            <Text style={s.subPathNoLbl}>いいえ</Text>
+            {renderSubItems(sub.no)}
+          </View>
         </View>
-      </View>
+      )}
     </View>
   );
 
