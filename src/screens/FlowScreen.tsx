@@ -206,6 +206,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   branchYesItems: { width: 152, alignItems: 'center', gap: 5, display: 'none' },
   branchNoRoute: { position: 'absolute', top: 40, left: '50%', right: -86, height: 150, zIndex: 1 },
   branchNoRail: { position: 'absolute', top: 0, left: 0, right: 54, height: 150, borderTopWidth: 2, borderRightWidth: 2, borderBottomWidth: 2, borderColor: C.line },
+  branchNoRailReturnless: { borderBottomWidth: 0 },
   branchNoMergeLine: { display: 'none' },
   branchNoLabel: { position: 'absolute', top: -20, left: 165, color: C.line, fontSize: 11, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 4 },
   branchNoItems: { position: 'absolute', top: 30, right: -30, width: 168, alignItems: 'stretch', gap: 6 },
@@ -235,6 +236,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   viewBranchYesItems: { width: 128, alignItems: 'center', gap: 4, display: 'none' },
   viewBranchNoRoute: { position: 'absolute', top: 30, left: '50%', right: -70, height: 122, zIndex: 1 },
   viewBranchNoRail: { position: 'absolute', top: 0, left: 0, right: 51, height: 122, borderTopWidth: 2, borderRightWidth: 2, borderBottomWidth: 2, borderColor: C.line },
+  viewBranchNoRailReturnless: { borderBottomWidth: 0 },
   viewBranchNoMergeLine: { display: 'none' },
   viewBranchNoLabel: { position: 'absolute', top: -18, left: 123, color: C.line, fontSize: 10, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 4 },
   viewBranchNoItems: { position: 'absolute', top: 24, right: -24, width: 150, alignItems: 'stretch', gap: 5 },
@@ -256,8 +258,8 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   subDiamondSC: { position: 'absolute', top: 19, left: 6, right: 6, height: 3, backgroundColor: '#fffbeb', zIndex: 1 },
   subDiamondInner: { width: 96, alignItems: 'center', justifyContent: 'center', zIndex: 2 },
   subDiamondQ: { color: '#78350f', fontSize: 9, fontWeight: '800', textAlign: 'center' },
-  subYesReturnLine: { position: 'absolute', left: -134, top: 20, width: 157, height: 2, backgroundColor: C.line, zIndex: 1 },
-  subYesReturnLabel: { position: 'absolute', left: -60, top: 4, color: C.line, fontSize: 9, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 5, zIndex: 3 },
+  subYesReturnLine: { position: 'absolute', left: -134, top: 20, width: 134, height: 2, backgroundColor: C.line, zIndex: 1 },
+  subYesReturnLabel: { position: 'absolute', left: -66, top: 4, color: C.line, fontSize: 9, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 5, zIndex: 3 },
   subDiamondBtns: { position: 'absolute', bottom: 0, flexDirection: 'row', alignItems: 'center', gap: 6 },
   subEditBtn: { minWidth: 42, height: 22, paddingHorizontal: 9, borderRadius: 11, backgroundColor: '#fef3c7', borderWidth: 1, borderColor: '#d97706', alignItems: 'center', justifyContent: 'center' },
   subEditBtnText: { color: '#92400e', fontSize: 10, fontWeight: '700' },
@@ -950,7 +952,14 @@ export default function FlowScreen({ navigation }: Props) {
           </View>
         </View>
         <View style={[s.viewBranchNoRoute, { height: layout.routeHeight }]}>
-          <View style={[s.viewBranchNoRail, { height: layout.routeHeight }]} pointerEvents="none" />
+          <View
+            style={[
+              s.viewBranchNoRail,
+              { height: layout.routeHeight },
+              b.no.sub?.yesReturns ? s.viewBranchNoRailReturnless : null,
+            ]}
+            pointerEvents="none"
+          />
           <Text style={s.viewBranchNoLabel}>いいえ</Text>
           <View style={s.viewBranchNoItems}>
             {renderPathItems(b.no, true)}
@@ -997,7 +1006,14 @@ export default function FlowScreen({ navigation }: Props) {
           </View>
         </View>
         <View style={[s.branchNoRoute, { height: layout.routeHeight }]}>
-          <View style={[s.branchNoRail, { height: layout.routeHeight }]} pointerEvents="none" />
+          <View
+            style={[
+              s.branchNoRail,
+              { height: layout.routeHeight },
+              b.no.sub?.yesReturns ? s.branchNoRailReturnless : null,
+            ]}
+            pointerEvents="none"
+          />
           <Text style={s.branchNoLabel}>いいえ</Text>
           <View style={s.branchNoItems}>
             {renderNoRouteItems(b)}
