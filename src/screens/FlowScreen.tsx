@@ -208,7 +208,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   branchNoRail: { position: 'absolute', top: 0, left: 0, right: 76, height: 150, borderTopWidth: 2, borderRightWidth: 2, borderBottomWidth: 2, borderColor: C.line },
   branchNoMergeLine: { display: 'none' },
   branchNoLabel: { position: 'absolute', top: -20, left: 143, color: C.line, fontSize: 11, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 4 },
-  branchNoItems: { position: 'absolute', top: 30, right: -18, width: 168, alignItems: 'stretch', gap: 6 },
+  branchNoItems: { position: 'absolute', top: 30, right: -30, width: 168, alignItems: 'stretch', gap: 6 },
   branchPathTask: { width: 168, minHeight: 44, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8, borderWidth: 1.5, borderColor: C.line, backgroundColor: '#fff' },
   branchPathNote: { width: 168, minHeight: 44, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8, borderWidth: 1.5, borderColor: C.line, backgroundColor: '#fff' },
   branchPathTaskText: { color: C.ink, fontSize: 12, fontWeight: '700', textAlign: 'center', lineHeight: 16 },
@@ -237,7 +237,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   viewBranchNoRail: { position: 'absolute', top: 0, left: 0, right: 69, height: 122, borderTopWidth: 2, borderRightWidth: 2, borderBottomWidth: 2, borderColor: C.line },
   viewBranchNoMergeLine: { display: 'none' },
   viewBranchNoLabel: { position: 'absolute', top: -18, left: 105, color: C.line, fontSize: 10, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 4 },
-  viewBranchNoItems: { position: 'absolute', top: 24, right: -14, width: 150, alignItems: 'stretch', gap: 5 },
+  viewBranchNoItems: { position: 'absolute', top: 24, right: -24, width: 150, alignItems: 'stretch', gap: 5 },
   viewBranchTaskBox: { width: 150, minHeight: 38, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 7, borderWidth: 1.5, borderColor: C.line, backgroundColor: '#fff' },
   viewBranchNoteBox: { width: 150, minHeight: 38, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 7, borderWidth: 1.5, borderColor: C.line, backgroundColor: '#fff' },
   viewBranchTask: { color: C.ink, fontSize: 11, fontWeight: '700', textAlign: 'center', lineHeight: 15 },
@@ -410,22 +410,15 @@ export default function FlowScreen({ navigation }: Props) {
     Math.min(viewportWidth - (isEditing ? 48 : 80), isEditing ? 420 : 360)
   );
   const flowCanvasWidth = flowLaneWidth + (hasSideBranch ? (isEditing ? 280 : 240) : 0);
-  const defaultFlowPanX = Math.round((flowCanvasWidth - flowLaneWidth) / 2);
   const flowContentStyle = [
     isEditing ? s.editContent : s.viewContent,
     hasSideBranch && (isEditing ? s.editContentZoomed : s.viewContentZoomed),
   ];
   useEffect(() => {
     setManualFlowScale(null);
-    flowPan.setValue({ x: defaultFlowPanX, y: 0 });
-    flowPanOffsetRef.current = { x: defaultFlowPanX, y: 0 };
-  }, [selectedDate, defaultFlowPanX, flowPan]);
-  useEffect(() => {
-    if (flowPanOffsetRef.current.x === 0 && flowPanOffsetRef.current.y === 0) {
-      flowPan.setValue({ x: defaultFlowPanX, y: 0 });
-      flowPanOffsetRef.current = { x: defaultFlowPanX, y: 0 };
-    }
-  }, [defaultFlowPanX, flowPan]);
+    flowPan.setValue({ x: 0, y: 0 });
+    flowPanOffsetRef.current = { x: 0, y: 0 };
+  }, [selectedDate, flowPan]);
   const getPinchDistance = (e: GestureResponderEvent) => {
     const touches = e.nativeEvent.touches;
     if (touches.length < 2) return null;
