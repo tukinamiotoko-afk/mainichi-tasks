@@ -582,9 +582,23 @@ export default function FlowScreen({ navigation }: Props) {
     );
   };
 
-  const renderBranchViewNode = (b: BranchNode) => (
+  const getBranchLayout = (b: BranchNode, compact = false) => {
+    const itemCount = Math.max(1, b.no.notes.length + b.no.taskIds.length);
+    const routeTop = compact ? 30 : 40;
+    const itemHeight = compact ? 43 : 50;
+    const itemGap = compact ? 5 : 6;
+    const baseRouteHeight = compact ? 122 : 150;
+    const routeHeight = Math.max(baseRouteHeight, 30 + itemCount * itemHeight + (itemCount - 1) * itemGap);
+    const flowHeight = routeTop + routeHeight + (compact ? 32 : 30);
+    const yesHeight = compact ? Math.max(120, routeHeight) : Math.max(140, routeHeight);
+    return { routeHeight, flowHeight, yesHeight };
+  };
+
+  const renderBranchViewNode = (b: BranchNode) => {
+    const layout = getBranchLayout(b, true);
+    return (
     <View key={`bv${b.id}`} style={s.viewBranch}>
-      <View style={s.viewBranchFlow}>
+      <View style={[s.viewBranchFlow, { minHeight: layout.flowHeight }]}>
         <View style={s.viewBranchMainColumn}>
           <View style={s.viewBranchDiamond}>
             <View style={s.viewBranchDiamondTop} />
@@ -598,24 +612,27 @@ export default function FlowScreen({ navigation }: Props) {
               <Text style={s.viewBranchQ}>{b.question || '確認'}</Text>
             </View>
           </View>
-          <View style={s.viewBranchYesWrap}>
-            <View style={s.viewBranchYesLine} />
+          <View style={[s.viewBranchYesWrap, { height: layout.yesHeight }]}>
+            <View style={[s.viewBranchYesLine, { height: layout.yesHeight }]} />
             <Text style={s.viewBranchLabel}>はい</Text>
           </View>
         </View>
-        <View style={s.viewBranchNoRoute}>
-          <View style={s.viewBranchNoRail} pointerEvents="none" />
+        <View style={[s.viewBranchNoRoute, { height: layout.routeHeight }]}>
+          <View style={[s.viewBranchNoRail, { height: layout.routeHeight }]} pointerEvents="none" />
           <Text style={s.viewBranchNoLabel}>いいえ</Text>
           <View style={s.viewBranchNoItems}>{renderPathItems(b.no, true)}</View>
         </View>
         <View style={s.viewBranchNoMergeLine} pointerEvents="none" />
       </View>
     </View>
-  );
+    );
+  };
 
-  const renderBranchEditNode = (b: BranchNode) => (
+  const renderBranchEditNode = (b: BranchNode) => {
+    const layout = getBranchLayout(b);
+    return (
     <View key={`be${b.id}`} style={s.branchNode}>
-      <View style={s.branchFlow}>
+      <View style={[s.branchFlow, { minHeight: layout.flowHeight }]}>
         <View style={s.branchMainColumn}>
           <View style={s.branchDiamond}>
             <View style={s.branchDiamondTop} />
@@ -637,20 +654,21 @@ export default function FlowScreen({ navigation }: Props) {
               <Text style={s.branchDelBtnText}>×</Text>
             </TouchableOpacity>
           </View>
-          <View style={s.branchYesWrap}>
-            <View style={s.branchYesLine} />
+          <View style={[s.branchYesWrap, { height: layout.yesHeight }]}>
+            <View style={[s.branchYesLine, { height: layout.yesHeight }]} />
             <Text style={s.branchYesLabel}>はい</Text>
           </View>
         </View>
-        <View style={s.branchNoRoute}>
-          <View style={s.branchNoRail} pointerEvents="none" />
+        <View style={[s.branchNoRoute, { height: layout.routeHeight }]}>
+          <View style={[s.branchNoRail, { height: layout.routeHeight }]} pointerEvents="none" />
           <Text style={s.branchNoLabel}>いいえ</Text>
           <View style={s.branchNoItems}>{renderPathItems(b.no)}</View>
         </View>
         <View style={s.branchNoMergeLine} pointerEvents="none" />
       </View>
     </View>
-  );
+    );
+  };
 
   const renderGap = (afterIdx: number) => {
     const here = branches.filter(b => b.insertAfterIdx === afterIdx);
