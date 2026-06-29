@@ -208,7 +208,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   branchNoRail: { position: 'absolute', top: 0, left: 0, right: 76, height: 150, borderTopWidth: 2, borderRightWidth: 2, borderBottomWidth: 2, borderColor: C.line },
   branchNoMergeLine: { display: 'none' },
   branchNoLabel: { position: 'absolute', top: -20, left: 143, color: C.line, fontSize: 11, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 4 },
-  branchNoItems: { position: 'absolute', top: 30, right: -8, width: 168, alignItems: 'stretch', gap: 6 },
+  branchNoItems: { position: 'absolute', top: 30, right: -18, width: 168, alignItems: 'stretch', gap: 6 },
   branchPathTask: { width: 168, minHeight: 44, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8, borderWidth: 1.5, borderColor: C.line, backgroundColor: '#fff' },
   branchPathNote: { width: 168, minHeight: 44, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8, borderWidth: 1.5, borderColor: C.line, backgroundColor: '#fff' },
   branchPathTaskText: { color: C.ink, fontSize: 12, fontWeight: '700', textAlign: 'center', lineHeight: 16 },
@@ -237,7 +237,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   viewBranchNoRail: { position: 'absolute', top: 0, left: 0, right: 69, height: 122, borderTopWidth: 2, borderRightWidth: 2, borderBottomWidth: 2, borderColor: C.line },
   viewBranchNoMergeLine: { display: 'none' },
   viewBranchNoLabel: { position: 'absolute', top: -18, left: 105, color: C.line, fontSize: 10, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 4 },
-  viewBranchNoItems: { position: 'absolute', top: 24, right: -6, width: 150, alignItems: 'stretch', gap: 5 },
+  viewBranchNoItems: { position: 'absolute', top: 24, right: -14, width: 150, alignItems: 'stretch', gap: 5 },
   viewBranchTaskBox: { width: 150, minHeight: 38, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 7, borderWidth: 1.5, borderColor: C.line, backgroundColor: '#fff' },
   viewBranchNoteBox: { width: 150, minHeight: 38, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 7, borderWidth: 1.5, borderColor: C.line, backgroundColor: '#fff' },
   viewBranchTask: { color: C.ink, fontSize: 11, fontWeight: '700', textAlign: 'center', lineHeight: 15 },
@@ -261,7 +261,8 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   subEditBtnText: { color: '#92400e', fontSize: 10, fontWeight: '700' },
   subDelBtn: { minWidth: 28, height: 22, paddingHorizontal: 7, borderRadius: 11, backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fca5a5', alignItems: 'center', justifyContent: 'center' },
   subDelBtnText: { color: '#dc2626', fontSize: 12, fontWeight: '700', lineHeight: 14 },
-  subPaths: { flexDirection: 'row', marginTop: 4, width: 130 },
+  subPaths: { flexDirection: 'row', marginTop: 4, width: 130, position: 'relative' },
+  subYesLead: { position: 'absolute', left: 11, top: -8, width: 26, height: 2, backgroundColor: C.line, transform: [{ rotate: '34deg' }] },
   subYesCol: { flex: 1, alignItems: 'center', paddingHorizontal: 3 },
   subNoCol: { flex: 1, alignItems: 'center', paddingHorizontal: 3 },
   subPathDiv: { width: 1, backgroundColor: C.line, alignSelf: 'stretch', marginVertical: 2 },
@@ -858,6 +859,7 @@ export default function FlowScreen({ navigation }: Props) {
         ) : null}
       </View>
       <View style={s.subPaths}>
+        <View style={s.subYesLead} />
         <View style={s.subYesCol}>
           <Text style={s.subPathYesLbl}>はい</Text>
           {sub.yesReturns
