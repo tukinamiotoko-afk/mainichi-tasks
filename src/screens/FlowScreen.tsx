@@ -157,10 +157,15 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   branchNode: { width: '100%', alignItems: 'center', paddingVertical: 2, overflow: 'visible' },
   branchFlow: { width: '100%', minHeight: 220, alignItems: 'center', position: 'relative', overflow: 'visible' },
   branchMainColumn: { width: 190, alignItems: 'center', zIndex: 2 },
-  branchDiamond: { width: 152, height: 152, marginVertical: -20, borderWidth: 2, borderColor: C.line, backgroundColor: '#fffbeb', alignItems: 'center', justifyContent: 'center', transform: [{ rotate: '45deg' }] },
+  branchDiamond: { width: 188, height: 110, alignItems: 'center', justifyContent: 'center', position: 'relative' },
+  branchDiamondTopBorder: { position: 'absolute', top: 0, width: 0, height: 0, borderLeftWidth: 94, borderRightWidth: 94, borderBottomWidth: 55, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderBottomColor: C.line },
+  branchDiamondBottomBorder: { position: 'absolute', bottom: 0, width: 0, height: 0, borderLeftWidth: 94, borderRightWidth: 94, borderTopWidth: 55, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: C.line },
+  branchDiamondTop: { position: 'absolute', top: 3, width: 0, height: 0, borderLeftWidth: 88, borderRightWidth: 88, borderBottomWidth: 51, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderBottomColor: '#fffbeb' },
+  branchDiamondBottom: { position: 'absolute', bottom: 3, width: 0, height: 0, borderLeftWidth: 88, borderRightWidth: 88, borderTopWidth: 51, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: '#fffbeb' },
+  branchDiamondSeamCover: { position: 'absolute', top: 54, left: 12, right: 12, height: 3, backgroundColor: '#fffbeb', zIndex: 1 },
   branchDiamondInner: { width: 132, alignItems: 'center', justifyContent: 'center', zIndex: 2 },
   branchNodeHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 6 },
-  branchNodeQ: { color: '#78350f', fontSize: 12, fontWeight: '800', textAlign: 'center', transform: [{ rotate: '-45deg' }] },
+  branchNodeQ: { color: '#78350f', fontSize: 12, fontWeight: '800', textAlign: 'center' },
   branchNodeBtns: { flexDirection: 'row', gap: 6, marginTop: 10 },
   branchEditBtn: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, backgroundColor: '#fef3c7', borderWidth: 1, borderColor: '#d97706' },
   branchEditBtnText: { color: '#92400e', fontSize: 11, fontWeight: '700' },
@@ -170,13 +175,13 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   branchYesLine: { width: 2, height: 52, backgroundColor: C.line, marginTop: 0 },
   branchYesLabel: { color: C.line, fontSize: 11, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 4, marginTop: 12, marginLeft: 5 },
   branchYesItems: { width: 152, alignItems: 'center', gap: 5, display: 'none' },
-  branchNoRoute: { position: 'absolute', top: 56, left: '50%', right: -86, height: 150, zIndex: 1 },
-  branchNoTopLine: { position: 'absolute', top: 0, left: 76, right: 0, height: 2, backgroundColor: C.line },
+  branchNoRoute: { position: 'absolute', top: 55, left: '50%', right: -86, height: 150, zIndex: 1 },
+  branchNoTopLine: { position: 'absolute', top: 0, left: 94, right: 0, height: 2, backgroundColor: C.line },
   branchNoRightLine: { position: 'absolute', top: 0, right: 0, width: 2, height: 150, backgroundColor: C.line },
   branchNoBottomLine: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, backgroundColor: C.line },
   branchNoRail: { position: 'absolute', top: 0, right: 0, width: '100%', height: 150 },
   branchNoMergeLine: { position: 'absolute', top: 152, left: '50%', width: 2, height: 10, backgroundColor: C.line, zIndex: 1 },
-  branchNoLabel: { position: 'absolute', top: -20, left: 92, color: C.line, fontSize: 11, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 4 },
+  branchNoLabel: { position: 'absolute', top: -20, left: 110, color: C.line, fontSize: 11, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 4 },
   branchNoItems: { position: 'absolute', top: 30, right: -8, width: 168, alignItems: 'stretch', gap: 6 },
   branchPathTask: { width: 168, minHeight: 44, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8, borderWidth: 1.5, borderColor: C.line, backgroundColor: '#fff' },
   branchPathNote: { width: 168, minHeight: 44, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8, borderWidth: 1.5, borderColor: C.line, backgroundColor: '#fff' },
@@ -188,20 +193,25 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   viewBranch: { width: '100%', alignItems: 'center', paddingVertical: 2, overflow: 'visible' },
   viewBranchFlow: { width: '100%', minHeight: 184, alignItems: 'center', position: 'relative', overflow: 'visible' },
   viewBranchMainColumn: { width: 158, alignItems: 'center', zIndex: 2 },
-  viewBranchDiamond: { width: 126, height: 126, marginVertical: -18, borderWidth: 1.5, borderColor: C.line, backgroundColor: '#fffbeb', alignItems: 'center', justifyContent: 'center', transform: [{ rotate: '45deg' }] },
+  viewBranchDiamond: { width: 154, height: 90, alignItems: 'center', justifyContent: 'center', position: 'relative' },
+  viewBranchDiamondTopBorder: { position: 'absolute', top: 0, width: 0, height: 0, borderLeftWidth: 77, borderRightWidth: 77, borderBottomWidth: 45, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderBottomColor: C.line },
+  viewBranchDiamondBottomBorder: { position: 'absolute', bottom: 0, width: 0, height: 0, borderLeftWidth: 77, borderRightWidth: 77, borderTopWidth: 45, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: C.line },
+  viewBranchDiamondTop: { position: 'absolute', top: 2, width: 0, height: 0, borderLeftWidth: 72, borderRightWidth: 72, borderBottomWidth: 42, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderBottomColor: '#fffbeb' },
+  viewBranchDiamondBottom: { position: 'absolute', bottom: 2, width: 0, height: 0, borderLeftWidth: 72, borderRightWidth: 72, borderTopWidth: 42, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: '#fffbeb' },
+  viewBranchDiamondSeamCover: { position: 'absolute', top: 44, left: 10, right: 10, height: 3, backgroundColor: '#fffbeb', zIndex: 1 },
   viewBranchDiamondInner: { width: 112, alignItems: 'center', justifyContent: 'center', zIndex: 2 },
-  viewBranchQ: { color: '#78350f', fontSize: 11, fontWeight: '800', textAlign: 'center', transform: [{ rotate: '-45deg' }] },
+  viewBranchQ: { color: '#78350f', fontSize: 11, fontWeight: '800', textAlign: 'center' },
   viewBranchYesWrap: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'center' },
   viewBranchYesLine: { width: 2, height: 40, backgroundColor: C.line, marginTop: 0 },
   viewBranchLabel: { color: C.line, fontSize: 10, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 4, marginTop: 10, marginLeft: 5 },
   viewBranchYesItems: { width: 128, alignItems: 'center', gap: 4, display: 'none' },
   viewBranchNoRoute: { position: 'absolute', top: 45, left: '50%', right: -70, height: 122, zIndex: 1 },
-  viewBranchNoTopLine: { position: 'absolute', top: 0, left: 63, right: 0, height: 1.5, backgroundColor: C.line },
+  viewBranchNoTopLine: { position: 'absolute', top: 0, left: 77, right: 0, height: 1.5, backgroundColor: C.line },
   viewBranchNoRightLine: { position: 'absolute', top: 0, right: 0, width: 1.5, height: 122, backgroundColor: C.line },
   viewBranchNoBottomLine: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 1.5, backgroundColor: C.line },
   viewBranchNoRail: { position: 'absolute', top: 0, right: 0, width: '100%', height: 122 },
   viewBranchNoMergeLine: { position: 'absolute', top: 123, left: '50%', width: 1.5, height: 8, backgroundColor: C.line, zIndex: 1 },
-  viewBranchNoLabel: { position: 'absolute', top: -18, left: 78, color: C.line, fontSize: 10, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 4 },
+  viewBranchNoLabel: { position: 'absolute', top: -18, left: 92, color: C.line, fontSize: 10, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 4 },
   viewBranchNoItems: { position: 'absolute', top: 24, right: -6, width: 150, alignItems: 'stretch', gap: 5 },
   viewBranchTaskBox: { width: 150, minHeight: 38, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 7, borderWidth: 1.5, borderColor: C.line, backgroundColor: '#fff' },
   viewBranchNoteBox: { width: 150, minHeight: 38, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 7, borderWidth: 1.5, borderColor: C.line, backgroundColor: '#fff' },
@@ -579,6 +589,11 @@ export default function FlowScreen({ navigation }: Props) {
       <View style={s.viewBranchFlow}>
         <View style={s.viewBranchMainColumn}>
           <View style={s.viewBranchDiamond}>
+            <View style={s.viewBranchDiamondTopBorder} />
+            <View style={s.viewBranchDiamondBottomBorder} />
+            <View style={s.viewBranchDiamondTop} />
+            <View style={s.viewBranchDiamondBottom} />
+            <View style={s.viewBranchDiamondSeamCover} />
             <View style={s.viewBranchDiamondInner}>
               <Text style={s.viewBranchQ}>{b.question || '確認'}</Text>
             </View>
@@ -607,6 +622,11 @@ export default function FlowScreen({ navigation }: Props) {
       <View style={s.branchFlow}>
         <View style={s.branchMainColumn}>
           <View style={s.branchDiamond}>
+            <View style={s.branchDiamondTopBorder} />
+            <View style={s.branchDiamondBottomBorder} />
+            <View style={s.branchDiamondTop} />
+            <View style={s.branchDiamondBottom} />
+            <View style={s.branchDiamondSeamCover} />
             <View style={s.branchDiamondInner}>
               <Text style={s.branchNodeQ}>{b.question || '確認'}</Text>
             </View>
