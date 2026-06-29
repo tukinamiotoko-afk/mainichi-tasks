@@ -256,8 +256,6 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   subPathDiv: { width: 1, backgroundColor: C.line, alignSelf: 'stretch', marginVertical: 2 },
   subPathYesLbl: { color: C.line, fontSize: 9, fontWeight: '900', marginBottom: 3 },
   subPathNoLbl: { color: C.line, fontSize: 9, fontWeight: '900', marginBottom: 3 },
-  subReturnBox: { backgroundColor: '#f0fdf4', borderWidth: 1, borderColor: '#86efac', borderRadius: 6, paddingHorizontal: 5, paddingVertical: 4, alignItems: 'center' },
-  subReturnText: { color: '#15803d', fontSize: 9, fontWeight: '700', textAlign: 'center' },
   subItemBox: { backgroundColor: '#fff', borderWidth: 1, borderColor: C.line, borderRadius: 5, paddingHorizontal: 4, paddingVertical: 3, marginBottom: 3, width: '100%', alignItems: 'center' },
   subItemText: { color: C.ink, fontSize: 9, fontWeight: '700', textAlign: 'center' },
   subItemEmpty: { color: C.muted, fontSize: 9, fontStyle: 'italic', textAlign: 'center' },
@@ -772,7 +770,7 @@ export default function FlowScreen({ navigation }: Props) {
         <View style={s.subYesCol}>
           <Text style={s.subPathYesLbl}>はい</Text>
           {sub.yesReturns
-            ? <View style={s.subReturnBox}><Text style={s.subReturnText}>← メインへ</Text></View>
+            ? null
             : renderSubItems(sub.yes)}
         </View>
         <View style={s.subPathDiv} />
