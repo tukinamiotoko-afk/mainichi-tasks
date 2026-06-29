@@ -240,7 +240,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   viewBranchNote: { color: C.ink, fontSize: 11, fontWeight: '700', textAlign: 'center', lineHeight: 15 },
 
   // ── sub-branch (nested in no-path) ──
-  subBranchWrap: { marginTop: 8, width: '100%', alignItems: 'center' },
+  subBranchWrap: { marginTop: 8, width: '100%', alignItems: 'center', paddingLeft: 38 },
   subDiamond: { width: 130, height: 40, alignItems: 'center', justifyContent: 'center', position: 'relative' },
   subDiamondTB: { position: 'absolute', top: 0, width: 0, height: 0, borderLeftWidth: 65, borderRightWidth: 65, borderBottomWidth: 20, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderBottomColor: C.line },
   subDiamondBB: { position: 'absolute', bottom: 0, width: 0, height: 0, borderLeftWidth: 65, borderRightWidth: 65, borderTopWidth: 20, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: C.line },
