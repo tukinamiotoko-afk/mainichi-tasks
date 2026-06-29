@@ -1,8 +1,9 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, StatusBar, Modal,
-  Animated, PanResponder,
+  Animated, PanResponder, Platform,
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useFocusEffect } from '@react-navigation/native';
@@ -110,6 +111,10 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   pickerCheckText: { color: '#ffffff', fontSize: 14, fontWeight: '900' },
   pickerEmpty: { padding: 40, alignItems: 'center' },
   pickerEmptyText: { color: C.muted, fontSize: 14 },
+
+  editCard: { marginTop: 20, width: '100%', paddingVertical: 16, borderRadius: 14, borderWidth: 1.5, borderColor: C.primary, backgroundColor: C.primarySoft, alignItems: 'center', justifyContent: 'center' },
+  editCardText: { color: C.primary, fontSize: 14, fontWeight: '800', letterSpacing: 0.5 },
+  datePickerSheet: { backgroundColor: C.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 24 },
 });
 
 export default function FlowScreen({ navigation }: Props) {
@@ -127,6 +132,7 @@ export default function FlowScreen({ navigation }: Props) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   // ── drag-to-reorder state ──
   const [draggingIdx, setDraggingIdx] = useState<number | null>(null);
@@ -343,6 +349,9 @@ export default function FlowScreen({ navigation }: Props) {
       <View style={s.viewTerminator}>
         <Text style={s.viewTerminatorText}>終了</Text>
       </View>
+      <TouchableOpacity style={s.editCard} onPress={() => setIsEditing(true)} activeOpacity={0.8}>
+        <Text style={s.editCardText}>編集</Text>
+      </TouchableOpacity>
     </>
   );
 
@@ -424,18 +433,14 @@ export default function FlowScreen({ navigation }: Props) {
           <TouchableOpacity style={s.navBtn} onPress={() => shiftSelected(-1)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
             <Text style={s.navArrow}>‹</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={s.navCenter} onPress={() => setSelectedDate(today)} activeOpacity={0.7}>
+          <TouchableOpacity style={s.navCenter} onPress={() => setShowDatePicker(true)} activeOpacity={0.7}>
             <Text style={s.navDateText}>{dateLabel}</Text>
-            {!isToday && <Text style={s.navTodayHint}>タップで今日へ</Text>}
+            <Text style={s.navTodayHint}>タップで日付変更</Text>
           </TouchableOpacity>
           <View style={s.navRight}>
-            {isEditing ? (
+            {isEditing && (
               <TouchableOpacity style={s.saveBtn} onPress={saveOrder} disabled={saving}>
                 <Text style={s.saveBtnText}>{saving ? '…' : '保存'}</Text>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity style={s.editBtn} onPress={() => setIsEditing(true)}>
-                <Text style={s.editBtnText}>編集</Text>
               </TouchableOpacity>
             )}
             <TouchableOpacity style={s.navBtn} onPress={() => shiftSelected(1)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -458,10 +463,14 @@ export default function FlowScreen({ navigation }: Props) {
         ) : addedIds.length === 0 ? (
           <View style={s.emptyFlow}>
             <Text style={s.emptyTitle}>フローにタスクを追加しましょう</Text>
-            <Text style={s.emptyBody}>右上の「編集」からタスクを追加できます</Text>
-            {isEditing && (
+            <Text style={s.emptyBody}>「編集」からタスクを追加できます</Text>
+            {isEditing ? (
               <TouchableOpacity style={s.addFirstBtn} onPress={() => setPickerOpen(true)}>
                 <Text style={s.addFirstBtnText}>＋ タスクを追加</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity style={[s.editCard, { marginTop: 16, paddingHorizontal: 40 }]} onPress={() => setIsEditing(true)} activeOpacity={0.8}>
+                <Text style={s.editCardText}>編集</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -531,6 +540,40 @@ export default function FlowScreen({ navigation }: Props) {
                 })
               )}
             </ScrollView>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
+      {Platform.OS === 'android' && showDatePicker && (
+        <DateTimePicker
+          value={selDateObj}
+          mode="date"
+          display="default"
+          onChange={(_, date) => {
+            setShowDatePicker(false);
+            if (date) setSelectedDate(`${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`);
+          }}
+        />
+      )}
+
+      <Modal visible={Platform.OS === 'ios' && showDatePicker} transparent animationType="slide" onRequestClose={() => setShowDatePicker(false)}>
+        <TouchableOpacity style={s.pickerOverlay} activeOpacity={1} onPress={() => setShowDatePicker(false)}>
+          <TouchableOpacity activeOpacity={1} style={s.datePickerSheet} onPress={() => {}}>
+            <View style={s.pickerHeader}>
+              <Text style={s.pickerTitle}>日付を選択</Text>
+              <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                <Text style={s.pickerDone}>完了</Text>
+              </TouchableOpacity>
+            </View>
+            <DateTimePicker
+              value={selDateObj}
+              mode="date"
+              display="spinner"
+              onChange={(_, date) => {
+                if (date) setSelectedDate(`${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`);
+              }}
+              style={{ height: 200 }}
+            />
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
