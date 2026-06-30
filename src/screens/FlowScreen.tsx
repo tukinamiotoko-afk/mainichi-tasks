@@ -265,15 +265,23 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   subEditBtnText: { color: '#92400e', fontSize: 10, fontWeight: '700' },
   subDelBtn: { minWidth: 28, height: 22, paddingHorizontal: 7, borderRadius: 11, backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fca5a5', alignItems: 'center', justifyContent: 'center' },
   subDelBtnText: { color: '#dc2626', fontSize: 12, fontWeight: '700', lineHeight: 14 },
-  subPaths: { flexDirection: 'row', marginTop: 4, width: 130, position: 'relative' },
-  subPathsNoReturn: { width: 68, alignSelf: 'flex-end', justifyContent: 'flex-end' },
-  subYesCol: { flex: 1, alignItems: 'center', paddingHorizontal: 3 },
-  subNoCol: { flex: 1, alignItems: 'center', paddingHorizontal: 3 },
+  subPaths: { flexDirection: 'row', marginTop: 4, position: 'relative' },
+  subPathsWide: { width: 337 },
+  subPathsCompact: { width: 301 },
+  subPathsNoReturn: { alignSelf: 'center', justifyContent: 'flex-end' },
+  subPathsNoReturnWide: { width: 168 },
+  subPathsNoReturnCompact: { width: 150 },
+  subYesCol: { alignItems: 'center', paddingHorizontal: 0 },
+  subNoCol: { alignItems: 'center', paddingHorizontal: 0 },
+  subColWide: { width: 168 },
+  subColCompact: { width: 150 },
   subPathDiv: { width: 1, backgroundColor: C.line, alignSelf: 'stretch', marginVertical: 2 },
   subPathYesLbl: { color: C.line, fontSize: 9, fontWeight: '900', marginBottom: 3 },
   subPathNoLbl: { color: C.line, fontSize: 9, fontWeight: '900', marginBottom: 3 },
-  subItemBox: { backgroundColor: '#f0fdf4', borderWidth: 1, borderColor: '#22c55e', borderRadius: 5, paddingHorizontal: 4, paddingVertical: 3, marginBottom: 3, width: '100%', alignItems: 'center' },
-  subItemText: { color: '#166534', fontSize: 9, fontWeight: '700', textAlign: 'center' },
+  subItemBox: { width: 168, minHeight: 44, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8, borderWidth: 1.5, borderColor: '#22c55e', backgroundColor: '#f0fdf4', marginBottom: 6, alignItems: 'center', justifyContent: 'center' },
+  subItemBoxCompact: { width: 150, minHeight: 38, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 7, marginBottom: 5 },
+  subItemText: { color: '#166534', fontSize: 12, fontWeight: '700', textAlign: 'center', lineHeight: 16 },
+  subItemTextCompact: { fontSize: 11, lineHeight: 15 },
   subItemEmpty: { color: C.muted, fontSize: 9, fontStyle: 'italic', textAlign: 'center' },
   subAddBtn: { marginTop: 10, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, borderWidth: 1.5, borderStyle: 'dashed', borderColor: '#fb923c', alignItems: 'center', backgroundColor: '#fff7ed' },
   subAddBtnText: { color: '#c2410c', fontSize: 11, fontWeight: '700' },
@@ -817,18 +825,29 @@ export default function FlowScreen({ navigation }: Props) {
     return { routeHeight, flowHeight, yesHeight };
   };
 
-  const renderSubItems = (items: SimpleItems) => {
+  const renderSubItems = (items: SimpleItems, compact = false) => {
     const has = items.notes.length > 0 || items.taskIds.length > 0;
     if (!has) return <Text style={s.subItemEmpty}>なし</Text>;
     return (
       <>
-        {items.notes.map((n, i) => <View key={`sn${i}`} style={s.subItemBox}><Text style={s.subItemText} numberOfLines={2}>{n}</Text></View>)}
-        {items.taskIds.map(id => { const t = taskById.get(id); return t ? <View key={`st${id}`} style={s.subItemBox}><Text style={s.subItemText} numberOfLines={2}>{t.icon ? `${t.icon} ` : ''}{t.title}</Text></View> : null; })}
+        {items.notes.map((n, i) => (
+          <View key={`sn${i}`} style={[s.subItemBox, compact ? s.subItemBoxCompact : null]}>
+            <Text style={[s.subItemText, compact ? s.subItemTextCompact : null]} numberOfLines={2}>{n}</Text>
+          </View>
+        ))}
+        {items.taskIds.map(id => {
+          const t = taskById.get(id);
+          return t ? (
+            <View key={`st${id}`} style={[s.subItemBox, compact ? s.subItemBoxCompact : null]}>
+              <Text style={[s.subItemText, compact ? s.subItemTextCompact : null]} numberOfLines={2}>{t.icon ? `${t.icon} ` : ''}{t.title}</Text>
+            </View>
+          ) : null;
+        })}
       </>
     );
   };
 
-  const renderSubDiamond = (sub: SubBranch, parent?: BranchNode) => (
+  const renderSubDiamond = (sub: SubBranch, parent?: BranchNode, compact = false) => (
     <View style={s.subBranchWrap}>
       <ArrowDown color={C.line} h={8} />
       <View style={s.subDiamondShell}>
@@ -862,22 +881,22 @@ export default function FlowScreen({ navigation }: Props) {
         ) : null}
       </View>
       {sub.yesReturns ? (
-        <View style={[s.subPaths, s.subPathsNoReturn]}>
-          <View style={s.subNoCol}>
+        <View style={[s.subPaths, s.subPathsNoReturn, compact ? s.subPathsNoReturnCompact : s.subPathsNoReturnWide]}>
+          <View style={[s.subNoCol, compact ? s.subColCompact : s.subColWide]}>
             <Text style={s.subPathNoLbl}>いいえ</Text>
-            {renderSubItems(sub.no)}
+            {renderSubItems(sub.no, compact)}
           </View>
         </View>
       ) : (
-        <View style={s.subPaths}>
-          <View style={s.subYesCol}>
+        <View style={[s.subPaths, compact ? s.subPathsCompact : s.subPathsWide]}>
+          <View style={[s.subYesCol, compact ? s.subColCompact : s.subColWide]}>
             <Text style={s.subPathYesLbl}>はい</Text>
-            {renderSubItems(sub.yes)}
+            {renderSubItems(sub.yes, compact)}
           </View>
           <View style={s.subPathDiv} />
-          <View style={s.subNoCol}>
+          <View style={[s.subNoCol, compact ? s.subColCompact : s.subColWide]}>
             <Text style={s.subPathNoLbl}>いいえ</Text>
-            {renderSubItems(sub.no)}
+            {renderSubItems(sub.no, compact)}
           </View>
         </View>
       )}
@@ -963,7 +982,7 @@ export default function FlowScreen({ navigation }: Props) {
           <Text style={s.viewBranchNoLabel}>いいえ</Text>
           <View style={s.viewBranchNoItems}>
             {renderPathItems(b.no, true)}
-            {b.no.sub && renderSubDiamond(b.no.sub)}
+            {b.no.sub && renderSubDiamond(b.no.sub, undefined, true)}
           </View>
         </View>
         <View style={s.viewBranchNoMergeLine} pointerEvents="none" />
