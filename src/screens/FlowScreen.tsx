@@ -844,7 +844,7 @@ export default function FlowScreen({ navigation }: Props) {
           <View style={s.subDiamondEdgeTL} />
           <View style={s.subDiamondEdgeTR} />
           <View style={s.subDiamondEdgeBR} />
-          {!sub.yesReturns ? <View style={s.subDiamondEdgeBL} /> : null}
+          <View style={s.subDiamondEdgeBL} />
           <View style={s.subDiamondSC} />
           <View style={s.subDiamondInner}>
             <Text style={s.subDiamondQ}>{sub.question || '確認'}</Text>
