@@ -210,10 +210,10 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   branchNoMergeLine: { display: 'none' },
   branchNoLabel: { position: 'absolute', top: -20, left: 165, color: C.line, fontSize: 11, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 4 },
   branchNoItems: { position: 'absolute', top: 30, left: 68, width: 168, alignItems: 'stretch', gap: 6 },
-  branchPathTask: { width: 168, minHeight: 44, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8, borderWidth: 1.5, borderColor: C.line, backgroundColor: '#fff' },
-  branchPathNote: { width: 168, minHeight: 44, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8, borderWidth: 1.5, borderColor: C.line, backgroundColor: '#fff' },
-  branchPathTaskText: { color: C.ink, fontSize: 12, fontWeight: '700', textAlign: 'center', lineHeight: 16 },
-  branchPathNoteText: { color: C.ink, fontSize: 12, fontWeight: '700', textAlign: 'center', lineHeight: 16 },
+  branchPathTask: { width: 168, minHeight: 44, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8, borderWidth: 1.5, borderColor: '#22c55e', backgroundColor: '#f0fdf4' },
+  branchPathNote: { width: 168, minHeight: 44, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8, borderWidth: 1.5, borderColor: '#22c55e', backgroundColor: '#f0fdf4' },
+  branchPathTaskText: { color: '#166534', fontSize: 12, fontWeight: '700', textAlign: 'center', lineHeight: 16 },
+  branchPathNoteText: { color: '#166534', fontSize: 12, fontWeight: '700', textAlign: 'center', lineHeight: 16 },
   branchPathEmpty: { color: '#d97706', fontSize: 11, fontStyle: 'italic' },
 
   // ── branch node (view) ──
@@ -240,10 +240,10 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   viewBranchNoMergeLine: { display: 'none' },
   viewBranchNoLabel: { position: 'absolute', top: -18, left: 123, color: C.line, fontSize: 10, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 4 },
   viewBranchNoItems: { position: 'absolute', top: 24, left: 76, width: 150, alignItems: 'stretch', gap: 5 },
-  viewBranchTaskBox: { width: 150, minHeight: 38, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 7, borderWidth: 1.5, borderColor: C.line, backgroundColor: '#fff' },
-  viewBranchNoteBox: { width: 150, minHeight: 38, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 7, borderWidth: 1.5, borderColor: C.line, backgroundColor: '#fff' },
-  viewBranchTask: { color: C.ink, fontSize: 11, fontWeight: '700', textAlign: 'center', lineHeight: 15 },
-  viewBranchNote: { color: C.ink, fontSize: 11, fontWeight: '700', textAlign: 'center', lineHeight: 15 },
+  viewBranchTaskBox: { width: 150, minHeight: 38, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 7, borderWidth: 1.5, borderColor: '#22c55e', backgroundColor: '#f0fdf4' },
+  viewBranchNoteBox: { width: 150, minHeight: 38, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 7, borderWidth: 1.5, borderColor: '#22c55e', backgroundColor: '#f0fdf4' },
+  viewBranchTask: { color: '#166534', fontSize: 11, fontWeight: '700', textAlign: 'center', lineHeight: 15 },
+  viewBranchNote: { color: '#166534', fontSize: 11, fontWeight: '700', textAlign: 'center', lineHeight: 15 },
 
   // ── sub-branch (nested in no-path) ──
   subBranchWrap: { marginTop: 8, width: '100%', alignItems: 'center' },
@@ -808,9 +808,23 @@ export default function FlowScreen({ navigation }: Props) {
     );
   };
 
+  const countSimpleItems = (items: SimpleItems) => items.notes.length + items.taskIds.length;
+  const estimateSubItemStackHeight = (items: SimpleItems, compact: boolean) => {
+    const count = countSimpleItems(items);
+    if (count === 0) return compact ? 18 : 20;
+    return count * (compact ? 43 : 50);
+  };
+  const estimateNestedSubHeight = (sub: SubBranch, compact: boolean) => {
+    const introHeight = compact ? 94 : 104;
+    const labelHeight = compact ? 14 : 16;
+    const yesHeight = labelHeight + estimateSubItemStackHeight(sub.yes, compact);
+    const noHeight = labelHeight + estimateSubItemStackHeight(sub.no, compact);
+    return introHeight + (sub.yesReturns ? noHeight : Math.max(yesHeight, noHeight));
+  };
+
   const getBranchLayout = (b: BranchNode, compact = false, insertMode = false) => {
     const sub = b.no.sub;
-    const subExtra = sub ? (compact ? 80 : 100) : 0;
+    const subExtra = sub ? estimateNestedSubHeight(sub, compact) : 0;
     const rawItemCount = b.no.notes.length + b.no.taskIds.length;
     const itemCount = Math.max(1, rawItemCount);
     const routeTop = compact ? 30 : 40;
