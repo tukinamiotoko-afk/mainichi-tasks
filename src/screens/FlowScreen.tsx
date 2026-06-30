@@ -204,12 +204,12 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   branchYesLine: { width: 2, height: 140, backgroundColor: C.line, marginTop: 0 },
   branchYesLabel: { position: 'absolute', right: 34, top: 12, color: C.line, fontSize: 11, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 4 },
   branchYesItems: { width: 152, alignItems: 'center', gap: 5, display: 'none' },
-  branchNoRoute: { position: 'absolute', top: 40, left: '50%', width: 206, height: 150, zIndex: 1 },
+  branchNoRoute: { position: 'absolute', top: 40, left: '50%', width: 234, height: 150, zIndex: 1 },
   branchNoRail: { position: 'absolute', top: 0, left: 0, right: 54, height: 150, borderTopWidth: 2, borderRightWidth: 2, borderBottomWidth: 2, borderColor: C.line },
   branchNoRailReturnless: { borderBottomWidth: 0 },
   branchNoMergeLine: { display: 'none' },
-  branchNoLabel: { position: 'absolute', top: -20, left: 165, color: C.line, fontSize: 11, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 4 },
-  branchNoItems: { position: 'absolute', top: 30, left: 68, width: 168, alignItems: 'stretch', gap: 6 },
+  branchNoLabel: { position: 'absolute', top: -20, left: 192, color: C.line, fontSize: 11, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 4 },
+  branchNoItems: { position: 'absolute', top: 30, left: 96, width: 168, alignItems: 'stretch', gap: 6 },
   branchPathTask: { width: 168, minHeight: 44, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8, borderWidth: 1.5, borderColor: '#22c55e', backgroundColor: '#f0fdf4' },
   branchPathNote: { width: 168, minHeight: 44, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8, borderWidth: 1.5, borderColor: '#22c55e', backgroundColor: '#f0fdf4' },
   branchPathTaskText: { color: '#166534', fontSize: 12, fontWeight: '700', textAlign: 'center', lineHeight: 16 },
@@ -234,12 +234,12 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   viewBranchYesLine: { width: 1.5, height: 120, backgroundColor: C.line, marginTop: 0 },
   viewBranchLabel: { position: 'absolute', right: 30, top: 10, color: C.line, fontSize: 10, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 4 },
   viewBranchYesItems: { width: 128, alignItems: 'center', gap: 4, display: 'none' },
-  viewBranchNoRoute: { position: 'absolute', top: 30, left: '50%', width: 202, height: 122, zIndex: 1 },
+  viewBranchNoRoute: { position: 'absolute', top: 30, left: '50%', width: 220, height: 122, zIndex: 1 },
   viewBranchNoRail: { position: 'absolute', top: 0, left: 0, right: 51, height: 122, borderTopWidth: 2, borderRightWidth: 2, borderBottomWidth: 2, borderColor: C.line },
   viewBranchNoRailReturnless: { borderBottomWidth: 0 },
   viewBranchNoMergeLine: { display: 'none' },
-  viewBranchNoLabel: { position: 'absolute', top: -18, left: 123, color: C.line, fontSize: 10, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 4 },
-  viewBranchNoItems: { position: 'absolute', top: 24, left: 76, width: 150, alignItems: 'stretch', gap: 5 },
+  viewBranchNoLabel: { position: 'absolute', top: -18, left: 147, color: C.line, fontSize: 10, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 4 },
+  viewBranchNoItems: { position: 'absolute', top: 24, left: 94, width: 150, alignItems: 'stretch', gap: 5 },
   viewBranchTaskBox: { width: 150, minHeight: 38, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 7, borderWidth: 1.5, borderColor: '#22c55e', backgroundColor: '#f0fdf4' },
   viewBranchNoteBox: { width: 150, minHeight: 38, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 7, borderWidth: 1.5, borderColor: '#22c55e', backgroundColor: '#f0fdf4' },
   viewBranchTask: { color: '#166534', fontSize: 11, fontWeight: '700', textAlign: 'center', lineHeight: 15 },
@@ -258,8 +258,12 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   subDiamondSC: { position: 'absolute', top: 19, left: 6, right: 6, height: 3, backgroundColor: '#fffbeb', zIndex: 1 },
   subDiamondInner: { width: 96, alignItems: 'center', justifyContent: 'center', zIndex: 2 },
   subDiamondQ: { color: '#78350f', fontSize: 9, fontWeight: '800', textAlign: 'center' },
-  subYesReturnLine: { position: 'absolute', left: -87, top: 20, width: 87, height: 2, backgroundColor: C.line, zIndex: 1 },
-  subYesReturnLabel: { position: 'absolute', left: -43, top: 4, color: C.line, fontSize: 9, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 5, zIndex: 3 },
+  subYesReturnLine: { position: 'absolute', top: 20, height: 2, backgroundColor: C.line, zIndex: 1 },
+  subYesReturnLineWide: { left: -115, width: 115 },
+  subYesReturnLineCompact: { left: -105, width: 105 },
+  subYesReturnLabel: { position: 'absolute', top: 4, color: C.line, fontSize: 9, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 5, zIndex: 3 },
+  subYesReturnLabelWide: { left: -57 },
+  subYesReturnLabelCompact: { left: -52 },
   subDiamondBtns: { position: 'absolute', bottom: 0, flexDirection: 'row', alignItems: 'center', gap: 6 },
   subEditBtn: { minWidth: 42, height: 22, paddingHorizontal: 9, borderRadius: 11, backgroundColor: '#fef3c7', borderWidth: 1, borderColor: '#d97706', alignItems: 'center', justifyContent: 'center' },
   subEditBtnText: { color: '#92400e', fontSize: 10, fontWeight: '700' },
@@ -868,8 +872,8 @@ export default function FlowScreen({ navigation }: Props) {
         <View style={s.subDiamond}>
           {sub.yesReturns ? (
             <>
-              <View style={s.subYesReturnLine} />
-              <Text style={s.subYesReturnLabel}>はい</Text>
+              <View style={[s.subYesReturnLine, compact ? s.subYesReturnLineCompact : s.subYesReturnLineWide]} />
+              <Text style={[s.subYesReturnLabel, compact ? s.subYesReturnLabelCompact : s.subYesReturnLabelWide]}>はい</Text>
             </>
           ) : null}
           <View style={s.subDiamondTop} />
