@@ -300,9 +300,9 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   branchEditorSheet: { backgroundColor: C.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '85%' },
   branchEditorSection: { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 6 },
   branchEditorLabel: { color: C.muted, fontSize: 11, fontWeight: '800', letterSpacing: 0.5, marginBottom: 6 },
-  branchEditorInput: { borderWidth: 1.5, borderColor: C.border, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, fontSize: 15, color: '#6b7280', backgroundColor: C.body },
+  branchEditorInput: { borderWidth: 1.5, borderColor: C.border, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, fontSize: 15, color: C.ink, backgroundColor: C.body },
   branchNoteAddRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
-  branchNoteInput: { flex: 1, borderWidth: 1.5, borderColor: C.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9, fontSize: 14, color: '#6b7280', backgroundColor: C.body },
+  branchNoteInput: { flex: 1, borderWidth: 1.5, borderColor: C.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9, fontSize: 14, color: C.ink, backgroundColor: C.body },
   branchNoteAddBtn: { paddingHorizontal: 13, paddingVertical: 10, borderRadius: 10, backgroundColor: '#d97706' },
   branchNoteAddText: { color: '#ffffff', fontSize: 12, fontWeight: '800' },
   branchNoteList: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 },
@@ -1390,7 +1390,7 @@ export default function FlowScreen({ navigation }: Props) {
                   value={branchDraft?.question ?? ''}
                   onChangeText={t => setBranchDraft(p => p ? { ...p, question: t } : p)}
                   placeholder="例: 終わった？"
-                  placeholderTextColor={C.muted}
+                  placeholderTextColor="#cbd5e1"
                 />
               </View>
               <View style={s.branchEditorSection}>
@@ -1409,7 +1409,7 @@ export default function FlowScreen({ navigation }: Props) {
                     value={branchNoteDraft.no}
                     onChangeText={t => setBranchNoteDraft(p => ({ ...p, no: t }))}
                     placeholder="横に出す内容"
-                    placeholderTextColor={C.muted}
+                    placeholderTextColor="#cbd5e1"
                     returnKeyType="done"
                     onSubmitEditing={() => addBranchNote('no')}
                   />
@@ -1448,7 +1448,7 @@ export default function FlowScreen({ navigation }: Props) {
                       value={branchDraft.no.sub.question}
                       onChangeText={setSubQ}
                       placeholder="サブ分岐の内容（例: やり直す？）"
-                      placeholderTextColor="#9ca3af"
+                      placeholderTextColor="#cbd5e1"
                     />
                     <Text style={[s.branchEditorLabel, { marginTop: 12, color: '#15803d' }]}>はいで左に戻る（メインフローへ）</Text>
                     <View style={s.branchNoteList}>
@@ -1460,7 +1460,7 @@ export default function FlowScreen({ navigation }: Props) {
                       ))}
                     </View>
                     <View style={s.branchNoteAddRow}>
-                      <TextInput style={s.branchNoteInput} value={subNoteDraft.yes} onChangeText={t => setSubNoteDraft(p => ({ ...p, yes: t }))} placeholder="はいルートの内容" placeholderTextColor="#9ca3af" returnKeyType="done" onSubmitEditing={() => addSubNote('yes')} />
+                      <TextInput style={s.branchNoteInput} value={subNoteDraft.yes} onChangeText={t => setSubNoteDraft(p => ({ ...p, yes: t }))} placeholder="はいルートの内容" placeholderTextColor="#cbd5e1" returnKeyType="done" onSubmitEditing={() => addSubNote('yes')} />
                       <TouchableOpacity style={s.branchNoteAddBtn} onPress={() => addSubNote('yes')}><Text style={s.branchNoteAddText}>追加</Text></TouchableOpacity>
                     </View>
                     <Text style={[s.branchEditorLabel, { marginTop: 12, color: '#b91c1c' }]}>いいえで続けるカード</Text>
@@ -1473,7 +1473,7 @@ export default function FlowScreen({ navigation }: Props) {
                       ))}
                     </View>
                     <View style={s.branchNoteAddRow}>
-                      <TextInput style={s.branchNoteInput} value={subNoteDraft.no} onChangeText={t => setSubNoteDraft(p => ({ ...p, no: t }))} placeholder="いいえルートの内容" placeholderTextColor="#9ca3af" returnKeyType="done" onSubmitEditing={() => addSubNote('no')} />
+                      <TextInput style={s.branchNoteInput} value={subNoteDraft.no} onChangeText={t => setSubNoteDraft(p => ({ ...p, no: t }))} placeholder="いいえルートの内容" placeholderTextColor="#cbd5e1" returnKeyType="done" onSubmitEditing={() => addSubNote('no')} />
                       <TouchableOpacity style={s.branchNoteAddBtn} onPress={() => addSubNote('no')}><Text style={s.branchNoteAddText}>追加</Text></TouchableOpacity>
                     </View>
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
@@ -1528,7 +1528,7 @@ export default function FlowScreen({ navigation }: Props) {
                   value={noRouteSubDraft?.question ?? ''}
                   onChangeText={setNoRouteSubQ}
                   placeholder="例: やり直す？"
-                  placeholderTextColor={C.muted}
+                  placeholderTextColor="#cbd5e1"
                 />
               </View>
 
@@ -1548,7 +1548,7 @@ export default function FlowScreen({ navigation }: Props) {
                     value={noRouteSubNoteDraft.yes}
                     onChangeText={t => setNoRouteSubNoteDraft(p => ({ ...p, yes: t }))}
                     placeholder="はいルートの内容"
-                    placeholderTextColor={C.muted}
+                    placeholderTextColor="#cbd5e1"
                     returnKeyType="done"
                     onSubmitEditing={() => addNoRouteSubNote('yes')}
                   />
@@ -1574,7 +1574,7 @@ export default function FlowScreen({ navigation }: Props) {
                     value={noRouteSubNoteDraft.no}
                     onChangeText={t => setNoRouteSubNoteDraft(p => ({ ...p, no: t }))}
                     placeholder="いいえルートの内容"
-                    placeholderTextColor={C.muted}
+                    placeholderTextColor="#cbd5e1"
                     returnKeyType="done"
                     onSubmitEditing={() => addNoRouteSubNote('no')}
                   />
