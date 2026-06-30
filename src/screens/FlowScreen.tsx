@@ -20,7 +20,7 @@ import { useTheme, ColorSet } from '../contexts/ThemeContext';
 const pad = (n: number) => String(n).padStart(2, '0');
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'Flow'> };
 type SimpleItems = { taskIds: number[]; notes: string[] };
-type SubBranch = { question: string; yes: SimpleItems; no: SimpleItems; yesReturns: boolean };
+type SubBranch = { question: string; yes: SimpleItems; no: SimpleItems; yesReturns: boolean; noReturnsToMain?: boolean };
 type BranchPathData = { taskIds: number[]; notes: string[]; sub?: SubBranch };
 type BranchNode = { id: number | null; insertAfterIdx: number; question: string; yes: BranchPathData; no: BranchPathData };
 
@@ -35,7 +35,7 @@ function ArrowDown({ color, h = 18 }: { color: string; h?: number }) {
 
 const emptyPath = (): BranchPathData => ({ taskIds: [], notes: [] });
 const emptyItems = (): SimpleItems => ({ taskIds: [], notes: [] });
-const emptySubBranch = (): SubBranch => ({ question: '', yesReturns: true, yes: emptyItems(), no: emptyItems() });
+const emptySubBranch = (): SubBranch => ({ question: '', yesReturns: true, noReturnsToMain: false, yes: emptyItems(), no: emptyItems() });
 
 const parseSimpleItems = (raw: unknown): SimpleItems => ({
   taskIds: Array.isArray((raw as any)?.taskIds) ? (raw as any).taskIds.filter((v: unknown): v is number => typeof v === 'number') : [],
@@ -55,6 +55,7 @@ const parseBranchPath = (raw: string | null): BranchPathData => {
       base.sub = {
         question: typeof parsed.sub.question === 'string' ? parsed.sub.question : '',
         yesReturns: parsed.sub.yesReturns !== false,
+        noReturnsToMain: parsed.sub.noReturnsToMain === true,
         yes: parseSimpleItems(parsed.sub.yes),
         no: parseSimpleItems(parsed.sub.no),
       };
@@ -71,6 +72,7 @@ const stringifyBranchPath = (path: BranchPathData) => JSON.stringify({
   ...(path.sub ? { sub: {
     question: path.sub.question,
     yesReturns: path.sub.yesReturns,
+    noReturnsToMain: path.sub.noReturnsToMain === true,
     yes: { taskIds: path.sub.yes.taskIds, notes: path.sub.yes.notes.map(n => n.trim()).filter(Boolean) },
     no: { taskIds: path.sub.no.taskIds, notes: path.sub.no.notes.map(n => n.trim()).filter(Boolean) },
   }} : {}),
@@ -287,6 +289,11 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   subItemText: { color: '#166534', fontSize: 12, fontWeight: '700', textAlign: 'center', lineHeight: 16 },
   subItemTextCompact: { fontSize: 11, lineHeight: 15 },
   subItemEmpty: { color: C.muted, fontSize: 9, fontStyle: 'italic', textAlign: 'center' },
+  subReturnMergeWrap: { width: '100%', alignItems: 'center', marginTop: 2, position: 'relative' },
+  subReturnMergeStemWide: { width: 2, height: 18, backgroundColor: C.line },
+  subReturnMergeStemCompact: { width: 2, height: 16, backgroundColor: C.line },
+  subReturnMergeLineWide: { position: 'absolute', top: 18, left: -188, width: 188, height: 2, backgroundColor: C.line },
+  subReturnMergeLineCompact: { position: 'absolute', top: 16, left: -171, width: 171, height: 2, backgroundColor: C.line },
   subAddBtn: { marginTop: 10, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, borderWidth: 1.5, borderStyle: 'dashed', borderColor: '#fb923c', alignItems: 'center', backgroundColor: '#fff7ed' },
   subAddBtnText: { color: '#c2410c', fontSize: 11, fontWeight: '700' },
   subRemoveBtn: { marginTop: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fca5a5', alignItems: 'center', alignSelf: 'flex-end' },
@@ -309,6 +316,11 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   branchNoteChip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: '#fb923c', backgroundColor: '#fff7ed' },
   branchNoteChipText: { color: '#9a3412', fontSize: 12, fontWeight: '700', maxWidth: 180 },
   branchNoteChipX: { color: '#dc2626', fontSize: 13, fontWeight: '900' },
+  branchReturnRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
+  branchReturnBtn: { flex: 1, borderWidth: 1.5, borderColor: '#cbd5e1', backgroundColor: C.body, borderRadius: 10, paddingVertical: 10, alignItems: 'center' },
+  branchReturnBtnOn: { borderColor: '#2563eb', backgroundColor: '#eff6ff' },
+  branchReturnBtnText: { color: '#64748b', fontSize: 12, fontWeight: '700' },
+  branchReturnBtnTextOn: { color: '#1d4ed8' },
   branchTaskRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: C.grid, gap: 8 },
   branchTaskText: { flex: 1, color: C.ink, fontSize: 14, fontWeight: '600' },
   branchCheckY: { width: 28, height: 28, borderRadius: 14, borderWidth: 2, borderColor: '#16a34a', alignItems: 'center', justifyContent: 'center' },
@@ -736,11 +748,14 @@ export default function FlowScreen({ navigation }: Props) {
   };
 
   const addSubBranch = () => {
-    setBranchDraft(p => p ? { ...p, no: { ...p.no, sub: { question: '', yesReturns: true, yes: emptyItems(), no: emptyItems() } } } : p);
+    setBranchDraft(p => p ? { ...p, no: { ...p.no, sub: emptySubBranch() } } : p);
     setSubNoteDraft({ yes: '', no: '' });
   };
   const removeSubBranch = () => {
     setBranchDraft(p => p ? { ...p, no: { ...p.no, sub: undefined } } : p);
+  };
+  const setSubNoReturnToMain = (enabled: boolean) => {
+    setBranchDraft(p => p?.no.sub ? { ...p, no: { ...p.no, sub: { ...p.no.sub, noReturnsToMain: enabled } } } : p);
   };
   const setSubQ = (q: string) => {
     setBranchDraft(p => p?.no.sub ? { ...p, no: { ...p.no, sub: { ...p.no.sub, question: q } } } : p);
@@ -770,6 +785,9 @@ export default function FlowScreen({ navigation }: Props) {
   };
   const setNoRouteSubQ = (q: string) => {
     setNoRouteSubDraft(p => p ? { ...p, question: q } : p);
+  };
+  const setNoRouteSubReturnToMain = (enabled: boolean) => {
+    setNoRouteSubDraft(p => p ? { ...p, noReturnsToMain: enabled } : p);
   };
   const toggleNoRouteSubTask = (path: 'yes' | 'no', id: number) => {
     setNoRouteSubDraft(p => {
@@ -823,7 +841,8 @@ export default function FlowScreen({ navigation }: Props) {
     const labelHeight = compact ? 14 : 16;
     const yesHeight = labelHeight + estimateSubItemStackHeight(sub.yes, compact);
     const noHeight = labelHeight + estimateSubItemStackHeight(sub.no, compact);
-    return introHeight + (sub.yesReturns ? noHeight : Math.max(yesHeight, noHeight));
+    const mergeExtra = sub.noReturnsToMain && countSimpleItems(sub.no) > 0 ? (compact ? 30 : 34) : 0;
+    return introHeight + (sub.yesReturns ? noHeight : Math.max(yesHeight, noHeight)) + mergeExtra;
   };
 
   const getBranchLayout = (b: BranchNode, compact = false, insertMode = false) => {
@@ -865,6 +884,13 @@ export default function FlowScreen({ navigation }: Props) {
     );
   };
 
+  const renderSubMergeToMain = (compact = false) => (
+    <View style={s.subReturnMergeWrap}>
+      <View style={compact ? s.subReturnMergeStemCompact : s.subReturnMergeStemWide} />
+      <View style={compact ? s.subReturnMergeLineCompact : s.subReturnMergeLineWide} />
+    </View>
+  );
+
   const renderSubDiamond = (sub: SubBranch, parent?: BranchNode, compact = false) => (
     <View style={s.subBranchWrap}>
       <ArrowDown color={C.line} h={8} />
@@ -903,6 +929,7 @@ export default function FlowScreen({ navigation }: Props) {
           <View style={[s.subNoCol, compact ? s.subColCompact : s.subColWide]}>
             <Text style={s.subPathNoLbl}>いいえ</Text>
             {renderSubItems(sub.no, compact)}
+            {sub.noReturnsToMain && countSimpleItems(sub.no) > 0 ? renderSubMergeToMain(compact) : null}
           </View>
         </View>
       ) : (
@@ -915,6 +942,7 @@ export default function FlowScreen({ navigation }: Props) {
           <View style={[s.subNoCol, compact ? s.subColCompact : s.subColWide]}>
             <Text style={s.subPathNoLbl}>いいえ</Text>
             {renderSubItems(sub.no, compact)}
+            {sub.noReturnsToMain && countSimpleItems(sub.no) > 0 ? renderSubMergeToMain(compact) : null}
           </View>
         </View>
       )}
@@ -1476,6 +1504,15 @@ export default function FlowScreen({ navigation }: Props) {
                       <TextInput style={s.branchNoteInput} value={subNoteDraft.no} onChangeText={t => setSubNoteDraft(p => ({ ...p, no: t }))} placeholder="いいえルートの内容" placeholderTextColor="#cbd5e1" returnKeyType="done" onSubmitEditing={() => addSubNote('no')} />
                       <TouchableOpacity style={s.branchNoteAddBtn} onPress={() => addSubNote('no')}><Text style={s.branchNoteAddText}>追加</Text></TouchableOpacity>
                     </View>
+                    <Text style={[s.branchEditorLabel, { marginTop: 12 }]}>サブタスクの終着点</Text>
+                    <View style={s.branchReturnRow}>
+                      <TouchableOpacity style={[s.branchReturnBtn, !branchDraft.no.sub.noReturnsToMain && s.branchReturnBtnOn]} onPress={() => setSubNoReturnToMain(false)}>
+                        <Text style={[s.branchReturnBtnText, !branchDraft.no.sub.noReturnsToMain && s.branchReturnBtnTextOn]}>そのまま終了</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={[s.branchReturnBtn, branchDraft.no.sub.noReturnsToMain && s.branchReturnBtnOn]} onPress={() => setSubNoReturnToMain(true)}>
+                        <Text style={[s.branchReturnBtnText, branchDraft.no.sub.noReturnsToMain && s.branchReturnBtnTextOn]}>メインに合流</Text>
+                      </TouchableOpacity>
+                    </View>
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
                       <Text style={[s.branchEditorLabel, { flex: 1 }]}>タスク（いいえルート）</Text>
                       <View style={s.branchCheckLabels}><Text style={s.branchCheckLabelN}>いいえ</Text></View>
@@ -1580,6 +1617,15 @@ export default function FlowScreen({ navigation }: Props) {
                   />
                   <TouchableOpacity style={s.branchNoteAddBtn} onPress={() => addNoRouteSubNote('no')}>
                     <Text style={s.branchNoteAddText}>追加</Text>
+                  </TouchableOpacity>
+                </View>
+                <Text style={[s.branchEditorLabel, { marginTop: 12 }]}>サブタスクの終着点</Text>
+                <View style={s.branchReturnRow}>
+                  <TouchableOpacity style={[s.branchReturnBtn, !noRouteSubDraft?.noReturnsToMain && s.branchReturnBtnOn]} onPress={() => setNoRouteSubReturnToMain(false)}>
+                    <Text style={[s.branchReturnBtnText, !noRouteSubDraft?.noReturnsToMain && s.branchReturnBtnTextOn]}>そのまま終了</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[s.branchReturnBtn, !!noRouteSubDraft?.noReturnsToMain && s.branchReturnBtnOn]} onPress={() => setNoRouteSubReturnToMain(true)}>
+                    <Text style={[s.branchReturnBtnText, !!noRouteSubDraft?.noReturnsToMain && s.branchReturnBtnTextOn]}>メインに合流</Text>
                   </TouchableOpacity>
                 </View>
               </View>
