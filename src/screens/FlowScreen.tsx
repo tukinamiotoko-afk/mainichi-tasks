@@ -1613,28 +1613,30 @@ export default function FlowScreen({ navigation }: Props) {
 
               <View style={s.branchEditorSection}>
                 <Text style={[s.branchEditorLabel, { color: '#15803d' }]}>はいで左に戻る（メインフローへ）</Text>
-                {(noRouteSubDraft?.yes.taskIds.length ?? 0) > 0 && (
-                  <View style={[s.branchNoteList, { marginTop: 6 }]}>
-                    {(noRouteSubDraft?.yes.taskIds ?? []).map(id => {
-                      const t = taskById.get(id);
-                      if (!t) return null;
-                      return (
-                        <View key={`yesChip${id}`} style={[s.branchNoteChip, { borderColor: '#16a34a', backgroundColor: '#f0fdf4' }]}>
-                          <Text style={[s.branchNoteChipText, { color: '#15803d' }]} numberOfLines={1}>{t.icon ? `${t.icon} ` : ''}{t.title}</Text>
-                        </View>
-                      );
-                    })}
-                  </View>
-                )}
                 <TouchableOpacity
-                  style={[s.branchReturnBtn, { marginTop: 8, flex: 0 }]}
+                  style={[s.branchReturnBtn, { marginTop: 8, flex: 0, alignItems: 'stretch', paddingHorizontal: 12 }]}
                   onPress={() => {
                     LayoutAnimation.configureNext(LayoutAnimation.create(280, LayoutAnimation.Types.easeInEaseOut, LayoutAnimation.Properties.opacity));
                     setYesTasksExpanded(v => !v);
                   }}
                   activeOpacity={0.75}
                 >
-                  <Text style={s.branchReturnBtnText}>{yesTasksExpanded ? 'タスクを閉じる ▲' : 'タスクを選択 ▼'}</Text>
+                  {(noRouteSubDraft?.yes.taskIds.length ?? 0) > 0 ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
+                      {(noRouteSubDraft?.yes.taskIds ?? []).map(id => {
+                        const t = taskById.get(id);
+                        if (!t) return null;
+                        return (
+                          <View key={`yesChip${id}`} style={{ backgroundColor: '#dcfce7', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 }}>
+                            <Text style={{ color: '#15803d', fontSize: 12, fontWeight: '600' }} numberOfLines={1}>{t.icon ? `${t.icon} ` : ''}{t.title}</Text>
+                          </View>
+                        );
+                      })}
+                      <Text style={[s.branchReturnBtnText, { marginLeft: 4 }]}>{yesTasksExpanded ? '▲' : '▼'}</Text>
+                    </View>
+                  ) : (
+                    <Text style={[s.branchReturnBtnText, { textAlign: 'center' }]}>{yesTasksExpanded ? 'タスクを閉じる ▲' : 'タスクを選択 ▼'}</Text>
+                  )}
                 </TouchableOpacity>
                 {yesTasksExpanded && (
                   <View style={{ marginTop: 8 }}>
