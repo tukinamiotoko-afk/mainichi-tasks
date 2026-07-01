@@ -1614,7 +1614,7 @@ export default function FlowScreen({ navigation }: Props) {
               <View style={s.branchEditorSection}>
                 <Text style={[s.branchEditorLabel, { color: '#15803d' }]}>はいで左に戻る（メインフローへ）</Text>
                 <TouchableOpacity
-                  style={[s.branchReturnBtn, { marginTop: 8, flex: 0, alignItems: 'stretch', paddingHorizontal: 12 }]}
+                  style={[s.branchNoteInput, { marginTop: 8, flex: 0 }]}
                   onPress={() => {
                     LayoutAnimation.configureNext(LayoutAnimation.create(280, LayoutAnimation.Types.easeInEaseOut, LayoutAnimation.Properties.opacity));
                     setYesTasksExpanded(v => !v);
