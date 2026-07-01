@@ -102,7 +102,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   flowViewport: { flex: 1, overflow: 'hidden' },
 
   // ── view mode (compact) ──
-  viewContent: { alignItems: 'center', paddingTop: 20, paddingBottom: 24, paddingHorizontal: 40 },
+  viewContent: { alignItems: 'center', paddingTop: 20, paddingBottom: 24, paddingHorizontal: 40, overflow: 'visible' },
   viewContentZoomed: { paddingHorizontal: 14 },
   flowZoomWrap: { width: '100%', alignItems: 'center' },
   viewTerminator: { backgroundColor: C.termBg, borderWidth: 1.5, borderColor: C.termBorder, borderRadius: 18, paddingHorizontal: 22, paddingVertical: 7 },
@@ -276,28 +276,28 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   subDelBtn: { minWidth: 28, height: 22, paddingHorizontal: 7, borderRadius: 11, backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fca5a5', alignItems: 'center', justifyContent: 'center' },
   subDelBtnText: { color: '#dc2626', fontSize: 12, fontWeight: '700', lineHeight: 14 },
   subPaths: { flexDirection: 'row', marginTop: 4, position: 'relative', overflow: 'visible' },
-  subPathsWide: { width: 337 },
-  subPathsCompact: { width: 301 },
+  subPathsWide: { width: 361 },
+  subPathsCompact: { width: 325 },
   subPathsNoReturn: { alignSelf: 'center', justifyContent: 'flex-end', overflow: 'visible' },
-  subPathsNoReturnWide: { width: 168 },
-  subPathsNoReturnCompact: { width: 150 },
+  subPathsNoReturnWide: { width: 180 },
+  subPathsNoReturnCompact: { width: 162 },
   subYesCol: { alignItems: 'center', paddingHorizontal: 0, overflow: 'visible' },
   subNoCol: { alignItems: 'center', paddingHorizontal: 0, overflow: 'visible' },
-  subColWide: { width: 168, overflow: 'visible' },
-  subColCompact: { width: 150, overflow: 'visible' },
+  subColWide: { width: 180, overflow: 'visible' },
+  subColCompact: { width: 162, overflow: 'visible' },
   subPathDiv: { width: 1, backgroundColor: C.line, alignSelf: 'stretch', marginVertical: 2 },
   subPathYesLbl: { color: C.line, fontSize: 9, fontWeight: '900', marginBottom: 3 },
   subPathNoLbl: { color: C.line, fontSize: 9, fontWeight: '900', marginBottom: 3 },
-  subItemBox: { width: 168, minHeight: 44, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8, borderWidth: 1.5, borderColor: '#22c55e', backgroundColor: '#f0fdf4', marginBottom: 6, alignItems: 'center', justifyContent: 'center' },
-  subItemBoxCompact: { width: 150, minHeight: 38, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 7, marginBottom: 5 },
+  subItemBox: { width: 180, minHeight: 48, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8, borderWidth: 1.5, borderColor: '#22c55e', backgroundColor: '#f0fdf4', marginBottom: 6, alignItems: 'center', justifyContent: 'center' },
+  subItemBoxCompact: { width: 162, minHeight: 42, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 7, marginBottom: 5 },
   subItemText: { color: '#166534', fontSize: 12, fontWeight: '700', textAlign: 'center', lineHeight: 16 },
   subItemTextCompact: { fontSize: 11, lineHeight: 15 },
   subItemEmpty: { color: C.muted, fontSize: 9, fontStyle: 'italic', textAlign: 'center' },
-  subReturnMergeWrap: { width: '100%', alignItems: 'center', marginTop: 2, position: 'relative' },
-  subReturnMergeStemWide: { width: 2, height: 18, backgroundColor: C.line },
-  subReturnMergeStemCompact: { width: 2, height: 16, backgroundColor: C.line },
-  subReturnMergeLineWide: { position: 'absolute', top: 18, left: -188, width: 188, height: 2, backgroundColor: C.line },
-  subReturnMergeLineCompact: { position: 'absolute', top: 16, left: -171, width: 171, height: 2, backgroundColor: C.line },
+  subReturnMergeWrap: { width: '100%', alignItems: 'center', marginTop: 2, position: 'relative', overflow: 'visible' },
+  subReturnMergeStemWide: { width: 2, height: 55, backgroundColor: C.line },
+  subReturnMergeStemCompact: { width: 2, height: 50, backgroundColor: C.line },
+  subReturnMergeLineWide: { position: 'absolute', top: 55, left: -134, width: 224, height: 2, backgroundColor: C.line },
+  subReturnMergeLineCompact: { position: 'absolute', top: 50, left: -128, width: 209, height: 2, backgroundColor: C.line },
   subAddBtn: { marginTop: 10, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, borderWidth: 1.5, borderStyle: 'dashed', borderColor: '#fb923c', alignItems: 'center', backgroundColor: '#fff7ed' },
   subAddBtnText: { color: '#c2410c', fontSize: 11, fontWeight: '700' },
   subRemoveBtn: { marginTop: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fca5a5', alignItems: 'center', alignSelf: 'flex-end' },
@@ -870,7 +870,7 @@ export default function FlowScreen({ navigation }: Props) {
     const labelHeight = compact ? 14 : 16;
     const yesHeight = labelHeight + estimateSubItemStackHeight(sub.yes, compact);
     const noHeight = labelHeight + estimateSubItemStackHeight(sub.no, compact);
-    const mergeExtra = sub.noReturnsToMain && countSimpleItems(sub.no) > 0 ? (compact ? 30 : 34) : 0;
+    const mergeExtra = 0;
     return introHeight + (sub.yesReturns ? noHeight : Math.max(yesHeight, noHeight)) + mergeExtra;
   };
 
@@ -1050,7 +1050,7 @@ export default function FlowScreen({ navigation }: Props) {
             style={[
               s.viewBranchNoRail,
               { height: layout.routeHeight },
-              b.no.sub?.yesReturns ? s.viewBranchNoRailReturnless : null,
+              (b.no.sub?.yesReturns || b.no.sub?.noReturnsToMain) ? s.viewBranchNoRailReturnless : null,
             ]}
             pointerEvents="none"
           />
@@ -1104,7 +1104,7 @@ export default function FlowScreen({ navigation }: Props) {
             style={[
               s.branchNoRail,
               { height: layout.routeHeight },
-              b.no.sub?.yesReturns ? s.branchNoRailReturnless : null,
+              (b.no.sub?.yesReturns || b.no.sub?.noReturnsToMain) ? s.branchNoRailReturnless : null,
             ]}
             pointerEvents="none"
           />
@@ -1171,9 +1171,9 @@ export default function FlowScreen({ navigation }: Props) {
           <React.Fragment key={idx}>
             <View style={s.viewSlotWrap}>
               {isMergeTarget ? (
-                <View style={{ alignItems: 'center', marginVertical: 2, position: 'relative' }} pointerEvents="none">
-                  <View style={{ width: 2, height: 30, backgroundColor: C.line }} />
-                  <View style={{ position: 'absolute', top: 15, left: '50%' as any, width: 160, height: 2, backgroundColor: C.line }} />
+                <View style={{ alignItems: 'center', marginVertical: 2, position: 'relative', overflow: 'visible' }} pointerEvents="none">
+                  <View style={{ position: 'absolute', top: 0, left: '50%' as any, width: 220, height: 2, backgroundColor: C.line }} />
+                  <View style={{ width: 2, height: 72, backgroundColor: C.line }} />
                   <View style={{ width: 0, height: 0, borderLeftWidth: 5, borderRightWidth: 5, borderTopWidth: 8, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: C.line }} />
                 </View>
               ) : (
