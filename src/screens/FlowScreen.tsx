@@ -934,15 +934,15 @@ export default function FlowScreen({ navigation }: Props) {
         </View>
       ) : (
         <View style={[s.subPaths, compact ? s.subPathsCompact : s.subPathsWide]}>
-          <View style={[s.subYesCol, compact ? s.subColCompact : s.subColWide]}>
-            <Text style={s.subPathYesLbl}>はい</Text>
-            {renderSubItems(sub.yes, compact)}
-          </View>
-          <View style={s.subPathDiv} />
           <View style={[s.subNoCol, compact ? s.subColCompact : s.subColWide]}>
             <Text style={s.subPathNoLbl}>いいえ</Text>
             {renderSubItems(sub.no, compact)}
             {sub.noReturnsToMain && countSimpleItems(sub.no) > 0 ? renderSubMergeToMain(compact) : null}
+          </View>
+          <View style={s.subPathDiv} />
+          <View style={[s.subYesCol, compact ? s.subColCompact : s.subColWide]}>
+            <Text style={s.subPathYesLbl}>はい</Text>
+            {renderSubItems(sub.yes, compact)}
           </View>
         </View>
       )}
