@@ -206,8 +206,8 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   branchEditBtnText: { color: '#92400e', fontSize: 11, fontWeight: '700' },
   branchDelBtn: { minWidth: 28, height: 24, paddingHorizontal: 8, borderRadius: 12, backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fca5a5', alignItems: 'center', justifyContent: 'center' },
   branchDelBtnText: { color: '#dc2626', fontSize: 13, fontWeight: '700', lineHeight: 16 },
-  branchYesWrap: { width: 58, height: 140, alignItems: 'center', justifyContent: 'flex-start', position: 'relative' },
-  branchYesLine: { width: 2, height: 140, backgroundColor: C.line, marginTop: 0 },
+  branchYesWrap: { width: 58, height: 160, alignItems: 'center', justifyContent: 'flex-start', position: 'relative' },
+  branchYesLine: { width: 2, height: 160, backgroundColor: C.line, marginTop: 0 },
   branchYesLabel: { position: 'absolute', right: 34, top: 12, color: C.line, fontSize: 11, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 4 },
   branchYesItems: { width: 152, alignItems: 'center', gap: 5, display: 'none' },
   branchNoRoute: { position: 'absolute', top: 40, left: '50%', marginLeft: 44, width: 234, height: 150, zIndex: 1 },
@@ -236,8 +236,8 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   viewBranchDiamondSeamCover: { position: 'absolute', top: 29, left: 8, right: 8, height: 3, backgroundColor: '#fffbeb', zIndex: 1 },
   viewBranchDiamondInner: { width: 148, alignItems: 'center', justifyContent: 'center', zIndex: 2 },
   viewBranchQ: { color: '#78350f', fontSize: 11, fontWeight: '800', textAlign: 'center' },
-  viewBranchYesWrap: { width: 50, height: 120, alignItems: 'center', justifyContent: 'flex-start', position: 'relative' },
-  viewBranchYesLine: { width: 1.5, height: 120, backgroundColor: C.line, marginTop: 0 },
+  viewBranchYesWrap: { width: 50, height: 150, alignItems: 'center', justifyContent: 'flex-start', position: 'relative' },
+  viewBranchYesLine: { width: 1.5, height: 150, backgroundColor: C.line, marginTop: 0 },
   viewBranchLabel: { position: 'absolute', right: 30, top: 10, color: C.line, fontSize: 10, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 4 },
   viewBranchYesItems: { width: 128, alignItems: 'center', gap: 4, display: 'none' },
   viewBranchNoRoute: { position: 'absolute', top: 30, left: '50%', marginLeft: 40, width: 220, height: 122, zIndex: 1 },
@@ -253,8 +253,8 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
 
   // ── sub-branch (nested in no-path) ──
   subBranchWrap: { marginTop: 8, width: '100%', alignItems: 'center' },
-  subDiamondShell: { width: 176, height: 60, alignItems: 'center', justifyContent: 'flex-start', position: 'relative' },
-  subDiamond: { width: 130, height: 40, alignItems: 'center', justifyContent: 'center', position: 'relative' },
+  subDiamondShell: { width: 176, height: 60, alignItems: 'center', justifyContent: 'flex-start', position: 'relative', overflow: 'visible' },
+  subDiamond: { width: 130, height: 40, alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'visible' },
   subDiamondTop: { position: 'absolute', top: 1, width: 0, height: 0, borderLeftWidth: 64, borderRightWidth: 64, borderBottomWidth: 19, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderBottomColor: '#fffbeb' },
   subDiamondBottom: { position: 'absolute', bottom: 1, width: 0, height: 0, borderLeftWidth: 64, borderRightWidth: 64, borderTopWidth: 19, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: '#fffbeb' },
   subDiamondEdgeTL: { position: 'absolute', left: -2, top: 9, width: 68, height: 2, backgroundColor: C.line, transform: [{ rotate: '-16.7deg' }], zIndex: 2 },
@@ -264,12 +264,15 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   subDiamondSC: { position: 'absolute', top: 19, left: 6, right: 6, height: 3, backgroundColor: '#fffbeb', zIndex: 1 },
   subDiamondInner: { width: 96, alignItems: 'center', justifyContent: 'center', zIndex: 2 },
   subDiamondQ: { color: '#78350f', fontSize: 9, fontWeight: '800', textAlign: 'center' },
-  subYesReturnLine: { position: 'absolute', top: 20, height: 2, backgroundColor: C.line, zIndex: 1 },
-  subYesReturnLineWide: { left: -159, width: 159 },
-  subYesReturnLineCompact: { left: -145, width: 145 },
-  subYesReturnLabel: { position: 'absolute', top: 4, color: C.line, fontSize: 9, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 5, zIndex: 3 },
-  subYesReturnLabelWide: { left: -79 },
-  subYesReturnLabelCompact: { left: -72 },
+  subYesDownStem: { position: 'absolute', left: 0, width: 2, backgroundColor: C.line, zIndex: 2 },
+  subYesDownStemWide: { top: 20, height: 64 },
+  subYesDownStemCompact: { top: 20, height: 54 },
+  subYesReturnLine: { position: 'absolute', height: 2, backgroundColor: C.line, zIndex: 2 },
+  subYesReturnLineWide: { top: 84, left: -157, width: 159 },
+  subYesReturnLineCompact: { top: 74, left: -143, width: 145 },
+  subYesReturnLabel: { position: 'absolute', color: C.line, fontSize: 9, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 5, zIndex: 3 },
+  subYesReturnLabelWide: { top: 6, left: 4 },
+  subYesReturnLabelCompact: { top: 6, left: 4 },
   subDiamondBtns: { position: 'absolute', bottom: 0, flexDirection: 'row', alignItems: 'center', gap: 6 },
   subEditBtn: { minWidth: 42, height: 22, paddingHorizontal: 9, borderRadius: 11, backgroundColor: '#fef3c7', borderWidth: 1, borderColor: '#d97706', alignItems: 'center', justifyContent: 'center' },
   subEditBtnText: { color: '#92400e', fontSize: 10, fontWeight: '700' },
@@ -434,6 +437,19 @@ export default function FlowScreen({ navigation }: Props) {
 
   const taskById = useMemo(() => new Map(dueTasks.map(t => [t.id, t])), [dueTasks]);
   const tray = useMemo(() => addedIds.filter(id => !slots.includes(id)), [addedIds, slots]);
+  const yesReturnTargets = useMemo(() => {
+    const set = new Set<number>();
+    branches.forEach(b => {
+      if (b.no.sub?.yesReturns) {
+        b.no.sub.yes.taskIds.forEach(taskId => {
+          const idx = slots.indexOf(taskId);
+          if (idx !== -1) set.add(idx);
+        });
+      }
+    });
+    return set;
+  }, [branches, slots]);
+
   const yesEligibleTasks = useMemo(() => {
     if (!noRouteBranchParent) return dueTasks;
     const allowedIds = new Set(
@@ -874,7 +890,7 @@ export default function FlowScreen({ navigation }: Props) {
     const slotExtra = slotCount * 44;
     const routeHeight = Math.max(baseRouteHeight, 30 + itemCount * itemHeight + (itemCount - 1) * itemGap + subExtra + slotExtra);
     const flowHeight = routeTop + routeHeight + (compact ? 32 : 30);
-    const yesHeight = compact ? Math.max(120, routeHeight) : Math.max(140, routeHeight);
+    const yesHeight = compact ? Math.max(150, routeHeight) : Math.max(160, routeHeight);
     return { routeHeight, flowHeight, yesHeight };
   };
 
@@ -914,6 +930,7 @@ export default function FlowScreen({ navigation }: Props) {
         <View style={s.subDiamond}>
           {sub.yesReturns ? (
             <>
+              <View style={[s.subYesDownStem, compact ? s.subYesDownStemCompact : s.subYesDownStemWide]} />
               <View style={[s.subYesReturnLine, compact ? s.subYesReturnLineCompact : s.subYesReturnLineWide]} />
               <Text style={[s.subYesReturnLabel, compact ? s.subYesReturnLabelCompact : s.subYesReturnLabelWide]}>はい</Text>
             </>
@@ -1113,13 +1130,13 @@ export default function FlowScreen({ navigation }: Props) {
       <View style={s.gapWrap}>
         {here.map(b => (
           <React.Fragment key={`g${b.id}`}>
-            <ArrowDown color={C.line} h={12} />
+            <ArrowDown color={C.line} h={22} />
             {renderBranchEditNode(b)}
           </React.Fragment>
         ))}
         {insertBranchMode && (
           <>
-            <ArrowDown color="#fb923c" h={12} />
+            <ArrowDown color="#fb923c" h={22} />
             <TouchableOpacity style={s.insertSlot} onPress={() => openBranchEditor(afterIdx)}>
               <Text style={s.insertSlotText}>＋ 分岐をここに追加</Text>
             </TouchableOpacity>
@@ -1136,7 +1153,7 @@ export default function FlowScreen({ navigation }: Props) {
       <View style={s.gapWrap}>
         {here.map(b => (
           <React.Fragment key={`gv${b.id}`}>
-            <ArrowDown color={C.line} h={12} />
+            <ArrowDown color={C.line} h={22} />
             {renderBranchViewNode(b)}
           </React.Fragment>
         ))}
@@ -1153,10 +1170,19 @@ export default function FlowScreen({ navigation }: Props) {
       {renderViewGap(-1)}
       {slots.map((taskId, idx) => {
         const task = taskId !== null ? taskById.get(taskId) : undefined;
+        const isMergeTarget = yesReturnTargets.has(idx);
         return (
           <React.Fragment key={idx}>
             <View style={s.viewSlotWrap}>
-              <ArrowDown color={C.line} h={14} />
+              {isMergeTarget ? (
+                <View style={{ alignItems: 'center', marginVertical: 2, position: 'relative' }} pointerEvents="none">
+                  <View style={{ width: 2, height: 30, backgroundColor: C.line }} />
+                  <View style={{ position: 'absolute', top: 15, left: 1, width: 155, height: 2, backgroundColor: C.line }} />
+                  <View style={{ width: 0, height: 0, borderLeftWidth: 5, borderRightWidth: 5, borderTopWidth: 8, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: C.line }} />
+                </View>
+              ) : (
+                <ArrowDown color={C.line} h={30} />
+              )}
               {task ? (
                 <View style={s.viewSlot}>
                   <View style={s.viewSlotNum}>
@@ -1179,7 +1205,7 @@ export default function FlowScreen({ navigation }: Props) {
           </React.Fragment>
         );
       })}
-      <ArrowDown color={C.line} h={14} />
+      <ArrowDown color={C.line} h={30} />
       <View style={s.viewTerminator}>
         <Text style={s.viewTerminatorText}>終了</Text>
       </View>
@@ -1213,7 +1239,7 @@ export default function FlowScreen({ navigation }: Props) {
               ]}
               onLayout={(e) => { slotHRef.current = e.nativeEvent.layout.height; }}
             >
-              <ArrowDown color={C.line} />
+              <ArrowDown color={C.line} h={30} />
               {task ? (
                 <View style={[
                   s.slotBase,
