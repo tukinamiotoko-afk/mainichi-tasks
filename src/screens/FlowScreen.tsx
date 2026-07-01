@@ -1593,15 +1593,6 @@ export default function FlowScreen({ navigation }: Props) {
                     <Text style={s.branchNoteAddText}>追加</Text>
                   </TouchableOpacity>
                 </View>
-                <Text style={[s.branchEditorLabel, { marginTop: 12 }]}>サブタスクの終着点</Text>
-                <View style={s.branchReturnRow}>
-                  <TouchableOpacity style={[s.branchReturnBtn, !noRouteSubDraft?.noReturnsToMain && s.branchReturnBtnOn]} onPress={() => setNoRouteSubReturnToMain(false)}>
-                    <Text style={[s.branchReturnBtnText, !noRouteSubDraft?.noReturnsToMain && s.branchReturnBtnTextOn]}>そのまま終了</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={[s.branchReturnBtn, !!noRouteSubDraft?.noReturnsToMain && s.branchReturnBtnOn]} onPress={() => setNoRouteSubReturnToMain(true)}>
-                    <Text style={[s.branchReturnBtnText, !!noRouteSubDraft?.noReturnsToMain && s.branchReturnBtnTextOn]}>メインに合流</Text>
-                  </TouchableOpacity>
-                </View>
               </View>
 
               <View style={s.branchEditorSection}>
@@ -1626,6 +1617,18 @@ export default function FlowScreen({ navigation }: Props) {
                   />
                   <TouchableOpacity style={s.branchNoteAddBtn} onPress={() => addNoRouteSubNote('yes')}>
                     <Text style={s.branchNoteAddText}>追加</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <View style={s.branchEditorSection}>
+                <Text style={[s.branchEditorLabel, { marginTop: 12 }]}>サブタスクの終着点</Text>
+                <View style={s.branchReturnRow}>
+                  <TouchableOpacity style={[s.branchReturnBtn, !noRouteSubDraft?.noReturnsToMain && s.branchReturnBtnOn]} onPress={() => setNoRouteSubReturnToMain(false)}>
+                    <Text style={[s.branchReturnBtnText, !noRouteSubDraft?.noReturnsToMain && s.branchReturnBtnTextOn]}>そのまま終了</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[s.branchReturnBtn, !!noRouteSubDraft?.noReturnsToMain && s.branchReturnBtnOn]} onPress={() => setNoRouteSubReturnToMain(true)}>
+                    <Text style={[s.branchReturnBtnText, !!noRouteSubDraft?.noReturnsToMain && s.branchReturnBtnTextOn]}>メインに合流</Text>
                   </TouchableOpacity>
                 </View>
               </View>
