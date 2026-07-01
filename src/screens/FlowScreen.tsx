@@ -1622,17 +1622,17 @@ export default function FlowScreen({ navigation }: Props) {
                   activeOpacity={0.75}
                 >
                   {(noRouteSubDraft?.yes.taskIds.length ?? 0) > 0 ? (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
-                      {(noRouteSubDraft?.yes.taskIds ?? []).map(id => {
-                        const t = taskById.get(id);
-                        if (!t) return null;
-                        return (
-                          <View key={`yesChip${id}`} style={{ backgroundColor: '#dcfce7', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 }}>
-                            <Text style={{ color: '#15803d', fontSize: 12, fontWeight: '600' }} numberOfLines={1}>{t.icon ? `${t.icon} ` : ''}{t.title}</Text>
-                          </View>
-                        );
-                      })}
-                      <Text style={[s.branchReturnBtnText, { marginLeft: 4 }]}>{yesTasksExpanded ? '▲' : '▼'}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <View style={{ flex: 1 }}>
+                        {(noRouteSubDraft?.yes.taskIds ?? []).map(id => {
+                          const t = taskById.get(id);
+                          if (!t) return null;
+                          return (
+                            <Text key={`yesChip${id}`} style={{ color: '#374151', fontSize: 12 }} numberOfLines={1}>{t.icon ? `${t.icon} ` : ''}{t.title}</Text>
+                          );
+                        })}
+                      </View>
+                      <Text style={[s.branchReturnBtnText, { marginLeft: 8 }]}>{yesTasksExpanded ? '▲' : '▼'}</Text>
                     </View>
                   ) : (
                     <Text style={[s.branchReturnBtnText, { textAlign: 'center' }]}>{yesTasksExpanded ? 'タスクを閉じる ▲' : 'タスクを選択 ▼'}</Text>
