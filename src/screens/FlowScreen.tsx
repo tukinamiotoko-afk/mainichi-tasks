@@ -1612,10 +1612,7 @@ export default function FlowScreen({ navigation }: Props) {
                 <Text style={[s.branchEditorLabel, { color: '#15803d' }]}>はいで左に戻る（メインフローへ）</Text>
                 <TouchableOpacity
                   style={[s.branchNoteInput, { marginTop: 8, flex: 0 }]}
-                  onPress={() => {
-                    LayoutAnimation.configureNext(LayoutAnimation.create(280, LayoutAnimation.Types.easeInEaseOut, LayoutAnimation.Properties.opacity));
-                    setYesTasksExpanded(v => !v);
-                  }}
+                  onPress={() => setYesTasksExpanded(true)}
                   activeOpacity={0.75}
                 >
                   {(noRouteSubDraft?.yes.taskIds.length ?? 0) > 0 ? (
@@ -1629,32 +1626,12 @@ export default function FlowScreen({ navigation }: Props) {
                           );
                         })}
                       </View>
-                      <Text style={[s.branchReturnBtnText, { marginLeft: 8 }]}>{yesTasksExpanded ? '▲' : '▼'}</Text>
+                      <Text style={[s.branchReturnBtnText, { marginLeft: 8 }]}>▼</Text>
                     </View>
                   ) : (
-                    <Text style={[s.branchReturnBtnText, { textAlign: 'center' }]}>{yesTasksExpanded ? 'タスクを閉じる ▲' : 'タスクを選択 ▼'}</Text>
+                    <Text style={[s.branchReturnBtnText, { textAlign: 'center' }]}>タスクを選択 ▼</Text>
                   )}
                 </TouchableOpacity>
-                {yesTasksExpanded && (
-                  <View style={{ marginTop: 8 }}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 4 }}>
-                      <Text style={s.branchCheckLabelY}>はい</Text>
-                    </View>
-                    {yesEligibleTasks.length === 0 ? (
-                      <Text style={{ color: '#94a3b8', fontSize: 12, textAlign: 'center', paddingVertical: 8 }}>選択できるタスクがありません</Text>
-                    ) : yesEligibleTasks.map(t => {
-                      const inYes = noRouteSubDraft?.yes.taskIds.includes(t.id) ?? false;
-                      return (
-                        <View key={`nrsyt${t.id}`} style={s.branchTaskRow}>
-                          <Text style={s.branchTaskText} numberOfLines={2}>{t.icon ? `${t.icon} ` : ''}{t.title}</Text>
-                          <TouchableOpacity style={[s.branchCheckY, inYes && s.branchCheckYOn]} onPress={() => toggleNoRouteSubTask('yes', t.id)}>
-                            {inYes && <Text style={s.branchCheckText}>✓</Text>}
-                          </TouchableOpacity>
-                        </View>
-                      );
-                    })}
-                  </View>
-                )}
               </View>
 
               <View style={s.branchEditorSection}>
@@ -1669,6 +1646,35 @@ export default function FlowScreen({ navigation }: Props) {
                 </View>
               </View>
 
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Yes-task picker bottom sheet */}
+      <Modal visible={yesTasksExpanded} transparent animationType="slide" onRequestClose={() => setYesTasksExpanded(false)}>
+        <TouchableOpacity style={s.pickerOverlay} activeOpacity={1} onPress={() => setYesTasksExpanded(false)}>
+          <View style={{ backgroundColor: C.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '72%' }} onStartShouldSetResponder={() => true}>
+            <View style={s.pickerHeader}>
+              <Text style={[s.pickerTitle, { color: '#15803d' }]}>はいで左に戻る（タスクを選択）</Text>
+              <TouchableOpacity onPress={() => setYesTasksExpanded(false)}>
+                <Text style={s.pickerDone}>完了</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}>
+              {yesEligibleTasks.length === 0 ? (
+                <Text style={{ color: '#94a3b8', fontSize: 13, textAlign: 'center', paddingVertical: 24 }}>選択できるタスクがありません</Text>
+              ) : yesEligibleTasks.map(t => {
+                const inYes = noRouteSubDraft?.yes.taskIds.includes(t.id) ?? false;
+                return (
+                  <View key={`nrsyt${t.id}`} style={s.branchTaskRow}>
+                    <Text style={s.branchTaskText} numberOfLines={2}>{t.icon ? `${t.icon} ` : ''}{t.title}</Text>
+                    <TouchableOpacity style={[s.branchCheckY, inYes && s.branchCheckYOn]} onPress={() => toggleNoRouteSubTask('yes', t.id)}>
+                      {inYes && <Text style={s.branchCheckText}>✓</Text>}
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
             </ScrollView>
           </View>
         </TouchableOpacity>
