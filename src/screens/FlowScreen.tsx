@@ -1601,16 +1601,16 @@ export default function FlowScreen({ navigation }: Props) {
               </View>
 
               <View style={s.branchEditorSection}>
+                <Text style={[s.branchEditorLabel, { color: '#15803d' }]}>はいで左に戻る（メインフローへ）</Text>
                 <TouchableOpacity
-                  style={s.yesExpandBtn}
+                  style={[s.branchReturnBtn, { marginTop: 8, flex: 0 }]}
                   onPress={() => {
                     LayoutAnimation.configureNext(LayoutAnimation.create(280, LayoutAnimation.Types.easeInEaseOut, LayoutAnimation.Properties.opacity));
                     setYesTasksExpanded(v => !v);
                   }}
                   activeOpacity={0.75}
                 >
-                  <Text style={s.yesExpandBtnText}>はいで左に戻る（メインフローへ）</Text>
-                  <Text style={s.yesExpandBtnArrow}>{yesTasksExpanded ? '▲' : '▼'}</Text>
+                  <Text style={s.branchReturnBtnText}>{yesTasksExpanded ? 'タスクを閉じる ▲' : 'タスクを選択 ▼'}</Text>
                 </TouchableOpacity>
                 {yesTasksExpanded && (
                   <View style={{ marginTop: 8 }}>
@@ -1643,24 +1643,6 @@ export default function FlowScreen({ navigation }: Props) {
                   </TouchableOpacity>
                 </View>
               </View>
-
-              <View style={[s.branchEditorSection, { paddingBottom: 0 }]}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <Text style={[s.branchEditorLabel, { flex: 1 }]}>タスク（いいえルート）</Text>
-                  <View style={s.branchCheckLabels}><Text style={s.branchCheckLabelN}>いいえ</Text></View>
-                </View>
-              </View>
-              {dueTasks.map(t => {
-                const inNoRouteSub = noRouteSubDraft?.no.taskIds.includes(t.id) ?? false;
-                return (
-                  <View key={`nrt${t.id}`} style={s.branchTaskRow}>
-                    <Text style={s.branchTaskText} numberOfLines={2}>{t.icon ? `${t.icon} ` : ''}{t.title}</Text>
-                    <TouchableOpacity style={[s.branchCheckN, inNoRouteSub && s.branchCheckNOn]} onPress={() => toggleNoRouteSubTask('no', t.id)}>
-                      {inNoRouteSub && <Text style={s.branchCheckText}>✓</Text>}
-                    </TouchableOpacity>
-                  </View>
-                );
-              })}
 
               <TouchableOpacity style={s.branchSaveBtn} onPress={saveNoRouteBranchDraft}>
                 <Text style={s.branchSaveBtnText}>保存</Text>
