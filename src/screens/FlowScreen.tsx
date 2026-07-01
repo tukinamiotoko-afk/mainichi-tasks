@@ -2,7 +2,7 @@ import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, StatusBar, Modal,
   Animated, PanResponder, Platform, TextInput, Alert, GestureResponderEvent,
-  useWindowDimensions,
+  useWindowDimensions, LayoutAnimation,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -316,6 +316,9 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   branchNoteChip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: '#fb923c', backgroundColor: '#fff7ed' },
   branchNoteChipText: { color: '#9a3412', fontSize: 12, fontWeight: '700', maxWidth: 180 },
   branchNoteChipX: { color: '#dc2626', fontSize: 13, fontWeight: '900' },
+  yesExpandBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10, borderWidth: 1.5, borderColor: '#16a34a', backgroundColor: '#f0fdf4' },
+  yesExpandBtnText: { color: '#15803d', fontSize: 13, fontWeight: '700', flex: 1 },
+  yesExpandBtnArrow: { color: '#15803d', fontSize: 12, fontWeight: '700', marginLeft: 8 },
   branchReturnRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
   branchReturnBtn: { flex: 1, borderWidth: 1.5, borderColor: '#cbd5e1', backgroundColor: C.body, borderRadius: 10, paddingVertical: 10, alignItems: 'center' },
   branchReturnBtnOn: { borderColor: '#2563eb', backgroundColor: '#eff6ff' },
@@ -359,6 +362,7 @@ export default function FlowScreen({ navigation }: Props) {
   const [branchNoteDraft, setBranchNoteDraft] = useState({ yes: '', no: '' });
   const [subNoteDraft, setSubNoteDraft] = useState({ yes: '', no: '' });
   const [noRouteBranchEditorOpen, setNoRouteBranchEditorOpen] = useState(false);
+  const [yesTasksExpanded, setYesTasksExpanded] = useState(false);
   const [noRouteBranchParent, setNoRouteBranchParent] = useState<BranchNode | null>(null);
   const [noRouteSubDraft, setNoRouteSubDraft] = useState<SubBranch | null>(null);
   const [noRouteSubNoteDraft, setNoRouteSubNoteDraft] = useState({ yes: '', no: '' });
@@ -652,6 +656,7 @@ export default function FlowScreen({ navigation }: Props) {
     setNoRouteBranchParent(b);
     setNoRouteSubDraft(b.no.sub ? { ...b.no.sub, yes: { ...b.no.sub.yes }, no: { ...b.no.sub.no } } : emptySubBranch());
     setNoRouteSubNoteDraft({ yes: '', no: '' });
+    setYesTasksExpanded(false);
     setNoRouteBranchEditorOpen(true);
   };
   const closeNoRouteBranchEditor = () => {
@@ -1595,23 +1600,37 @@ export default function FlowScreen({ navigation }: Props) {
                 </View>
               </View>
 
-              <View style={[s.branchEditorSection, { paddingBottom: 0 }]}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <Text style={[s.branchEditorLabel, { flex: 1, color: '#15803d' }]}>はいで左に戻る（メインフローへ）</Text>
-                  <View style={s.branchCheckLabels}><Text style={s.branchCheckLabelY}>はい</Text></View>
-                </View>
-              </View>
-              {dueTasks.map(t => {
-                const inYes = noRouteSubDraft?.yes.taskIds.includes(t.id) ?? false;
-                return (
-                  <View key={`nrsyt${t.id}`} style={s.branchTaskRow}>
-                    <Text style={s.branchTaskText} numberOfLines={2}>{t.icon ? `${t.icon} ` : ''}{t.title}</Text>
-                    <TouchableOpacity style={[s.branchCheckY, inYes && s.branchCheckYOn]} onPress={() => toggleNoRouteSubTask('yes', t.id)}>
-                      {inYes && <Text style={s.branchCheckText}>✓</Text>}
-                    </TouchableOpacity>
+              <View style={s.branchEditorSection}>
+                <TouchableOpacity
+                  style={s.yesExpandBtn}
+                  onPress={() => {
+                    LayoutAnimation.configureNext(LayoutAnimation.create(280, LayoutAnimation.Types.easeInEaseOut, LayoutAnimation.Properties.opacity));
+                    setYesTasksExpanded(v => !v);
+                  }}
+                  activeOpacity={0.75}
+                >
+                  <Text style={s.yesExpandBtnText}>はいで左に戻る（メインフローへ）</Text>
+                  <Text style={s.yesExpandBtnArrow}>{yesTasksExpanded ? '▲' : '▼'}</Text>
+                </TouchableOpacity>
+                {yesTasksExpanded && (
+                  <View style={{ marginTop: 8 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 4 }}>
+                      <Text style={s.branchCheckLabelY}>はい</Text>
+                    </View>
+                    {dueTasks.map(t => {
+                      const inYes = noRouteSubDraft?.yes.taskIds.includes(t.id) ?? false;
+                      return (
+                        <View key={`nrsyt${t.id}`} style={s.branchTaskRow}>
+                          <Text style={s.branchTaskText} numberOfLines={2}>{t.icon ? `${t.icon} ` : ''}{t.title}</Text>
+                          <TouchableOpacity style={[s.branchCheckY, inYes && s.branchCheckYOn]} onPress={() => toggleNoRouteSubTask('yes', t.id)}>
+                            {inYes && <Text style={s.branchCheckText}>✓</Text>}
+                          </TouchableOpacity>
+                        </View>
+                      );
+                    })}
                   </View>
-                );
-              })}
+                )}
+              </View>
 
               <View style={s.branchEditorSection}>
                 <Text style={[s.branchEditorLabel, { marginTop: 12 }]}>サブタスクの終着点</Text>
