@@ -107,7 +107,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   flowZoomWrap: { width: '100%', alignItems: 'center' },
   viewTerminator: { backgroundColor: C.termBg, borderWidth: 1.5, borderColor: C.termBorder, borderRadius: 18, paddingHorizontal: 22, paddingVertical: 7 },
   viewTerminatorText: { color: C.termText, fontSize: 12, fontWeight: '800', letterSpacing: 1 },
-  viewSlotWrap: { width: '100%' },
+  viewSlotWrap: { width: '100%', overflow: 'visible' },
   viewSlot: { width: '100%', minHeight: 44, borderWidth: 1.5, borderRadius: 10, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderColor: C.termBorder, backgroundColor: C.termBg },
   viewSlotEmpty: { borderColor: C.border, borderStyle: 'dashed', backgroundColor: C.card },
   viewSlotNum: { width: 20, height: 20, borderRadius: 10, backgroundColor: C.primarySoft, alignItems: 'center', justifyContent: 'center', marginRight: 8, flexShrink: 0 },
@@ -210,12 +210,12 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   branchYesLine: { width: 2, height: 160, backgroundColor: C.line, marginTop: 0 },
   branchYesLabel: { position: 'absolute', right: 34, top: 12, color: C.line, fontSize: 11, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 4 },
   branchYesItems: { width: 152, alignItems: 'center', gap: 5, display: 'none' },
-  branchNoRoute: { position: 'absolute', top: 40, left: '50%', marginLeft: 44, width: 234, height: 150, zIndex: 1 },
+  branchNoRoute: { position: 'absolute', top: 40, left: '50%', marginLeft: 44, width: 234, height: 150, zIndex: 1, overflow: 'visible' },
   branchNoRail: { position: 'absolute', top: 0, left: 0, right: 54, height: 150, borderTopWidth: 2, borderRightWidth: 2, borderBottomWidth: 2, borderColor: C.line },
   branchNoRailReturnless: { borderBottomWidth: 0 },
   branchNoMergeLine: { display: 'none' },
   branchNoLabel: { position: 'absolute', top: -20, left: 192, color: C.line, fontSize: 11, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 4 },
-  branchNoItems: { position: 'absolute', top: 30, left: 96, width: 168, alignItems: 'stretch', gap: 6 },
+  branchNoItems: { position: 'absolute', top: 30, left: 96, width: 168, alignItems: 'stretch', gap: 6, overflow: 'visible' },
   branchPathTask: { width: 168, minHeight: 44, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8, borderWidth: 1.5, borderColor: '#22c55e', backgroundColor: '#f0fdf4' },
   branchPathNote: { width: 168, minHeight: 44, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8, borderWidth: 1.5, borderColor: '#22c55e', backgroundColor: '#f0fdf4' },
   branchPathTaskText: { color: '#166534', fontSize: 12, fontWeight: '700', textAlign: 'center', lineHeight: 16 },
@@ -240,19 +240,19 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   viewBranchYesLine: { width: 1.5, height: 150, backgroundColor: C.line, marginTop: 0 },
   viewBranchLabel: { position: 'absolute', right: 30, top: 10, color: C.line, fontSize: 10, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 4 },
   viewBranchYesItems: { width: 128, alignItems: 'center', gap: 4, display: 'none' },
-  viewBranchNoRoute: { position: 'absolute', top: 30, left: '50%', marginLeft: 40, width: 220, height: 122, zIndex: 1 },
+  viewBranchNoRoute: { position: 'absolute', top: 30, left: '50%', marginLeft: 40, width: 220, height: 122, zIndex: 1, overflow: 'visible' },
   viewBranchNoRail: { position: 'absolute', top: 0, left: 0, right: 51, height: 122, borderTopWidth: 2, borderRightWidth: 2, borderBottomWidth: 2, borderColor: C.line },
   viewBranchNoRailReturnless: { borderBottomWidth: 0 },
   viewBranchNoMergeLine: { display: 'none' },
   viewBranchNoLabel: { position: 'absolute', top: -18, left: 147, color: C.line, fontSize: 10, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 4 },
-  viewBranchNoItems: { position: 'absolute', top: 24, left: 94, width: 150, alignItems: 'stretch', gap: 5 },
+  viewBranchNoItems: { position: 'absolute', top: 24, left: 94, width: 150, alignItems: 'stretch', gap: 5, overflow: 'visible' },
   viewBranchTaskBox: { width: 150, minHeight: 38, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 7, borderWidth: 1.5, borderColor: '#22c55e', backgroundColor: '#f0fdf4' },
   viewBranchNoteBox: { width: 150, minHeight: 38, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 7, borderWidth: 1.5, borderColor: '#22c55e', backgroundColor: '#f0fdf4' },
   viewBranchTask: { color: '#166534', fontSize: 11, fontWeight: '700', textAlign: 'center', lineHeight: 15 },
   viewBranchNote: { color: '#166534', fontSize: 11, fontWeight: '700', textAlign: 'center', lineHeight: 15 },
 
   // ── sub-branch (nested in no-path) ──
-  subBranchWrap: { marginTop: 8, width: '100%', alignItems: 'center' },
+  subBranchWrap: { marginTop: 8, width: '100%', alignItems: 'center', overflow: 'visible' },
   subDiamondShell: { width: 176, height: 60, alignItems: 'center', justifyContent: 'flex-start', position: 'relative', overflow: 'visible' },
   subDiamond: { width: 130, height: 40, alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'visible' },
   subDiamondTop: { position: 'absolute', top: 1, width: 0, height: 0, borderLeftWidth: 64, borderRightWidth: 64, borderBottomWidth: 19, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderBottomColor: '#fffbeb' },
@@ -275,16 +275,16 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   subEditBtnText: { color: '#92400e', fontSize: 10, fontWeight: '700' },
   subDelBtn: { minWidth: 28, height: 22, paddingHorizontal: 7, borderRadius: 11, backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fca5a5', alignItems: 'center', justifyContent: 'center' },
   subDelBtnText: { color: '#dc2626', fontSize: 12, fontWeight: '700', lineHeight: 14 },
-  subPaths: { flexDirection: 'row', marginTop: 4, position: 'relative' },
+  subPaths: { flexDirection: 'row', marginTop: 4, position: 'relative', overflow: 'visible' },
   subPathsWide: { width: 337 },
   subPathsCompact: { width: 301 },
-  subPathsNoReturn: { alignSelf: 'center', justifyContent: 'flex-end' },
+  subPathsNoReturn: { alignSelf: 'center', justifyContent: 'flex-end', overflow: 'visible' },
   subPathsNoReturnWide: { width: 168 },
   subPathsNoReturnCompact: { width: 150 },
-  subYesCol: { alignItems: 'center', paddingHorizontal: 0 },
-  subNoCol: { alignItems: 'center', paddingHorizontal: 0 },
-  subColWide: { width: 168 },
-  subColCompact: { width: 150 },
+  subYesCol: { alignItems: 'center', paddingHorizontal: 0, overflow: 'visible' },
+  subNoCol: { alignItems: 'center', paddingHorizontal: 0, overflow: 'visible' },
+  subColWide: { width: 168, overflow: 'visible' },
+  subColCompact: { width: 150, overflow: 'visible' },
   subPathDiv: { width: 1, backgroundColor: C.line, alignSelf: 'stretch', marginVertical: 2 },
   subPathYesLbl: { color: C.line, fontSize: 9, fontWeight: '900', marginBottom: 3 },
   subPathNoLbl: { color: C.line, fontSize: 9, fontWeight: '900', marginBottom: 3 },
@@ -1173,7 +1173,7 @@ export default function FlowScreen({ navigation }: Props) {
               {isMergeTarget ? (
                 <View style={{ alignItems: 'center', marginVertical: 2, position: 'relative' }} pointerEvents="none">
                   <View style={{ width: 2, height: 30, backgroundColor: C.line }} />
-                  <View style={{ position: 'absolute', top: 15, left: 1, width: 155, height: 2, backgroundColor: C.line }} />
+                  <View style={{ position: 'absolute', top: 15, left: '50%' as any, width: 160, height: 2, backgroundColor: C.line }} />
                   <View style={{ width: 0, height: 0, borderLeftWidth: 5, borderRightWidth: 5, borderTopWidth: 8, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: C.line }} />
                 </View>
               ) : (
