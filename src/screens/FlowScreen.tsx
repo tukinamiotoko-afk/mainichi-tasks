@@ -264,15 +264,12 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   subDiamondSC: { position: 'absolute', top: 19, left: 6, right: 6, height: 3, backgroundColor: '#fffbeb', zIndex: 1 },
   subDiamondInner: { width: 96, alignItems: 'center', justifyContent: 'center', zIndex: 2 },
   subDiamondQ: { color: '#78350f', fontSize: 9, fontWeight: '800', textAlign: 'center' },
-  subYesDownStem: { position: 'absolute', left: 0, width: 2, backgroundColor: C.line, zIndex: 2 },
-  subYesDownStemWide: { top: 20, height: 64 },
-  subYesDownStemCompact: { top: 20, height: 54 },
-  subYesReturnLine: { position: 'absolute', height: 2, backgroundColor: C.line, zIndex: 2 },
-  subYesReturnLineWide: { top: 84, left: -157, width: 159 },
-  subYesReturnLineCompact: { top: 74, left: -143, width: 145 },
-  subYesReturnLabel: { position: 'absolute', color: C.line, fontSize: 9, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 5, zIndex: 3 },
-  subYesReturnLabelWide: { top: 6, left: 4 },
-  subYesReturnLabelCompact: { top: 6, left: 4 },
+  subYesReturnLine: { position: 'absolute', top: 20, height: 2, backgroundColor: C.line, zIndex: 1 },
+  subYesReturnLineWide: { left: -159, width: 159 },
+  subYesReturnLineCompact: { left: -145, width: 145 },
+  subYesReturnLabel: { position: 'absolute', top: 4, color: C.line, fontSize: 9, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 5, zIndex: 3 },
+  subYesReturnLabelWide: { left: -79 },
+  subYesReturnLabelCompact: { left: -72 },
   subDiamondBtns: { position: 'absolute', bottom: 0, flexDirection: 'row', alignItems: 'center', gap: 6 },
   subEditBtn: { minWidth: 42, height: 22, paddingHorizontal: 9, borderRadius: 11, backgroundColor: '#fef3c7', borderWidth: 1, borderColor: '#d97706', alignItems: 'center', justifyContent: 'center' },
   subEditBtnText: { color: '#92400e', fontSize: 10, fontWeight: '700' },
@@ -437,14 +434,14 @@ export default function FlowScreen({ navigation }: Props) {
 
   const taskById = useMemo(() => new Map(dueTasks.map(t => [t.id, t])), [dueTasks]);
   const tray = useMemo(() => addedIds.filter(id => !slots.includes(id)), [addedIds, slots]);
-  const yesReturnTargets = useMemo(() => {
+  const noReturnTargets = useMemo(() => {
     const set = new Set<number>();
     branches.forEach(b => {
-      if (b.no.sub?.yesReturns) {
-        b.no.sub.yes.taskIds.forEach(taskId => {
-          const idx = slots.indexOf(taskId);
-          if (idx !== -1) set.add(idx);
-        });
+      if (b.no.sub?.noReturnsToMain) {
+        const targetIdx = b.insertAfterIdx + 1;
+        if (targetIdx >= 0 && targetIdx < slots.length) {
+          set.add(targetIdx);
+        }
       }
     });
     return set;
@@ -930,7 +927,6 @@ export default function FlowScreen({ navigation }: Props) {
         <View style={s.subDiamond}>
           {sub.yesReturns ? (
             <>
-              <View style={[s.subYesDownStem, compact ? s.subYesDownStemCompact : s.subYesDownStemWide]} />
               <View style={[s.subYesReturnLine, compact ? s.subYesReturnLineCompact : s.subYesReturnLineWide]} />
               <Text style={[s.subYesReturnLabel, compact ? s.subYesReturnLabelCompact : s.subYesReturnLabelWide]}>はい</Text>
             </>
@@ -1170,7 +1166,7 @@ export default function FlowScreen({ navigation }: Props) {
       {renderViewGap(-1)}
       {slots.map((taskId, idx) => {
         const task = taskId !== null ? taskById.get(taskId) : undefined;
-        const isMergeTarget = yesReturnTargets.has(idx);
+        const isMergeTarget = noReturnTargets.has(idx);
         return (
           <React.Fragment key={idx}>
             <View style={s.viewSlotWrap}>
