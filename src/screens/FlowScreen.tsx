@@ -1555,9 +1555,6 @@ export default function FlowScreen({ navigation }: Props) {
                 )}
               </View>
 
-              <TouchableOpacity style={s.branchSaveBtn} onPress={saveBranchDraft}>
-                <Text style={s.branchSaveBtnText}>保存</Text>
-              </TouchableOpacity>
             </ScrollView>
           </TouchableOpacity>
         </TouchableOpacity>
@@ -1672,9 +1669,6 @@ export default function FlowScreen({ navigation }: Props) {
                 </View>
               </View>
 
-              <TouchableOpacity style={s.branchSaveBtn} onPress={saveNoRouteBranchDraft}>
-                <Text style={s.branchSaveBtnText}>保存</Text>
-              </TouchableOpacity>
             </ScrollView>
           </View>
         </TouchableOpacity>
