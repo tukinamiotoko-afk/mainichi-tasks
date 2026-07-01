@@ -1584,7 +1584,7 @@ export default function FlowScreen({ navigation }: Props) {
                     style={s.branchNoteInput}
                     value={noRouteSubNoteDraft.no}
                     onChangeText={t => setNoRouteSubNoteDraft(p => ({ ...p, no: t }))}
-                    placeholder="いいえルートの内容"
+                    placeholder="カードの内容"
                     placeholderTextColor="#cbd5e1"
                     returnKeyType="done"
                     onSubmitEditing={() => addNoRouteSubNote('no')}
@@ -1595,31 +1595,23 @@ export default function FlowScreen({ navigation }: Props) {
                 </View>
               </View>
 
-              <View style={s.branchEditorSection}>
-                <Text style={[s.branchEditorLabel, { color: '#15803d' }]}>はいで左に戻る（メインフローへ）</Text>
-                <View style={s.branchNoteList}>
-                  {(noRouteSubDraft?.yes.notes ?? []).map((note, idx) => (
-                    <TouchableOpacity key={`nry${note}${idx}`} style={s.branchNoteChip} onPress={() => removeNoRouteSubNote('yes', idx)} activeOpacity={0.75}>
-                      <Text style={s.branchNoteChipText} numberOfLines={1}>{note}</Text>
-                      <Text style={s.branchNoteChipX}>×</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-                <View style={s.branchNoteAddRow}>
-                  <TextInput
-                    style={s.branchNoteInput}
-                    value={noRouteSubNoteDraft.yes}
-                    onChangeText={t => setNoRouteSubNoteDraft(p => ({ ...p, yes: t }))}
-                    placeholder="はいルートの内容"
-                    placeholderTextColor="#cbd5e1"
-                    returnKeyType="done"
-                    onSubmitEditing={() => addNoRouteSubNote('yes')}
-                  />
-                  <TouchableOpacity style={s.branchNoteAddBtn} onPress={() => addNoRouteSubNote('yes')}>
-                    <Text style={s.branchNoteAddText}>追加</Text>
-                  </TouchableOpacity>
+              <View style={[s.branchEditorSection, { paddingBottom: 0 }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Text style={[s.branchEditorLabel, { flex: 1, color: '#15803d' }]}>はいで左に戻る（メインフローへ）</Text>
+                  <View style={s.branchCheckLabels}><Text style={s.branchCheckLabelY}>はい</Text></View>
                 </View>
               </View>
+              {dueTasks.map(t => {
+                const inYes = noRouteSubDraft?.yes.taskIds.includes(t.id) ?? false;
+                return (
+                  <View key={`nrsyt${t.id}`} style={s.branchTaskRow}>
+                    <Text style={s.branchTaskText} numberOfLines={2}>{t.icon ? `${t.icon} ` : ''}{t.title}</Text>
+                    <TouchableOpacity style={[s.branchCheckY, inYes && s.branchCheckYOn]} onPress={() => toggleNoRouteSubTask('yes', t.id)}>
+                      {inYes && <Text style={s.branchCheckText}>✓</Text>}
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
 
               <View style={s.branchEditorSection}>
                 <Text style={[s.branchEditorLabel, { marginTop: 12 }]}>サブタスクの終着点</Text>
