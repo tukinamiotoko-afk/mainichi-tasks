@@ -2,7 +2,7 @@ import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, StatusBar, Modal,
   Animated, PanResponder, Platform, TextInput, Alert, GestureResponderEvent,
-  useWindowDimensions, LayoutAnimation,
+  useWindowDimensions, LayoutAnimation, UIManager,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,6 +16,10 @@ import { isDueToday, WEEKDAYS } from '../constants/taskMeta';
 import { GRAD_START, GRAD_END } from '../constants/theme';
 import TabBar from '../components/TabBar';
 import { useTheme, ColorSet } from '../contexts/ThemeContext';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 const pad = (n: number) => String(n).padStart(2, '0');
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'Flow'> };
@@ -334,7 +338,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   branchCheckLabels: { flexDirection: 'row', gap: 4, alignItems: 'center' },
   branchCheckLabelY: { color: '#15803d', fontSize: 10, fontWeight: '700', width: 28, textAlign: 'center' },
   branchCheckLabelN: { color: '#b91c1c', fontSize: 10, fontWeight: '700', width: 28, textAlign: 'center' },
-  branchSaveBtn: { margin: 16, paddingVertical: 14, borderRadius: 12, backgroundColor: '#d97706', alignItems: 'center' },
+  branchSaveBtn: { margin: 16, paddingVertical: 14, borderRadius: 12, backgroundColor: '#2563eb', alignItems: 'center' },
   branchSaveBtnText: { color: '#ffffff', fontSize: 15, fontWeight: '800' },
 });
 
@@ -1555,7 +1559,7 @@ export default function FlowScreen({ navigation }: Props) {
       {/* No-route branch editor modal */}
       <Modal visible={noRouteBranchEditorOpen} transparent animationType="slide" onRequestClose={closeNoRouteBranchEditor}>
         <TouchableOpacity style={s.pickerOverlay} activeOpacity={1} onPress={closeNoRouteBranchEditor}>
-          <TouchableOpacity activeOpacity={1} style={s.branchEditorSheet} onPress={() => {}}>
+          <View style={s.branchEditorSheet} onStartShouldSetResponder={() => true}>
             <View style={s.pickerHeader}>
               <Text style={s.pickerTitle}>{noRouteBranchParent?.no.sub ? '右側分岐を編集' : '右側分岐を追加'}</Text>
               <TouchableOpacity onPress={saveNoRouteBranchDraft}>
@@ -1648,7 +1652,7 @@ export default function FlowScreen({ navigation }: Props) {
                 <Text style={s.branchSaveBtnText}>保存</Text>
               </TouchableOpacity>
             </ScrollView>
-          </TouchableOpacity>
+          </View>
         </TouchableOpacity>
       </Modal>
 
