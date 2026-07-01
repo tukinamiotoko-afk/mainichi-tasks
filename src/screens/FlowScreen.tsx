@@ -434,6 +434,13 @@ export default function FlowScreen({ navigation }: Props) {
 
   const taskById = useMemo(() => new Map(dueTasks.map(t => [t.id, t])), [dueTasks]);
   const tray = useMemo(() => addedIds.filter(id => !slots.includes(id)), [addedIds, slots]);
+  const yesEligibleTasks = useMemo(() => {
+    if (!noRouteBranchParent) return dueTasks;
+    const allowedIds = new Set(
+      slots.slice(noRouteBranchParent.insertAfterIdx + 1).filter((id): id is number => id !== null)
+    );
+    return dueTasks.filter(t => allowedIds.has(t.id));
+  }, [noRouteBranchParent, slots, dueTasks]);
   const hasSelection = selectedCardId !== null;
   const hasSideBranch = useMemo(
     () => branches.some(b => b.no.notes.length > 0 || b.no.taskIds.length > 0),
@@ -1606,6 +1613,19 @@ export default function FlowScreen({ navigation }: Props) {
 
               <View style={s.branchEditorSection}>
                 <Text style={[s.branchEditorLabel, { color: '#15803d' }]}>はいで左に戻る（メインフローへ）</Text>
+                {(noRouteSubDraft?.yes.taskIds.length ?? 0) > 0 && (
+                  <View style={[s.branchNoteList, { marginTop: 6 }]}>
+                    {(noRouteSubDraft?.yes.taskIds ?? []).map(id => {
+                      const t = taskById.get(id);
+                      if (!t) return null;
+                      return (
+                        <View key={`yesChip${id}`} style={[s.branchNoteChip, { borderColor: '#16a34a', backgroundColor: '#f0fdf4' }]}>
+                          <Text style={[s.branchNoteChipText, { color: '#15803d' }]} numberOfLines={1}>{t.icon ? `${t.icon} ` : ''}{t.title}</Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+                )}
                 <TouchableOpacity
                   style={[s.branchReturnBtn, { marginTop: 8, flex: 0 }]}
                   onPress={() => {
@@ -1621,7 +1641,9 @@ export default function FlowScreen({ navigation }: Props) {
                     <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 4 }}>
                       <Text style={s.branchCheckLabelY}>はい</Text>
                     </View>
-                    {dueTasks.map(t => {
+                    {yesEligibleTasks.length === 0 ? (
+                      <Text style={{ color: '#94a3b8', fontSize: 12, textAlign: 'center', paddingVertical: 8 }}>選択できるタスクがありません</Text>
+                    ) : yesEligibleTasks.map(t => {
                       const inYes = noRouteSubDraft?.yes.taskIds.includes(t.id) ?? false;
                       return (
                         <View key={`nrsyt${t.id}`} style={s.branchTaskRow}>
