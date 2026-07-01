@@ -934,15 +934,15 @@ export default function FlowScreen({ navigation }: Props) {
         </View>
       ) : (
         <View style={[s.subPaths, compact ? s.subPathsCompact : s.subPathsWide]}>
+          <View style={[s.subYesCol, compact ? s.subColCompact : s.subColWide]}>
+            <Text style={s.subPathYesLbl}>はい</Text>
+            {renderSubItems(sub.yes, compact)}
+          </View>
+          <View style={s.subPathDiv} />
           <View style={[s.subNoCol, compact ? s.subColCompact : s.subColWide]}>
             <Text style={s.subPathNoLbl}>いいえ</Text>
             {renderSubItems(sub.no, compact)}
             {sub.noReturnsToMain && countSimpleItems(sub.no) > 0 ? renderSubMergeToMain(compact) : null}
-          </View>
-          <View style={s.subPathDiv} />
-          <View style={[s.subYesCol, compact ? s.subColCompact : s.subColWide]}>
-            <Text style={s.subPathYesLbl}>はい</Text>
-            {renderSubItems(sub.yes, compact)}
           </View>
         </View>
       )}
@@ -1478,19 +1478,6 @@ export default function FlowScreen({ navigation }: Props) {
                       placeholder="サブ分岐の内容（例: やり直す？）"
                       placeholderTextColor="#cbd5e1"
                     />
-                    <Text style={[s.branchEditorLabel, { marginTop: 12, color: '#15803d' }]}>はいで左に戻る（メインフローへ）</Text>
-                    <View style={s.branchNoteList}>
-                      {(branchDraft.no.sub.yes.notes ?? []).map((note, idx) => (
-                        <TouchableOpacity key={`sy${note}${idx}`} style={s.branchNoteChip} onPress={() => removeSubNote('yes', idx)} activeOpacity={0.75}>
-                          <Text style={s.branchNoteChipText} numberOfLines={1}>{note}</Text>
-                          <Text style={s.branchNoteChipX}>×</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                    <View style={s.branchNoteAddRow}>
-                      <TextInput style={s.branchNoteInput} value={subNoteDraft.yes} onChangeText={t => setSubNoteDraft(p => ({ ...p, yes: t }))} placeholder="はいルートの内容" placeholderTextColor="#cbd5e1" returnKeyType="done" onSubmitEditing={() => addSubNote('yes')} />
-                      <TouchableOpacity style={s.branchNoteAddBtn} onPress={() => addSubNote('yes')}><Text style={s.branchNoteAddText}>追加</Text></TouchableOpacity>
-                    </View>
                     <Text style={[s.branchEditorLabel, { marginTop: 12, color: '#b91c1c' }]}>いいえで続けるカード</Text>
                     <View style={s.branchNoteList}>
                       {(branchDraft.no.sub.no.notes ?? []).map((note, idx) => (
@@ -1503,6 +1490,19 @@ export default function FlowScreen({ navigation }: Props) {
                     <View style={s.branchNoteAddRow}>
                       <TextInput style={s.branchNoteInput} value={subNoteDraft.no} onChangeText={t => setSubNoteDraft(p => ({ ...p, no: t }))} placeholder="いいえルートの内容" placeholderTextColor="#cbd5e1" returnKeyType="done" onSubmitEditing={() => addSubNote('no')} />
                       <TouchableOpacity style={s.branchNoteAddBtn} onPress={() => addSubNote('no')}><Text style={s.branchNoteAddText}>追加</Text></TouchableOpacity>
+                    </View>
+                    <Text style={[s.branchEditorLabel, { marginTop: 12, color: '#15803d' }]}>はいで左に戻る（メインフローへ）</Text>
+                    <View style={s.branchNoteList}>
+                      {(branchDraft.no.sub.yes.notes ?? []).map((note, idx) => (
+                        <TouchableOpacity key={`sy${note}${idx}`} style={s.branchNoteChip} onPress={() => removeSubNote('yes', idx)} activeOpacity={0.75}>
+                          <Text style={s.branchNoteChipText} numberOfLines={1}>{note}</Text>
+                          <Text style={s.branchNoteChipX}>×</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                    <View style={s.branchNoteAddRow}>
+                      <TextInput style={s.branchNoteInput} value={subNoteDraft.yes} onChangeText={t => setSubNoteDraft(p => ({ ...p, yes: t }))} placeholder="はいルートの内容" placeholderTextColor="#cbd5e1" returnKeyType="done" onSubmitEditing={() => addSubNote('yes')} />
+                      <TouchableOpacity style={s.branchNoteAddBtn} onPress={() => addSubNote('yes')}><Text style={s.branchNoteAddText}>追加</Text></TouchableOpacity>
                     </View>
                     <Text style={[s.branchEditorLabel, { marginTop: 12 }]}>サブタスクの終着点</Text>
                     <View style={s.branchReturnRow}>
@@ -1570,32 +1570,6 @@ export default function FlowScreen({ navigation }: Props) {
               </View>
 
               <View style={s.branchEditorSection}>
-                <Text style={[s.branchEditorLabel, { color: '#15803d' }]}>はいで左に戻る（メインフローへ）</Text>
-                <View style={s.branchNoteList}>
-                  {(noRouteSubDraft?.yes.notes ?? []).map((note, idx) => (
-                    <TouchableOpacity key={`nry${note}${idx}`} style={s.branchNoteChip} onPress={() => removeNoRouteSubNote('yes', idx)} activeOpacity={0.75}>
-                      <Text style={s.branchNoteChipText} numberOfLines={1}>{note}</Text>
-                      <Text style={s.branchNoteChipX}>×</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-                <View style={s.branchNoteAddRow}>
-                  <TextInput
-                    style={s.branchNoteInput}
-                    value={noRouteSubNoteDraft.yes}
-                    onChangeText={t => setNoRouteSubNoteDraft(p => ({ ...p, yes: t }))}
-                    placeholder="はいルートの内容"
-                    placeholderTextColor="#cbd5e1"
-                    returnKeyType="done"
-                    onSubmitEditing={() => addNoRouteSubNote('yes')}
-                  />
-                  <TouchableOpacity style={s.branchNoteAddBtn} onPress={() => addNoRouteSubNote('yes')}>
-                    <Text style={s.branchNoteAddText}>追加</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              <View style={s.branchEditorSection}>
                 <Text style={[s.branchEditorLabel, { color: '#b91c1c' }]}>いいえで続けるカード</Text>
                 <View style={s.branchNoteList}>
                   {(noRouteSubDraft?.no.notes ?? []).map((note, idx) => (
@@ -1626,6 +1600,32 @@ export default function FlowScreen({ navigation }: Props) {
                   </TouchableOpacity>
                   <TouchableOpacity style={[s.branchReturnBtn, !!noRouteSubDraft?.noReturnsToMain && s.branchReturnBtnOn]} onPress={() => setNoRouteSubReturnToMain(true)}>
                     <Text style={[s.branchReturnBtnText, !!noRouteSubDraft?.noReturnsToMain && s.branchReturnBtnTextOn]}>メインに合流</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <View style={s.branchEditorSection}>
+                <Text style={[s.branchEditorLabel, { color: '#15803d' }]}>はいで左に戻る（メインフローへ）</Text>
+                <View style={s.branchNoteList}>
+                  {(noRouteSubDraft?.yes.notes ?? []).map((note, idx) => (
+                    <TouchableOpacity key={`nry${note}${idx}`} style={s.branchNoteChip} onPress={() => removeNoRouteSubNote('yes', idx)} activeOpacity={0.75}>
+                      <Text style={s.branchNoteChipText} numberOfLines={1}>{note}</Text>
+                      <Text style={s.branchNoteChipX}>×</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <View style={s.branchNoteAddRow}>
+                  <TextInput
+                    style={s.branchNoteInput}
+                    value={noRouteSubNoteDraft.yes}
+                    onChangeText={t => setNoRouteSubNoteDraft(p => ({ ...p, yes: t }))}
+                    placeholder="はいルートの内容"
+                    placeholderTextColor="#cbd5e1"
+                    returnKeyType="done"
+                    onSubmitEditing={() => addNoRouteSubNote('yes')}
+                  />
+                  <TouchableOpacity style={s.branchNoteAddBtn} onPress={() => addNoRouteSubNote('yes')}>
+                    <Text style={s.branchNoteAddText}>追加</Text>
                   </TouchableOpacity>
                 </View>
               </View>
