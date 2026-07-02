@@ -27,7 +27,7 @@ type SimpleItems = { taskIds: number[]; notes: string[] };
 type PathAfter = 'merge' | 'end';
 // recursive: any path can carry a nested sub-branch (rendering currently stops at depth 2)
 type SubBranch = { question: string; yes: BranchPathData; no: BranchPathData; yesReturns: boolean; noReturnsToMain?: boolean };
-type BranchPathData = { taskIds: number[]; notes: string[]; after?: PathAfter; sub?: SubBranch };
+type BranchPathData = { taskIds: number[]; notes: string[]; after?: PathAfter; mergeTaskId?: number; sub?: SubBranch };
 type BranchNode = { id: number | null; insertAfterIdx: number; question: string; yes: BranchPathData; no: BranchPathData };
 
 function ArrowDown({ color, h = 18 }: { color: string; h?: number }) {
@@ -49,6 +49,7 @@ const parsePathData = (raw: unknown): BranchPathData => {
     notes: Array.isArray(r?.notes) ? r.notes.filter((v: unknown): v is string => typeof v === 'string' && v.trim().length > 0) : [],
   };
   if (r?.after === 'end') base.after = 'end';
+  if (typeof r?.mergeTaskId === 'number') base.mergeTaskId = r.mergeTaskId;
   if (r?.sub) {
     base.sub = {
       question: typeof r.sub.question === 'string' ? r.sub.question : '',
@@ -76,6 +77,7 @@ const stringifyPathData = (path: BranchPathData): Record<string, unknown> => ({
   taskIds: path.taskIds,
   notes: path.notes.map(n => n.trim()).filter(Boolean),
   ...(path.after === 'end' ? { after: 'end' } : {}),
+  ...(typeof path.mergeTaskId === 'number' ? { mergeTaskId: path.mergeTaskId } : {}),
   ...(path.sub ? { sub: {
     question: path.sub.question,
     yesReturns: path.sub.yesReturns,
@@ -179,10 +181,10 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   datePickerSheet: { backgroundColor: C.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 24 },
 
   // ── branch button in header ──
-  branchBtn: { paddingHorizontal: 10, paddingVertical: 8, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.18)' },
-  branchBtnText: { color: '#ffffff', fontSize: 11, fontWeight: '800' },
+  branchBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.9)' },
+  branchBtnText: { color: '#7c3aed', fontSize: 13, fontWeight: '900' },
   branchBtnActive: { backgroundColor: 'rgba(255,237,213,0.9)' },
-  branchBtnActiveText: { color: '#c2410c', fontSize: 11, fontWeight: '900' },
+  branchBtnActiveText: { color: '#c2410c', fontSize: 13, fontWeight: '900' },
 
   // ── branch insertion slot ──
   insertSlot: { width: '100%', paddingVertical: 9, borderWidth: 1.5, borderColor: '#fb923c', borderStyle: 'dashed', borderRadius: 10, alignItems: 'center', backgroundColor: '#fff7ed' },
@@ -363,6 +365,7 @@ export default function FlowScreen({ navigation }: Props) {
   const [subNoteDraft, setSubNoteDraft] = useState({ yes: '', no: '' });
   const [noRouteBranchEditorOpen, setNoRouteBranchEditorOpen] = useState(false);
   const [branchNoTasksExpanded, setBranchNoTasksExpanded] = useState(false);
+  const [mergeTaskExpanded, setMergeTaskExpanded] = useState(false);
   const [yesTasksExpanded, setYesTasksExpanded] = useState(false);
   const [noRouteBranchParent, setNoRouteBranchParent] = useState<BranchNode | null>(null);
   const [noRouteSubDraft, setNoRouteSubDraft] = useState<SubBranch | null>(null);
@@ -433,8 +436,15 @@ export default function FlowScreen({ navigation }: Props) {
   const tray = useMemo(() => addedIds.filter(id => !slots.includes(id)), [addedIds, slots]);
   const getMergeTargetIdx = useCallback((b: BranchNode) => {
     const sub = b.no.sub;
-    if (!sub?.noReturnsToMain) return -1;
-    const retId = sub.yes.taskIds[0];
+    let retId: number | undefined;
+    if (sub) {
+      if (!sub.noReturnsToMain) return -1;
+      retId = sub.yes.taskIds[0];
+    } else {
+      if (b.no.after === 'end') return -1;
+      if (b.no.notes.length + b.no.taskIds.length === 0) return -1;
+      retId = b.no.mergeTaskId;
+    }
     const retIdx = retId !== undefined ? slots.indexOf(retId) : -1;
     const idx = retIdx >= 0 ? retIdx : b.insertAfterIdx + 1;
     return idx >= 0 && idx < slots.length ? idx : -1;
@@ -455,6 +465,13 @@ export default function FlowScreen({ navigation }: Props) {
     );
     return dueTasks.filter(t => allowedIds.has(t.id));
   }, [noRouteBranchParent, slots, dueTasks]);
+  const mergeEligibleTasks = useMemo(() => {
+    if (!branchDraft) return dueTasks;
+    const allowedIds = new Set(
+      slots.slice(branchDraft.insertAfterIdx + 1).filter((id): id is number => id !== null)
+    );
+    return dueTasks.filter(t => allowedIds.has(t.id));
+  }, [branchDraft, slots, dueTasks]);
   const hasSelection = selectedCardId !== null;
   const hasSideBranch = useMemo(
     () => branches.some(b => b.no.notes.length > 0 || b.no.taskIds.length > 0),
@@ -779,6 +796,9 @@ export default function FlowScreen({ navigation }: Props) {
 
   // three-way "サブタスクのその後": end here / merge back to main / continue with a sub-branch
   const noAfterMode: 'end' | 'merge' | 'sub' = branchDraft?.no.sub ? 'sub' : (branchDraft?.no.after === 'end' ? 'end' : 'merge');
+  const toggleMergeTask = (id: number) => {
+    setBranchDraft(p => p ? { ...p, no: { ...p.no, mergeTaskId: p.no.mergeTaskId === id ? undefined : id } } : p);
+  };
   const setNoAfterMode = (mode: 'end' | 'merge' | 'sub') => {
     if (mode === 'sub') setSubNoteDraft({ yes: '', no: '' });
     setBranchDraft(p => {
@@ -895,8 +915,8 @@ export default function FlowScreen({ navigation }: Props) {
       const next: Record<number, { left: number; top: number; width: number; height: number }> = {};
       for (const b of branches) {
         const sub = b.no.sub;
-        if (b.id === null || !sub?.noReturnsToMain) continue;
-        if (sub.no.notes.length + sub.no.taskIds.length === 0) continue;
+        if (b.id === null) continue;
+        if (sub && sub.no.notes.length + sub.no.taskIds.length === 0) continue;
         const targetIdx = getMergeTargetIdx(b);
         if (targetIdx < 0) continue;
         const stemNode = mergeStemRefs.current.get(b.id);
@@ -1085,6 +1105,7 @@ export default function FlowScreen({ navigation }: Props) {
         <>
           {hasAny ? allEntries.map(([, node]) => node) : <Text style={s.branchPathEmpty}>なし</Text>}
           {b.no.sub && renderSubDiamond(b.no.sub, b, false, b.id)}
+          {!b.no.sub && b.id !== null && getMergeTargetIdx(b) >= 0 ? renderMergeStemMarker(b.id) : null}
         </>
       );
     }
@@ -1097,6 +1118,8 @@ export default function FlowScreen({ navigation }: Props) {
     if (b.no.sub) {
       out.push(<React.Fragment key="sub">{renderSubDiamond(b.no.sub, b, false, b.id)}</React.Fragment>);
       out.push(slot('post-sub'));
+    } else if (b.id !== null && getMergeTargetIdx(b) >= 0) {
+      out.push(<React.Fragment key="mergeMark">{renderMergeStemMarker(b.id)}</React.Fragment>);
     }
     return <>{out}</>;
   };
@@ -1129,7 +1152,7 @@ export default function FlowScreen({ navigation }: Props) {
             style={[
               s.viewBranchNoRail,
               { height: layout.railHeight },
-              (b.no.sub ? (b.no.sub.yesReturns || b.no.sub.noReturnsToMain) : b.no.after === 'end') ? s.viewBranchNoRailReturnless : null,
+              (b.no.sub ? (b.no.sub.yesReturns || b.no.sub.noReturnsToMain) : true) ? s.viewBranchNoRailReturnless : null,
             ]}
             pointerEvents="none"
           />
@@ -1137,6 +1160,7 @@ export default function FlowScreen({ navigation }: Props) {
           <View style={s.viewBranchNoItems}>
             {renderPathItems(b.no, true)}
             {b.no.sub && renderSubDiamond(b.no.sub, undefined, true, b.id)}
+            {!b.no.sub && b.id !== null && getMergeTargetIdx(b) >= 0 ? renderMergeStemMarker(b.id) : null}
           </View>
         </View>
         <View style={s.viewBranchNoMergeLine} pointerEvents="none" />
@@ -1183,7 +1207,7 @@ export default function FlowScreen({ navigation }: Props) {
             style={[
               s.branchNoRail,
               { height: layout.railHeight },
-              (b.no.sub ? (b.no.sub.yesReturns || b.no.sub.noReturnsToMain) : b.no.after === 'end') ? s.branchNoRailReturnless : null,
+              (b.no.sub ? (b.no.sub.yesReturns || b.no.sub.noReturnsToMain) : true) ? s.branchNoRailReturnless : null,
             ]}
             pointerEvents="none"
           />
@@ -1643,6 +1667,28 @@ export default function FlowScreen({ navigation }: Props) {
                     <Text style={[s.branchReturnBtnText, noAfterMode === 'sub' && s.branchReturnBtnTextOn]}>サブ分岐を追加</Text>
                   </TouchableOpacity>
                 </View>
+                {noAfterMode === 'merge' ? (
+                  <>
+                    <TouchableOpacity
+                      style={[s.branchNoteInput, { marginTop: 8, flex: 0 }]}
+                      onPress={() => setMergeTaskExpanded(true)}
+                      activeOpacity={0.75}
+                    >
+                      {(() => {
+                        const mt = branchDraft?.no.mergeTaskId != null ? taskById.get(branchDraft.no.mergeTaskId) : undefined;
+                        return mt ? (
+                          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <Text style={{ color: '#374151', fontSize: 12, flex: 1 }} numberOfLines={1}>{mt.icon ? `${mt.icon} ` : ''}{mt.title}</Text>
+                            <Text style={[s.branchReturnBtnText, { marginLeft: 8 }]}>▼</Text>
+                          </View>
+                        ) : (
+                          <Text style={[s.branchReturnBtnText, { textAlign: 'center' }]}>合流先タスクを選択 ▼</Text>
+                        );
+                      })()}
+                    </TouchableOpacity>
+                    <Text style={{ color: '#94a3b8', fontSize: 10, marginTop: 4 }}>未選択の場合は分岐のすぐ下に合流します</Text>
+                  </>
+                ) : null}
               </View>
 
               {/* Sub-branch section */}
@@ -1827,6 +1873,35 @@ export default function FlowScreen({ navigation }: Props) {
                     <Text style={s.branchTaskText} numberOfLines={2}>{t.icon ? `${t.icon} ` : ''}{t.title}</Text>
                     <TouchableOpacity style={[s.branchCheckY, inYes && s.branchCheckYOn]} onPress={() => toggleNoRouteSubTask('yes', t.id)}>
                       {inYes && <Text style={s.branchCheckText}>✓</Text>}
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Merge-target task picker bottom sheet */}
+      <Modal visible={mergeTaskExpanded} transparent animationType="slide" onRequestClose={() => setMergeTaskExpanded(false)}>
+        <TouchableOpacity style={s.pickerOverlay} activeOpacity={1} onPress={() => setMergeTaskExpanded(false)}>
+          <View style={{ backgroundColor: C.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '72%' }} onStartShouldSetResponder={() => true}>
+            <View style={s.pickerHeader}>
+              <Text style={[s.pickerTitle, { color: '#1d4ed8' }]}>合流先タスクを選択</Text>
+              <TouchableOpacity onPress={() => setMergeTaskExpanded(false)}>
+                <Text style={s.pickerDone}>完了</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}>
+              {mergeEligibleTasks.length === 0 ? (
+                <Text style={{ color: '#94a3b8', fontSize: 13, textAlign: 'center', paddingVertical: 24 }}>選択できるタスクがありません</Text>
+              ) : mergeEligibleTasks.map(t => {
+                const inM = branchDraft?.no.mergeTaskId === t.id;
+                return (
+                  <View key={`mgt${t.id}`} style={s.branchTaskRow}>
+                    <Text style={s.branchTaskText} numberOfLines={2}>{t.icon ? `${t.icon} ` : ''}{t.title}</Text>
+                    <TouchableOpacity style={[s.branchCheckY, inM && s.branchCheckYOn]} onPress={() => toggleMergeTask(t.id)}>
+                      {inM && <Text style={s.branchCheckText}>✓</Text>}
                     </TouchableOpacity>
                   </View>
                 );
