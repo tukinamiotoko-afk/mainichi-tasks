@@ -287,17 +287,13 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   subColCompact: { width: 162, overflow: 'visible' },
   subPathDiv: { width: 1, backgroundColor: C.line, alignSelf: 'stretch', marginVertical: 2 },
   subPathYesLbl: { color: C.line, fontSize: 9, fontWeight: '900', marginBottom: 3 },
-  subPathNoLbl: { color: C.line, fontSize: 9, fontWeight: '900', marginBottom: 3 },
+  subPathNoLbl: { color: C.line, fontSize: 9, fontWeight: '900', marginBottom: 3, backgroundColor: C.body, paddingHorizontal: 4, zIndex: 1 },
   subItemBox: { width: 180, minHeight: 48, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8, borderWidth: 1.5, borderColor: '#22c55e', backgroundColor: '#f0fdf4', marginBottom: 6, alignItems: 'center', justifyContent: 'center' },
   subItemBoxCompact: { width: 162, minHeight: 42, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 7, marginBottom: 5 },
   subItemText: { color: '#166534', fontSize: 12, fontWeight: '700', textAlign: 'center', lineHeight: 16 },
   subItemTextCompact: { fontSize: 11, lineHeight: 15 },
   subItemEmpty: { color: C.muted, fontSize: 9, fontStyle: 'italic', textAlign: 'center' },
-  subReturnMergeWrap: { width: '100%', alignItems: 'center', marginTop: 2, position: 'relative', overflow: 'visible' },
-  subReturnMergeStemWide: { width: 2, height: 55, backgroundColor: C.line },
-  subReturnMergeStemCompact: { width: 2, height: 50, backgroundColor: C.line },
-  subReturnMergeLineWide: { position: 'absolute', top: 55, left: -134, width: 224, height: 2, backgroundColor: C.line },
-  subReturnMergeLineCompact: { position: 'absolute', top: 50, left: -128, width: 209, height: 2, backgroundColor: C.line },
+  subNoColLine: { position: 'absolute', top: -26, bottom: 0, width: 2, backgroundColor: C.line, alignSelf: 'center', zIndex: 0 },
   subAddBtn: { marginTop: 10, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, borderWidth: 1.5, borderStyle: 'dashed', borderColor: '#fb923c', alignItems: 'center', backgroundColor: '#fff7ed' },
   subAddBtnText: { color: '#c2410c', fontSize: 11, fontWeight: '700' },
   subRemoveBtn: { marginTop: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fca5a5', alignItems: 'center', alignSelf: 'flex-end' },
@@ -434,18 +430,22 @@ export default function FlowScreen({ navigation }: Props) {
 
   const taskById = useMemo(() => new Map(dueTasks.map(t => [t.id, t])), [dueTasks]);
   const tray = useMemo(() => addedIds.filter(id => !slots.includes(id)), [addedIds, slots]);
+  const getMergeTargetIdx = useCallback((b: BranchNode) => {
+    const sub = b.no.sub;
+    if (!sub?.noReturnsToMain) return -1;
+    const retId = sub.yes.taskIds[0];
+    const retIdx = retId !== undefined ? slots.indexOf(retId) : -1;
+    const idx = retIdx >= 0 ? retIdx : b.insertAfterIdx + 1;
+    return idx >= 0 && idx < slots.length ? idx : -1;
+  }, [slots]);
   const noReturnTargets = useMemo(() => {
     const set = new Set<number>();
     branches.forEach(b => {
-      if (b.no.sub?.noReturnsToMain) {
-        const targetIdx = b.insertAfterIdx + 1;
-        if (targetIdx >= 0 && targetIdx < slots.length) {
-          set.add(targetIdx);
-        }
-      }
+      const targetIdx = getMergeTargetIdx(b);
+      if (targetIdx >= 0) set.add(targetIdx);
     });
     return set;
-  }, [branches, slots]);
+  }, [branches, getMergeTargetIdx]);
 
   const yesEligibleTasks = useMemo(() => {
     if (!noRouteBranchParent) return dueTasks;
@@ -822,7 +822,10 @@ export default function FlowScreen({ navigation }: Props) {
     setNoRouteSubDraft(p => {
       if (!p) return p;
       const cur = p[path].taskIds;
-      const next = cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id];
+      // the yes-return target is a single rejoin point on the main flow
+      const next = path === 'yes'
+        ? (cur.includes(id) ? [] : [id])
+        : (cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id]);
       return { ...p, [path]: { ...p[path], taskIds: next } };
     });
   };
@@ -860,6 +863,67 @@ export default function FlowScreen({ navigation }: Props) {
   };
 
   const countSimpleItems = (items: SimpleItems) => items.notes.length + items.taskIds.length;
+
+  // ── merge-line measurement (noReturnsToMain L-shape) ──
+  const flowContentRef = useRef<View | null>(null);
+  const mergeStemRefs = useRef<Map<number, View>>(new Map());
+  const mergeSlotRefs = useRef<Map<number, View>>(new Map());
+  const [mergeLines, setMergeLines] = useState<Record<number, { left: number; top: number; width: number; height: number }>>({});
+  const mergeLinesRef = useRef(mergeLines);
+  mergeLinesRef.current = mergeLines;
+  const mergeMeasureReq = useRef(0);
+
+  const measureInFlow = (node: View, container: View) =>
+    new Promise<{ x: number; y: number; width: number; height: number } | null>(resolve => {
+      node.measureLayout(
+        container as unknown as number,
+        (x, y, width, height) => resolve({ x, y, width, height }),
+        () => resolve(null),
+      );
+    });
+
+  const scheduleMergeMeasure = useCallback(() => {
+    const req = ++mergeMeasureReq.current;
+    requestAnimationFrame(async () => {
+      if (req !== mergeMeasureReq.current) return;
+      const container = flowContentRef.current;
+      if (!container) return;
+      const next: Record<number, { left: number; top: number; width: number; height: number }> = {};
+      for (const b of branches) {
+        const sub = b.no.sub;
+        if (b.id === null || !sub?.noReturnsToMain) continue;
+        if (sub.no.notes.length + sub.no.taskIds.length === 0) continue;
+        const targetIdx = getMergeTargetIdx(b);
+        if (targetIdx < 0) continue;
+        const stemNode = mergeStemRefs.current.get(b.id);
+        const gapNode = mergeSlotRefs.current.get(targetIdx);
+        if (!stemNode || !gapNode) continue;
+        const [stem, gap] = await Promise.all([
+          measureInFlow(stemNode, container),
+          measureInFlow(gapNode, container),
+        ]);
+        if (!stem || !gap) continue;
+        const stemX = stem.x + stem.width / 2;
+        const mainX = gap.x + gap.width / 2;
+        const cornerY = gap.y + gap.height / 2;
+        if (cornerY <= stem.y || stemX <= mainX + 4) continue;
+        // one View: borderRight = vertical drop, borderBottom = horizontal into
+        // the main line; extend 3px past the main line so the T-joint never gaps
+        next[b.id] = {
+          left: mainX - 3,
+          top: stem.y,
+          width: stemX + 1 - (mainX - 3),
+          height: cornerY - stem.y,
+        };
+      }
+      if (req !== mergeMeasureReq.current) return;
+      if (JSON.stringify(next) !== JSON.stringify(mergeLinesRef.current)) {
+        setMergeLines(next);
+      }
+    });
+  }, [branches, getMergeTargetIdx]);
+
+  useEffect(() => { scheduleMergeMeasure(); }, [scheduleMergeMeasure, slots, isEditing, dueTasks]);
   const estimateSubItemStackHeight = (items: SimpleItems, compact: boolean) => {
     const count = countSimpleItems(items);
     if (count === 0) return compact ? 18 : 20;
@@ -870,8 +934,7 @@ export default function FlowScreen({ navigation }: Props) {
     const labelHeight = compact ? 14 : 16;
     const yesHeight = labelHeight + estimateSubItemStackHeight(sub.yes, compact);
     const noHeight = labelHeight + estimateSubItemStackHeight(sub.no, compact);
-    const mergeExtra = 0;
-    return introHeight + (sub.yesReturns ? noHeight : Math.max(yesHeight, noHeight)) + mergeExtra;
+    return introHeight + (sub.yesReturns ? noHeight : Math.max(yesHeight, noHeight));
   };
 
   const getBranchLayout = (b: BranchNode, compact = false, insertMode = false) => {
@@ -888,7 +951,12 @@ export default function FlowScreen({ navigation }: Props) {
     const routeHeight = Math.max(baseRouteHeight, 30 + itemCount * itemHeight + (itemCount - 1) * itemGap + subExtra + slotExtra);
     const flowHeight = routeTop + routeHeight + (compact ? 32 : 30);
     const yesHeight = compact ? Math.max(150, routeHeight) : Math.max(160, routeHeight);
-    return { routeHeight, flowHeight, yesHeight };
+    // when the sub NO path merges back to main, the rail's vertical stops above
+    // the sub-branch: the L-shape overlay is the only line below it
+    const railHeight = sub?.noReturnsToMain
+      ? Math.min(routeHeight, (compact ? 24 : 30) + itemCount * itemHeight + slotExtra + 26)
+      : routeHeight;
+    return { routeHeight, flowHeight, yesHeight, railHeight };
   };
 
   const renderSubItems = (items: SimpleItems, compact = false) => {
@@ -913,14 +981,19 @@ export default function FlowScreen({ navigation }: Props) {
     );
   };
 
-  const renderSubMergeToMain = (compact = false) => (
-    <View style={s.subReturnMergeWrap}>
-      <View style={compact ? s.subReturnMergeStemCompact : s.subReturnMergeStemWide} />
-      <View style={compact ? s.subReturnMergeLineCompact : s.subReturnMergeLineWide} />
-    </View>
+  const renderMergeStemMarker = (branchId: number) => (
+    <View
+      ref={node => {
+        if (node) mergeStemRefs.current.set(branchId, node);
+        else mergeStemRefs.current.delete(branchId);
+      }}
+      collapsable={false}
+      onLayout={scheduleMergeMeasure}
+      style={{ alignSelf: 'stretch', height: 0 }}
+    />
   );
 
-  const renderSubDiamond = (sub: SubBranch, parent?: BranchNode, compact = false) => (
+  const renderSubDiamond = (sub: SubBranch, parent?: BranchNode, compact = false, branchId?: number | null) => (
     <View style={s.subBranchWrap}>
       <ArrowDown color={C.line} h={8} />
       <View style={s.subDiamondShell}>
@@ -956,9 +1029,10 @@ export default function FlowScreen({ navigation }: Props) {
       {sub.yesReturns ? (
         <View style={[s.subPaths, s.subPathsNoReturn, compact ? s.subPathsNoReturnCompact : s.subPathsNoReturnWide]}>
           <View style={[s.subNoCol, compact ? s.subColCompact : s.subColWide]}>
+            {sub.noReturnsToMain ? <View style={s.subNoColLine} pointerEvents="none" /> : null}
             <Text style={s.subPathNoLbl}>いいえ</Text>
             {renderSubItems(sub.no, compact)}
-            {sub.noReturnsToMain && countSimpleItems(sub.no) > 0 ? renderSubMergeToMain(compact) : null}
+            {sub.noReturnsToMain && countSimpleItems(sub.no) > 0 && branchId != null ? renderMergeStemMarker(branchId) : null}
           </View>
         </View>
       ) : (
@@ -971,7 +1045,7 @@ export default function FlowScreen({ navigation }: Props) {
           <View style={[s.subNoCol, compact ? s.subColCompact : s.subColWide]}>
             <Text style={s.subPathNoLbl}>いいえ</Text>
             {renderSubItems(sub.no, compact)}
-            {sub.noReturnsToMain && countSimpleItems(sub.no) > 0 ? renderSubMergeToMain(compact) : null}
+            {sub.noReturnsToMain && countSimpleItems(sub.no) > 0 && branchId != null ? renderMergeStemMarker(branchId) : null}
           </View>
         </View>
       )}
@@ -1005,7 +1079,7 @@ export default function FlowScreen({ navigation }: Props) {
       return (
         <>
           {hasAny ? allEntries.map(([, node]) => node) : <Text style={s.branchPathEmpty}>なし</Text>}
-          {b.no.sub && renderSubDiamond(b.no.sub, b)}
+          {b.no.sub && renderSubDiamond(b.no.sub, b, false, b.id)}
         </>
       );
     }
@@ -1016,7 +1090,7 @@ export default function FlowScreen({ navigation }: Props) {
       out.push(slot(`post-${key}`));
     });
     if (b.no.sub) {
-      out.push(<React.Fragment key="sub">{renderSubDiamond(b.no.sub, b)}</React.Fragment>);
+      out.push(<React.Fragment key="sub">{renderSubDiamond(b.no.sub, b, false, b.id)}</React.Fragment>);
       out.push(slot('post-sub'));
     }
     return <>{out}</>;
@@ -1049,7 +1123,7 @@ export default function FlowScreen({ navigation }: Props) {
           <View
             style={[
               s.viewBranchNoRail,
-              { height: layout.routeHeight },
+              { height: layout.railHeight },
               (b.no.sub?.yesReturns || b.no.sub?.noReturnsToMain) ? s.viewBranchNoRailReturnless : null,
             ]}
             pointerEvents="none"
@@ -1057,7 +1131,7 @@ export default function FlowScreen({ navigation }: Props) {
           <Text style={s.viewBranchNoLabel}>いいえ</Text>
           <View style={s.viewBranchNoItems}>
             {renderPathItems(b.no, true)}
-            {b.no.sub && renderSubDiamond(b.no.sub, undefined, true)}
+            {b.no.sub && renderSubDiamond(b.no.sub, undefined, true, b.id)}
           </View>
         </View>
         <View style={s.viewBranchNoMergeLine} pointerEvents="none" />
@@ -1103,7 +1177,7 @@ export default function FlowScreen({ navigation }: Props) {
           <View
             style={[
               s.branchNoRail,
-              { height: layout.routeHeight },
+              { height: layout.railHeight },
               (b.no.sub?.yesReturns || b.no.sub?.noReturnsToMain) ? s.branchNoRailReturnless : null,
             ]}
             pointerEvents="none"
@@ -1171,10 +1245,16 @@ export default function FlowScreen({ navigation }: Props) {
           <React.Fragment key={idx}>
             <View style={s.viewSlotWrap}>
               {isMergeTarget ? (
-                <View style={{ alignItems: 'center', marginVertical: 2, position: 'relative', overflow: 'visible' }} pointerEvents="none">
-                  <View style={{ position: 'absolute', top: 0, left: '50%' as any, width: 220, height: 2, backgroundColor: C.line }} />
-                  <View style={{ width: 2, height: 72, backgroundColor: C.line }} />
-                  <View style={{ width: 0, height: 0, borderLeftWidth: 5, borderRightWidth: 5, borderTopWidth: 8, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: C.line }} />
+                <View
+                  ref={node => {
+                    if (node) mergeSlotRefs.current.set(idx, node);
+                    else mergeSlotRefs.current.delete(idx);
+                  }}
+                  collapsable={false}
+                  onLayout={scheduleMergeMeasure}
+                  pointerEvents="none"
+                >
+                  <ArrowDown color={C.line} h={48} />
                 </View>
               ) : (
                 <ArrowDown color={C.line} h={30} />
@@ -1221,6 +1301,7 @@ export default function FlowScreen({ navigation }: Props) {
       {slots.map((taskId, idx) => {
         const task = taskId !== null ? taskById.get(taskId) : undefined;
         const isThisDragging = draggingIdx === idx;
+        const isMergeTarget = noReturnTargets.has(idx);
         const shiftAnim = shiftAnims.current[idx] ?? new Animated.Value(0);
         const pan = task ? getSlotPan(idx) : null;
 
@@ -1235,7 +1316,21 @@ export default function FlowScreen({ navigation }: Props) {
               ]}
               onLayout={(e) => { slotHRef.current = e.nativeEvent.layout.height; }}
             >
-              <ArrowDown color={C.line} h={30} />
+              {isMergeTarget ? (
+                <View
+                  ref={node => {
+                    if (node) mergeSlotRefs.current.set(idx, node);
+                    else mergeSlotRefs.current.delete(idx);
+                  }}
+                  collapsable={false}
+                  onLayout={scheduleMergeMeasure}
+                  pointerEvents="none"
+                >
+                  <ArrowDown color={C.line} h={48} />
+                </View>
+              ) : (
+                <ArrowDown color={C.line} h={30} />
+              )}
               {task ? (
                 <View style={[
                   s.slotBase,
@@ -1345,7 +1440,12 @@ export default function FlowScreen({ navigation }: Props) {
             onResponderRelease={endPinch}
             onResponderTerminate={endPinch}
           >
-            <View style={[flowContentStyle, { width: flowLaneWidth }]}>
+            <View
+              ref={flowContentRef}
+              collapsable={false}
+              style={[flowContentStyle, { width: flowLaneWidth }]}
+              onLayout={scheduleMergeMeasure}
+            >
               {dueTasks.length === 0 ? (
                 <View style={s.emptyFlow}>
                   <Text style={s.emptyTitle}>この日のフローはありません</Text>
@@ -1366,6 +1466,22 @@ export default function FlowScreen({ navigation }: Props) {
                   )}
                 </View>
               ) : isEditing ? renderEditFlow() : renderViewFlow()}
+              {Object.entries(mergeLines).map(([bid, r]) => (
+                <View
+                  key={`merge${bid}`}
+                  pointerEvents="none"
+                  style={{
+                    position: 'absolute',
+                    left: r.left,
+                    top: r.top,
+                    width: r.width,
+                    height: r.height,
+                    borderRightWidth: 2,
+                    borderBottomWidth: 2,
+                    borderColor: C.line,
+                  }}
+                />
+              ))}
             </View>
           </View>
         </Animated.View>
