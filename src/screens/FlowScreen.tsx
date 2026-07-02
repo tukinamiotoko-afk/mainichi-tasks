@@ -287,7 +287,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   subColCompact: { width: 162, overflow: 'visible' },
   subPathDiv: { width: 1, backgroundColor: C.line, alignSelf: 'stretch', marginVertical: 2 },
   subPathYesLbl: { color: C.line, fontSize: 9, fontWeight: '900', marginBottom: 3 },
-  subPathNoLbl: { color: C.line, fontSize: 9, fontWeight: '900', marginBottom: 3, backgroundColor: C.body, paddingHorizontal: 4, zIndex: 1 },
+  subPathNoLbl: { color: C.line, fontSize: 9, fontWeight: '900', marginBottom: 3, right: 24, zIndex: 1 },
   subItemBox: { width: 180, minHeight: 48, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8, borderWidth: 1.5, borderColor: '#22c55e', backgroundColor: '#f0fdf4', marginBottom: 6, alignItems: 'center', justifyContent: 'center' },
   subItemBoxCompact: { width: 162, minHeight: 42, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 7, marginBottom: 5 },
   subItemText: { color: '#166534', fontSize: 12, fontWeight: '700', textAlign: 'center', lineHeight: 16 },
