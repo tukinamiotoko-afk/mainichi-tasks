@@ -24,8 +24,10 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 const pad = (n: number) => String(n).padStart(2, '0');
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'Flow'> };
 type SimpleItems = { taskIds: number[]; notes: string[] };
-type SubBranch = { question: string; yes: SimpleItems; no: SimpleItems; yesReturns: boolean; noReturnsToMain?: boolean };
-type BranchPathData = { taskIds: number[]; notes: string[]; sub?: SubBranch };
+type PathAfter = 'merge' | 'end';
+// recursive: any path can carry a nested sub-branch (rendering currently stops at depth 2)
+type SubBranch = { question: string; yes: BranchPathData; no: BranchPathData; yesReturns: boolean; noReturnsToMain?: boolean };
+type BranchPathData = { taskIds: number[]; notes: string[]; after?: PathAfter; sub?: SubBranch };
 type BranchNode = { id: number | null; insertAfterIdx: number; question: string; yes: BranchPathData; no: BranchPathData };
 
 function ArrowDown({ color, h = 18 }: { color: string; h?: number }) {
@@ -38,49 +40,51 @@ function ArrowDown({ color, h = 18 }: { color: string; h?: number }) {
 }
 
 const emptyPath = (): BranchPathData => ({ taskIds: [], notes: [] });
-const emptyItems = (): SimpleItems => ({ taskIds: [], notes: [] });
-const emptySubBranch = (): SubBranch => ({ question: '', yesReturns: true, noReturnsToMain: false, yes: emptyItems(), no: emptyItems() });
+const emptySubBranch = (): SubBranch => ({ question: '', yesReturns: true, noReturnsToMain: false, yes: emptyPath(), no: emptyPath() });
 
-const parseSimpleItems = (raw: unknown): SimpleItems => ({
-  taskIds: Array.isArray((raw as any)?.taskIds) ? (raw as any).taskIds.filter((v: unknown): v is number => typeof v === 'number') : [],
-  notes: Array.isArray((raw as any)?.notes) ? (raw as any).notes.filter((v: unknown): v is string => typeof v === 'string' && v.trim().length > 0) : [],
-});
+const parsePathData = (raw: unknown): BranchPathData => {
+  const r = raw as any;
+  const base: BranchPathData = {
+    taskIds: Array.isArray(r?.taskIds) ? r.taskIds.filter((v: unknown): v is number => typeof v === 'number') : [],
+    notes: Array.isArray(r?.notes) ? r.notes.filter((v: unknown): v is string => typeof v === 'string' && v.trim().length > 0) : [],
+  };
+  if (r?.after === 'end') base.after = 'end';
+  if (r?.sub) {
+    base.sub = {
+      question: typeof r.sub.question === 'string' ? r.sub.question : '',
+      yesReturns: r.sub.yesReturns !== false,
+      noReturnsToMain: r.sub.noReturnsToMain === true,
+      yes: parsePathData(r.sub.yes),
+      no: parsePathData(r.sub.no),
+    };
+  }
+  return base;
+};
 
 const parseBranchPath = (raw: string | null): BranchPathData => {
   if (!raw) return emptyPath();
   try {
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) return { taskIds: parsed.filter(v => typeof v === 'number'), notes: [] };
-    const base: BranchPathData = {
-      taskIds: Array.isArray(parsed?.taskIds) ? parsed.taskIds.filter((v: unknown): v is number => typeof v === 'number') : [],
-      notes: Array.isArray(parsed?.notes) ? parsed.notes.filter((v: unknown): v is string => typeof v === 'string' && v.trim().length > 0) : [],
-    };
-    if (parsed?.sub) {
-      base.sub = {
-        question: typeof parsed.sub.question === 'string' ? parsed.sub.question : '',
-        yesReturns: parsed.sub.yesReturns !== false,
-        noReturnsToMain: parsed.sub.noReturnsToMain === true,
-        yes: parseSimpleItems(parsed.sub.yes),
-        no: parseSimpleItems(parsed.sub.no),
-      };
-    }
-    return base;
+    return parsePathData(parsed);
   } catch {
     return { taskIds: [], notes: raw.trim() ? [raw.trim()] : [] };
   }
 };
 
-const stringifyBranchPath = (path: BranchPathData) => JSON.stringify({
+const stringifyPathData = (path: BranchPathData): Record<string, unknown> => ({
   taskIds: path.taskIds,
   notes: path.notes.map(n => n.trim()).filter(Boolean),
+  ...(path.after === 'end' ? { after: 'end' } : {}),
   ...(path.sub ? { sub: {
     question: path.sub.question,
     yesReturns: path.sub.yesReturns,
     noReturnsToMain: path.sub.noReturnsToMain === true,
-    yes: { taskIds: path.sub.yes.taskIds, notes: path.sub.yes.notes.map(n => n.trim()).filter(Boolean) },
-    no: { taskIds: path.sub.no.taskIds, notes: path.sub.no.notes.map(n => n.trim()).filter(Boolean) },
+    yes: stringifyPathData(path.sub.yes),
+    no: stringifyPathData(path.sub.no),
   }} : {}),
 });
+const stringifyBranchPath = (path: BranchPathData) => JSON.stringify(stringifyPathData(path));
 
 const makeStyles = (C: ColorSet) => StyleSheet.create({
   root: { flex: 1, backgroundColor: C.body },
@@ -294,10 +298,6 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   subItemTextCompact: { fontSize: 11, lineHeight: 15 },
   subItemEmpty: { color: C.muted, fontSize: 9, fontStyle: 'italic', textAlign: 'center' },
   subNoColLine: { position: 'absolute', top: -26, bottom: 0, width: 2, backgroundColor: C.line, alignSelf: 'center', zIndex: 0 },
-  subAddBtn: { marginTop: 10, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, borderWidth: 1.5, borderStyle: 'dashed', borderColor: '#fb923c', alignItems: 'center', backgroundColor: '#fff7ed' },
-  subAddBtnText: { color: '#c2410c', fontSize: 11, fontWeight: '700' },
-  subRemoveBtn: { marginTop: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fca5a5', alignItems: 'center', alignSelf: 'flex-end' },
-  subRemoveBtnText: { color: '#dc2626', fontSize: 11, fontWeight: '700' },
 
   // ── no-route insert slots ──
   noInsertSlot: { paddingVertical: 7, borderWidth: 1.5, borderColor: '#fb923c', borderStyle: 'dashed', borderRadius: 8, alignItems: 'center', backgroundColor: '#fff7ed' },
@@ -362,6 +362,7 @@ export default function FlowScreen({ navigation }: Props) {
   const [branchNoteDraft, setBranchNoteDraft] = useState({ yes: '', no: '' });
   const [subNoteDraft, setSubNoteDraft] = useState({ yes: '', no: '' });
   const [noRouteBranchEditorOpen, setNoRouteBranchEditorOpen] = useState(false);
+  const [branchNoTasksExpanded, setBranchNoTasksExpanded] = useState(false);
   const [yesTasksExpanded, setYesTasksExpanded] = useState(false);
   const [noRouteBranchParent, setNoRouteBranchParent] = useState<BranchNode | null>(null);
   const [noRouteSubDraft, setNoRouteSubDraft] = useState<SubBranch | null>(null);
@@ -776,12 +777,15 @@ export default function FlowScreen({ navigation }: Props) {
     setBranchDraft(p => p ? ({ ...p, [path]: { ...p[path], notes: p[path].notes.filter((_, i) => i !== idx) } }) : p);
   };
 
-  const addSubBranch = () => {
-    setBranchDraft(p => p ? { ...p, no: { ...p.no, sub: emptySubBranch() } } : p);
-    setSubNoteDraft({ yes: '', no: '' });
-  };
-  const removeSubBranch = () => {
-    setBranchDraft(p => p ? { ...p, no: { ...p.no, sub: undefined } } : p);
+  // three-way "サブタスクのその後": end here / merge back to main / continue with a sub-branch
+  const noAfterMode: 'end' | 'merge' | 'sub' = branchDraft?.no.sub ? 'sub' : (branchDraft?.no.after === 'end' ? 'end' : 'merge');
+  const setNoAfterMode = (mode: 'end' | 'merge' | 'sub') => {
+    if (mode === 'sub') setSubNoteDraft({ yes: '', no: '' });
+    setBranchDraft(p => {
+      if (!p) return p;
+      if (mode === 'sub') return { ...p, no: { ...p.no, sub: p.no.sub ?? emptySubBranch(), after: undefined } };
+      return { ...p, no: { ...p.no, sub: undefined, after: mode === 'end' ? 'end' : undefined } };
+    });
   };
   const setSubNoReturnToMain = (enabled: boolean) => {
     setBranchDraft(p => p?.no.sub ? { ...p, no: { ...p.no, sub: { ...p.no.sub, noReturnsToMain: enabled } } } : p);
@@ -1125,7 +1129,7 @@ export default function FlowScreen({ navigation }: Props) {
             style={[
               s.viewBranchNoRail,
               { height: layout.railHeight },
-              (b.no.sub?.yesReturns || b.no.sub?.noReturnsToMain) ? s.viewBranchNoRailReturnless : null,
+              (b.no.sub ? (b.no.sub.yesReturns || b.no.sub.noReturnsToMain) : b.no.after === 'end') ? s.viewBranchNoRailReturnless : null,
             ]}
             pointerEvents="none"
           />
@@ -1179,7 +1183,7 @@ export default function FlowScreen({ navigation }: Props) {
             style={[
               s.branchNoRail,
               { height: layout.railHeight },
-              (b.no.sub?.yesReturns || b.no.sub?.noReturnsToMain) ? s.branchNoRailReturnless : null,
+              (b.no.sub ? (b.no.sub.yesReturns || b.no.sub.noReturnsToMain) : b.no.after === 'end') ? s.branchNoRailReturnless : null,
             ]}
             pointerEvents="none"
           />
@@ -1602,29 +1606,49 @@ export default function FlowScreen({ navigation }: Props) {
                 </View>
               </View>
               <View style={s.branchEditorSection}>
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <Text style={[s.branchEditorLabel, { flex: 1 }]}>いいえで右に出すタスク</Text>
-                  <View style={s.branchCheckLabels}>
-                    <Text style={s.branchCheckLabelN}>いいえ</Text>
-                  </View>
+                <Text style={s.branchEditorLabel}>いいえで右に出すタスク</Text>
+                <TouchableOpacity
+                  style={[s.branchNoteInput, { marginTop: 8, flex: 0 }]}
+                  onPress={() => setBranchNoTasksExpanded(true)}
+                  activeOpacity={0.75}
+                >
+                  {(branchDraft?.no.taskIds.length ?? 0) > 0 ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <View style={{ flex: 1 }}>
+                        {(branchDraft?.no.taskIds ?? []).map(id => {
+                          const t = taskById.get(id);
+                          if (!t) return null;
+                          return (
+                            <Text key={`bnChip${id}`} style={{ color: '#374151', fontSize: 12 }} numberOfLines={1}>{t.icon ? `${t.icon} ` : ''}{t.title}</Text>
+                          );
+                        })}
+                      </View>
+                      <Text style={[s.branchReturnBtnText, { marginLeft: 8 }]}>▼</Text>
+                    </View>
+                  ) : (
+                    <Text style={[s.branchReturnBtnText, { textAlign: 'center' }]}>タスクを選択 ▼</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+              <View style={s.branchEditorSection}>
+                <Text style={s.branchEditorLabel}>サブタスクのその後</Text>
+                <View style={s.branchReturnRow}>
+                  <TouchableOpacity style={[s.branchReturnBtn, noAfterMode === 'end' && s.branchReturnBtnOn]} onPress={() => setNoAfterMode('end')}>
+                    <Text style={[s.branchReturnBtnText, noAfterMode === 'end' && s.branchReturnBtnTextOn]}>そのまま終了</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[s.branchReturnBtn, noAfterMode === 'merge' && s.branchReturnBtnOn]} onPress={() => setNoAfterMode('merge')}>
+                    <Text style={[s.branchReturnBtnText, noAfterMode === 'merge' && s.branchReturnBtnTextOn]}>メインに合流</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[s.branchReturnBtn, noAfterMode === 'sub' && s.branchReturnBtnOn]} onPress={() => setNoAfterMode('sub')}>
+                    <Text style={[s.branchReturnBtnText, noAfterMode === 'sub' && s.branchReturnBtnTextOn]}>サブ分岐を追加</Text>
+                  </TouchableOpacity>
                 </View>
               </View>
-              {dueTasks.map(t => {
-                const inN = branchDraft?.no.taskIds.includes(t.id) ?? false;
-                return (
-                  <View key={t.id} style={s.branchTaskRow}>
-                    <Text style={s.branchTaskText} numberOfLines={2}>{t.icon ? `${t.icon} ` : ''}{t.title}</Text>
-                    <TouchableOpacity style={[s.branchCheckN, inN && s.branchCheckNOn]} onPress={() => toggleBranchN(t.id)}>
-                      {inN && <Text style={s.branchCheckText}>✓</Text>}
-                    </TouchableOpacity>
-                  </View>
-                );
-              })}
 
               {/* Sub-branch section */}
+              {branchDraft?.no.sub ? (
               <View style={[s.branchEditorSection, { borderTopWidth: 1, borderTopColor: '#fed7aa', marginTop: 8, paddingTop: 16 }]}>
-                <Text style={s.branchEditorLabel}>いいえルートにサブ分岐を追加</Text>
-                {branchDraft?.no.sub ? (
+                <Text style={s.branchEditorLabel}>サブ分岐の設定</Text>
                   <>
                     <TextInput
                       style={s.branchEditorInput}
@@ -1646,7 +1670,7 @@ export default function FlowScreen({ navigation }: Props) {
                       <TextInput style={s.branchNoteInput} value={subNoteDraft.no} onChangeText={t => setSubNoteDraft(p => ({ ...p, no: t }))} placeholder="いいえルートの内容" placeholderTextColor="#cbd5e1" returnKeyType="done" onSubmitEditing={() => addSubNote('no')} />
                       <TouchableOpacity style={s.branchNoteAddBtn} onPress={() => addSubNote('no')}><Text style={s.branchNoteAddText}>追加</Text></TouchableOpacity>
                     </View>
-                    <Text style={[s.branchEditorLabel, { marginTop: 12, color: '#15803d' }]}>はいで左に戻る（メインフローへ）</Text>
+                    <Text style={[s.branchEditorLabel, { marginTop: 12, color: '#15803d' }]}>はいで左に戻るタスク</Text>
                     <View style={s.branchNoteList}>
                       {(branchDraft.no.sub.yes.notes ?? []).map((note, idx) => (
                         <TouchableOpacity key={`sy${note}${idx}`} style={s.branchNoteChip} onPress={() => removeSubNote('yes', idx)} activeOpacity={0.75}>
@@ -1683,16 +1707,9 @@ export default function FlowScreen({ navigation }: Props) {
                         </View>
                       );
                     })}
-                    <TouchableOpacity style={s.subRemoveBtn} onPress={removeSubBranch}>
-                      <Text style={s.subRemoveBtnText}>サブ分岐を削除</Text>
-                    </TouchableOpacity>
                   </>
-                ) : (
-                  <TouchableOpacity style={s.subAddBtn} onPress={addSubBranch}>
-                    <Text style={s.subAddBtnText}>＋ サブ分岐を追加（はいで左に戻る）</Text>
-                  </TouchableOpacity>
-                )}
               </View>
+              ) : null}
 
             </ScrollView>
           </TouchableOpacity>
@@ -1748,7 +1765,7 @@ export default function FlowScreen({ navigation }: Props) {
               </View>
 
               <View style={s.branchEditorSection}>
-                <Text style={[s.branchEditorLabel, { color: '#15803d' }]}>はいで左に戻る（メインフローへ）</Text>
+                <Text style={[s.branchEditorLabel, { color: '#15803d' }]}>はいで左に戻るタスク</Text>
                 <TouchableOpacity
                   style={[s.branchNoteInput, { marginTop: 8, flex: 0 }]}
                   onPress={() => setYesTasksExpanded(true)}
@@ -1795,7 +1812,7 @@ export default function FlowScreen({ navigation }: Props) {
         <TouchableOpacity style={s.pickerOverlay} activeOpacity={1} onPress={() => setYesTasksExpanded(false)}>
           <View style={{ backgroundColor: C.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '72%' }} onStartShouldSetResponder={() => true}>
             <View style={s.pickerHeader}>
-              <Text style={[s.pickerTitle, { color: '#15803d' }]}>はいで左に戻る（タスクを選択）</Text>
+              <Text style={[s.pickerTitle, { color: '#15803d' }]}>はいで左に戻るタスク</Text>
               <TouchableOpacity onPress={() => setYesTasksExpanded(false)}>
                 <Text style={s.pickerDone}>完了</Text>
               </TouchableOpacity>
@@ -1810,6 +1827,35 @@ export default function FlowScreen({ navigation }: Props) {
                     <Text style={s.branchTaskText} numberOfLines={2}>{t.icon ? `${t.icon} ` : ''}{t.title}</Text>
                     <TouchableOpacity style={[s.branchCheckY, inYes && s.branchCheckYOn]} onPress={() => toggleNoRouteSubTask('yes', t.id)}>
                       {inYes && <Text style={s.branchCheckText}>✓</Text>}
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Main-branch NO-route task picker bottom sheet */}
+      <Modal visible={branchNoTasksExpanded} transparent animationType="slide" onRequestClose={() => setBranchNoTasksExpanded(false)}>
+        <TouchableOpacity style={s.pickerOverlay} activeOpacity={1} onPress={() => setBranchNoTasksExpanded(false)}>
+          <View style={{ backgroundColor: C.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '72%' }} onStartShouldSetResponder={() => true}>
+            <View style={s.pickerHeader}>
+              <Text style={[s.pickerTitle, { color: '#b91c1c' }]}>いいえで右に出すタスク</Text>
+              <TouchableOpacity onPress={() => setBranchNoTasksExpanded(false)}>
+                <Text style={s.pickerDone}>完了</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}>
+              {dueTasks.length === 0 ? (
+                <Text style={{ color: '#94a3b8', fontSize: 13, textAlign: 'center', paddingVertical: 24 }}>選択できるタスクがありません</Text>
+              ) : dueTasks.map(t => {
+                const inN = branchDraft?.no.taskIds.includes(t.id) ?? false;
+                return (
+                  <View key={`bnt${t.id}`} style={s.branchTaskRow}>
+                    <Text style={s.branchTaskText} numberOfLines={2}>{t.icon ? `${t.icon} ` : ''}{t.title}</Text>
+                    <TouchableOpacity style={[s.branchCheckN, inN && s.branchCheckNOn]} onPress={() => toggleBranchN(t.id)}>
+                      {inN && <Text style={s.branchCheckText}>✓</Text>}
                     </TouchableOpacity>
                   </View>
                 );
