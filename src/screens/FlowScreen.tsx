@@ -215,7 +215,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   branchNoRailReturnless: { borderBottomWidth: 0 },
   branchNoMergeLine: { display: 'none' },
   branchNoLabel: { position: 'absolute', top: -20, left: 192, color: C.line, fontSize: 11, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 4 },
-  branchNoItems: { position: 'absolute', top: 30, left: 96, width: 168, alignItems: 'stretch', gap: 6, overflow: 'visible' },
+  branchNoItems: { position: 'absolute', top: 44, left: 96, width: 168, alignItems: 'stretch', gap: 6, overflow: 'visible' },
   branchPathTask: { width: 168, minHeight: 44, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8, borderWidth: 1.5, borderColor: '#22c55e', backgroundColor: '#f0fdf4' },
   branchPathNote: { width: 168, minHeight: 44, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8, borderWidth: 1.5, borderColor: '#22c55e', backgroundColor: '#f0fdf4' },
   branchPathTaskText: { color: '#166534', fontSize: 12, fontWeight: '700', textAlign: 'center', lineHeight: 16 },
@@ -245,7 +245,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   viewBranchNoRailReturnless: { borderBottomWidth: 0 },
   viewBranchNoMergeLine: { display: 'none' },
   viewBranchNoLabel: { position: 'absolute', top: -18, left: 147, color: C.line, fontSize: 10, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 4 },
-  viewBranchNoItems: { position: 'absolute', top: 24, left: 94, width: 150, alignItems: 'stretch', gap: 5, overflow: 'visible' },
+  viewBranchNoItems: { position: 'absolute', top: 38, left: 94, width: 150, alignItems: 'stretch', gap: 5, overflow: 'visible' },
   viewBranchTaskBox: { width: 150, minHeight: 38, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 7, borderWidth: 1.5, borderColor: '#22c55e', backgroundColor: '#f0fdf4' },
   viewBranchNoteBox: { width: 150, minHeight: 38, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 7, borderWidth: 1.5, borderColor: '#22c55e', backgroundColor: '#f0fdf4' },
   viewBranchTask: { color: '#166534', fontSize: 11, fontWeight: '700', textAlign: 'center', lineHeight: 15 },
@@ -267,7 +267,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   subYesReturnLine: { position: 'absolute', top: 20, height: 2, backgroundColor: C.line, zIndex: 1 },
   subYesReturnLineWide: { left: -159, width: 159 },
   subYesReturnLineCompact: { left: -145, width: 145 },
-  subYesReturnLabel: { position: 'absolute', top: 4, color: C.line, fontSize: 9, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 5, zIndex: 3 },
+  subYesReturnLabel: { position: 'absolute', top: 0, color: C.line, fontSize: 9, fontWeight: '900', backgroundColor: C.body, paddingHorizontal: 5, zIndex: 3 },
   subYesReturnLabelWide: { left: -79 },
   subYesReturnLabelCompact: { left: -72 },
   subDiamondBtns: { position: 'absolute', bottom: 0, flexDirection: 'row', alignItems: 'center', gap: 6 },
@@ -948,13 +948,14 @@ export default function FlowScreen({ navigation }: Props) {
     const baseRouteHeight = compact ? 122 : 150;
     const slotCount = (insertMode && !compact) ? (rawItemCount + 1 + (sub ? 1 : 0)) : 0;
     const slotExtra = slotCount * 44;
-    const routeHeight = Math.max(baseRouteHeight, 30 + itemCount * itemHeight + (itemCount - 1) * itemGap + subExtra + slotExtra);
+    const itemsTop = compact ? 38 : 44;
+    const routeHeight = Math.max(baseRouteHeight, itemsTop + itemCount * itemHeight + (itemCount - 1) * itemGap + subExtra + slotExtra);
     const flowHeight = routeTop + routeHeight + (compact ? 32 : 30);
     const yesHeight = compact ? Math.max(150, routeHeight) : Math.max(160, routeHeight);
     // when the sub NO path merges back to main, the rail's vertical stops above
     // the sub-branch: the L-shape overlay is the only line below it
     const railHeight = sub?.noReturnsToMain
-      ? Math.min(routeHeight, (compact ? 24 : 30) + itemCount * itemHeight + slotExtra + 26)
+      ? Math.min(routeHeight, itemsTop + itemCount * itemHeight + slotExtra + 26)
       : routeHeight;
     return { routeHeight, flowHeight, yesHeight, railHeight };
   };
@@ -1254,7 +1255,7 @@ export default function FlowScreen({ navigation }: Props) {
                   onLayout={scheduleMergeMeasure}
                   pointerEvents="none"
                 >
-                  <ArrowDown color={C.line} h={48} />
+                  <ArrowDown color={C.line} h={30} />
                 </View>
               ) : (
                 <ArrowDown color={C.line} h={30} />
@@ -1326,7 +1327,7 @@ export default function FlowScreen({ navigation }: Props) {
                   onLayout={scheduleMergeMeasure}
                   pointerEvents="none"
                 >
-                  <ArrowDown color={C.line} h={48} />
+                  <ArrowDown color={C.line} h={30} />
                 </View>
               ) : (
                 <ArrowDown color={C.line} h={30} />
