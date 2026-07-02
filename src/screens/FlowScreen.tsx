@@ -976,11 +976,12 @@ export default function FlowScreen({ navigation }: Props) {
     const routeHeight = Math.max(baseRouteHeight, itemsTop + itemCount * itemHeight + (itemCount - 1) * itemGap + subExtra + slotExtra);
     const flowHeight = routeTop + routeHeight + (compact ? 32 : 30);
     const yesHeight = compact ? Math.max(150, routeHeight) : Math.max(160, routeHeight);
-    // when the sub NO path merges back to main, the rail's vertical stops above
-    // the sub-branch: the L-shape overlay is the only line below it
-    const railHeight = sub?.noReturnsToMain
-      ? Math.min(routeHeight, itemsTop + itemCount * itemHeight + slotExtra + 26)
-      : routeHeight;
+    // the rail's vertical stops at the NO-route content so the L-shape overlay
+    // (or nothing, for そのまま終了) is the only line below it
+    const stackBottom = itemsTop + itemCount * itemHeight + slotExtra;
+    const railHeight = sub
+      ? (sub.noReturnsToMain ? Math.min(routeHeight, stackBottom + 26) : routeHeight)
+      : Math.min(routeHeight, stackBottom - (compact ? 5 : 6));
     return { routeHeight, flowHeight, yesHeight, railHeight };
   };
 
