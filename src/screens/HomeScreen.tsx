@@ -595,7 +595,7 @@ const TaskRow = React.memo(function TaskRow({
         {(() => {
           const tagEl = (
             <TouchableOpacity style={s.tagBtn} onPress={() => onOpenDetail(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Text style={[s.tagIcon, !item.icon && s.tagIconEmpty]}>{item.icon ?? '🏷'}</Text>
+              <Text style={[s.tagIcon, !item.icon && s.tagIconEmpty]}>{item.icon ?? ''}</Text>
             </TouchableOpacity>
           );
           const checkEl = (
@@ -1441,7 +1441,7 @@ export default function HomeScreen({ navigation }: Props) {
         activeOpacity={0.8}
       >
         <View style={s.metaSelectLeft}>
-          <Text style={[s.metaSelectIcon, !icon && s.metaSelectIconEmpty]}>{icon ?? '🏷'}</Text>
+          <Text style={[s.metaSelectIcon, !icon && s.metaSelectIconEmpty]}>{icon ?? ''}</Text>
           <Text style={s.metaSelectText}>{icon ? 'アイコンを変更' : 'アイコンなし'}</Text>
         </View>
         <Text style={s.metaSelectArrow}>{openPicker === 'icon' ? '▲' : '▼'}</Text>
