@@ -3,7 +3,7 @@ import {
   View, Text, FlatList, TouchableOpacity, Modal,
   TextInput, StyleSheet, Alert, KeyboardAvoidingView,
   Platform, StatusBar, Animated, ScrollView, PanResponder, Dimensions, Switch,
-  LayoutAnimation, UIManager,
+  LayoutAnimation, UIManager, Easing,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSQLiteContext } from 'expo-sqlite';
@@ -701,11 +701,28 @@ export default function HomeScreen({ navigation }: Props) {
   if (activePanel) lastPanelRef.current = activePanel;
   const today = getToday();
   const [selectedDate, setSelectedDate] = useState(today);
+  const dateChangeAnim = useRef(new Animated.Value(1)).current;
+  const dateDirRef = useRef(1);
   const shiftSelected = (days: number) => {
+    dateDirRef.current = days >= 0 ? 1 : -1;
     const d = new Date(`${selectedDate}T00:00:00`);
     d.setDate(d.getDate() + days);
     setSelectedDate(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
   };
+  const jumpToToday = () => {
+    if (selectedDate === today) return;
+    dateDirRef.current = selectedDate < today ? 1 : -1;
+    setSelectedDate(today);
+  };
+  useEffect(() => {
+    dateChangeAnim.setValue(0);
+    Animated.timing(dateChangeAnim, {
+      toValue: 1,
+      duration: 320,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [selectedDate, dateChangeAnim]);
   const selDateObj = new Date(`${selectedDate}T00:00:00`);
 
   // Add task sheet draft
@@ -1501,8 +1518,21 @@ export default function HomeScreen({ navigation }: Props) {
           <TouchableOpacity onPress={() => shiftSelected(-1)} style={s.dateNavBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
             <Text style={s.dateNavArrow}>‹</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => setSelectedDate(today)} activeOpacity={0.7} style={s.dateNavCenter}>
-            <Text style={s.dateText}>{dateLabel}</Text>
+          <TouchableOpacity onPress={jumpToToday} activeOpacity={0.7} style={s.dateNavCenter}>
+            <Animated.Text
+              style={[
+                s.dateText,
+                {
+                  opacity: dateChangeAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 1], extrapolate: 'clamp' }),
+                  transform: [
+                    { translateY: dateChangeAnim.interpolate({ inputRange: [0, 1], outputRange: [dateDirRef.current * 14, 0], extrapolate: 'clamp' }) },
+                    { scale: dateChangeAnim.interpolate({ inputRange: [0, 0.6, 1], outputRange: [0.92, 1.08, 1], extrapolate: 'clamp' }) },
+                  ],
+                },
+              ]}
+            >
+              {dateLabel}
+            </Animated.Text>
             {!isToday && <Text style={s.dateTodayHint}>タップで今日へ</Text>}
           </TouchableOpacity>
           <TouchableOpacity onPress={() => shiftSelected(1)} style={s.dateNavBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
