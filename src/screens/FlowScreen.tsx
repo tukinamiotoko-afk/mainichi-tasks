@@ -110,7 +110,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   // ── view mode (compact) ──
   viewContent: { alignItems: 'center', paddingTop: 20, paddingBottom: 24, paddingHorizontal: 40, overflow: 'visible' },
   viewContentZoomed: { paddingHorizontal: 14 },
-  flowZoomWrap: { width: '100%', alignItems: 'center', alignSelf: 'center' },
+  flowZoomWrap: { width: '100%', alignItems: 'center', alignSelf: 'center', transformOrigin: 'top' },
   viewTerminator: { backgroundColor: C.termBg, borderWidth: 1.5, borderColor: C.termBorder, borderRadius: 18, paddingHorizontal: 22, paddingVertical: 7 },
   viewTerminatorText: { color: C.termText, fontSize: 12, fontWeight: '800', letterSpacing: 1 },
   viewSlotWrap: { width: '100%', overflow: 'visible' },
@@ -489,7 +489,9 @@ export default function FlowScreen({ navigation }: Props) {
     280,
     Math.min(viewportWidth - (isEditing ? 48 : 80), isEditing ? 420 : 360)
   );
-  const flowCanvasWidth = flowLaneWidth + (hasSideBranch ? (isEditing ? 280 : 240) : 0);
+  // the side branch draws via overflow, so the canvas stays at lane width;
+  // widening it only produced symmetric dead margins
+  const flowCanvasWidth = flowLaneWidth;
   const flowContentStyle = [
     isEditing ? s.editContent : s.viewContent,
     hasSideBranch && (isEditing ? s.editContentZoomed : s.viewContentZoomed),
@@ -518,7 +520,7 @@ export default function FlowScreen({ navigation }: Props) {
     const startDistance = pinchStartDistanceRef.current;
     const distance = getPinchDistance(e);
     if (!startDistance || !distance) return;
-    const nextScale = Math.max(0.58, Math.min(1.35, pinchStartScaleRef.current * (distance / startDistance)));
+    const nextScale = Math.max(0.4, Math.min(1.35, pinchStartScaleRef.current * (distance / startDistance)));
     setManualFlowScale(nextScale);
   };
 
