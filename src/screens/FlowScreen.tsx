@@ -174,6 +174,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   pickerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   pickerOverlayTop: { justifyContent: 'flex-start' },
   pickerSheet: { backgroundColor: C.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '75%' },
+  pickerSheetTop: { borderTopLeftRadius: 0, borderTopRightRadius: 0, borderBottomLeftRadius: 20, borderBottomRightRadius: 20, overflow: 'hidden' },
   pickerHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: C.grid },
   pickerTitle: { flex: 1, color: C.ink, fontSize: 16, fontWeight: '800' },
   pickerDone: { color: '#7c3aed', fontSize: 15, fontWeight: '800' },
@@ -405,6 +406,7 @@ export default function FlowScreen({ navigation }: Props) {
   const [autoFitScale, setAutoFitScale] = useState<number | null>(null);
   const [isPinching, setIsPinching] = useState(false);
   const topEditorAnim = useRef(new Animated.Value(0)).current;
+  const flowListAnim = useRef(new Animated.Value(0)).current;
 
   // ── drag-to-reorder state ──
   const [draggingIdx, setDraggingIdx] = useState<number | null>(null);
@@ -435,6 +437,13 @@ export default function FlowScreen({ navigation }: Props) {
       useNativeDriver: true,
     }).start();
   }, [branchEditorOpen, noRouteBranchEditorOpen, topEditorAnim]);
+  useEffect(() => {
+    Animated.timing(flowListAnim, {
+      toValue: flowListOpen ? 1 : 0,
+      duration: flowListOpen ? 220 : 160,
+      useNativeDriver: true,
+    }).start();
+  }, [flowListOpen, flowListAnim]);
 
   const isToday = selectedDate === today;
   const selDateObj = useMemo(() => new Date(`${selectedDate}T00:00:00`), [selectedDate]);
@@ -1734,9 +1743,20 @@ export default function FlowScreen({ navigation }: Props) {
       </Modal>
 
       {/* Flow chart list / add sheet */}
-      <Modal visible={flowListOpen} transparent animationType="slide" onRequestClose={() => setFlowListOpen(false)}>
-        <TouchableOpacity style={s.pickerOverlay} activeOpacity={1} onPress={() => setFlowListOpen(false)}>
-          <TouchableOpacity activeOpacity={1} style={s.pickerSheet} onPress={() => {}}>
+      <Modal visible={flowListOpen} transparent animationType="fade" onRequestClose={() => setFlowListOpen(false)}>
+        <TouchableOpacity style={[s.pickerOverlay, s.pickerOverlayTop]} activeOpacity={1} onPress={() => setFlowListOpen(false)}>
+          <Animated.View
+            style={[
+              s.pickerSheet,
+              s.pickerSheetTop,
+              {
+                marginTop: insets.top + 12,
+                transform: [{ translateY: flowListAnim.interpolate({ inputRange: [0, 1], outputRange: [-28, 0] }) }],
+                opacity: flowListAnim,
+              },
+            ]}
+          >
+            <TouchableOpacity activeOpacity={1} onPress={() => {}}>
             <View style={s.pickerHeader}>
               <Text style={s.pickerTitle}>フローチャート</Text>
               <TouchableOpacity onPress={() => setFlowListOpen(false)}>
@@ -1794,7 +1814,8 @@ export default function FlowScreen({ navigation }: Props) {
                 </TouchableOpacity>
               </View>
             </ScrollView>
-          </TouchableOpacity>
+            </TouchableOpacity>
+          </Animated.View>
         </TouchableOpacity>
       </Modal>
 

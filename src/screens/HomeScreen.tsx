@@ -945,7 +945,7 @@ export default function HomeScreen({ navigation }: Props) {
     await patchDetail({ notify: value ? 1 : 0 });
   };
 
-  const done = tasks.filter((t) => completedIds.has(t.id)).length;
+  const done = useMemo(() => tasks.filter((t) => completedIds.has(t.id)).length, [tasks, completedIds]);
   const total = tasks.length;
   const progress = total > 0 ? done / total : 0;
   // Gauge gradient color by completion ratio.
@@ -955,14 +955,14 @@ export default function HomeScreen({ navigation }: Props) {
     progress >= 0.34 ? ['#facc15', '#f59e0b'] :
     ['#fb7185', '#e11d48']
   ) as readonly [string, string];
-  const sortedTasks = [...tasks].sort((a, b) => {
+  const sortedTasks = useMemo(() => [...tasks].sort((a, b) => {
     if (a.sort_order !== b.sort_order) return a.sort_order - b.sort_order;
     return a.id - b.id;
-  });
+  }), [tasks]);
 
   // Drag reorder only makes sense in unfiltered manual order.
   const reorderEnabled = sortKey === 'manual' && filterStatus === 'all' && filterFreq === 'all' && filterDue === 'all';
-  const displayedTasks = (() => {
+  const displayedTasks = useMemo(() => {
     // Hide one-time tasks whose day has already passed.
     let list = sortedTasks.filter((t) => {
       if (t.freq_type === 'once' && t.once_date && t.once_date < selectedDate) return false;
@@ -989,7 +989,7 @@ export default function HomeScreen({ navigation }: Props) {
       list = [...list].sort((a, b) => a.title.localeCompare(b.title, 'ja'));
     }
     return list;
-  })();
+  }, [sortedTasks, selectedDate, filterStatus, filterFreq, filterDue, sortKey, completedIds, selDateObj]);
   displayedTasksRef.current = displayedTasks;
 
   const persistTaskOrder = async () => {
