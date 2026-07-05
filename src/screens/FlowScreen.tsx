@@ -189,6 +189,17 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   pickerEmptyText: { color: C.muted, fontSize: 14 },
   pickerIconGroupRow: { paddingHorizontal: 20, paddingVertical: 10, backgroundColor: '#f5f3ff', borderBottomWidth: 1, borderBottomColor: C.grid },
   pickerIconGroupText: { color: '#7c3aed', fontSize: 12, fontWeight: '800' },
+  pickerControls: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 4, borderBottomWidth: 1, borderBottomColor: C.grid, gap: 8 },
+  pickerControlRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 },
+  pickerControlLabel: { color: C.muted, fontSize: 11, fontWeight: '800', marginRight: 2 },
+  pickerChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, borderWidth: 1.5, borderColor: C.border, backgroundColor: C.body },
+  pickerChipActive: { borderColor: '#7c3aed', backgroundColor: '#ede9fe' },
+  pickerChipText: { color: C.muted, fontSize: 12, fontWeight: '700' },
+  pickerChipTextActive: { color: '#4c1d95' },
+  pickerIconFilterScroll: { marginTop: 2 },
+  pickerIconChip: { width: 40, height: 40, borderRadius: 12, borderWidth: 1.5, borderColor: C.border, backgroundColor: C.body, alignItems: 'center', justifyContent: 'center', marginRight: 8 },
+  pickerIconChipActive: { borderColor: '#7c3aed', backgroundColor: '#ede9fe' },
+  pickerIconChipText: { fontSize: 18 },
 
   // ── flow chart list/add sheet ──
   flowChartRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: C.grid, gap: 8 },
@@ -384,6 +395,15 @@ export default function FlowScreen({ navigation }: Props) {
   const [slots, setSlots] = useState<(number | null)[]>([]);
   const [selectedCardId, setSelectedCardId] = useState<number | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerSortKey, setPickerSortKey] = useState<'manual' | 'priority' | 'name'>('manual');
+  const [pickerIconFilterOpen, setPickerIconFilterOpen] = useState(false);
+  const [pickerIconFilter, setPickerIconFilter] = useState<string | null>(null);
+  const closeTaskPicker = () => {
+    setPickerOpen(false);
+    setPickerSortKey('manual');
+    setPickerIconFilterOpen(false);
+    setPickerIconFilter(null);
+  };
   const [saving, setSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -569,6 +589,15 @@ export default function FlowScreen({ navigation }: Props) {
     }
     return map;
   }, [dueTasks]);
+  const pickerVisibleTasks = useMemo(() => {
+    let list = pickerIconFilter ? dueTasks.filter(t => t.icon === pickerIconFilter) : dueTasks;
+    if (pickerSortKey === 'priority') {
+      list = [...list].sort((a, b) => (b.priority - a.priority) || (a.sort_order - b.sort_order));
+    } else if (pickerSortKey === 'name') {
+      list = [...list].sort((a, b) => a.title.localeCompare(b.title, 'ja'));
+    }
+    return list;
+  }, [dueTasks, pickerIconFilter, pickerSortKey]);
   const tray = useMemo(() => addedIds.filter(id => !slots.includes(id)), [addedIds, slots]);
   const getMergeTargetIdx = useCallback((b: BranchNode) => {
     const sub = b.no.sub;
@@ -1753,24 +1782,78 @@ export default function FlowScreen({ navigation }: Props) {
         </View>
       )}
 
-      <Modal visible={pickerOpen} transparent animationType="slide" onRequestClose={() => setPickerOpen(false)}>
-        <TouchableOpacity style={s.pickerOverlay} activeOpacity={1} onPress={() => setPickerOpen(false)}>
+      <Modal visible={pickerOpen} transparent animationType="slide" onRequestClose={closeTaskPicker}>
+        <TouchableOpacity style={s.pickerOverlay} activeOpacity={1} onPress={closeTaskPicker}>
           <TouchableOpacity activeOpacity={1} style={s.pickerSheet} onPress={() => {}}>
             <View style={s.pickerHeader}>
               <Text style={s.pickerTitle}>タスクを追加</Text>
-              <TouchableOpacity onPress={() => setPickerOpen(false)}>
+              <TouchableOpacity onPress={closeTaskPicker}>
                 <Text style={s.pickerDone}>完了</Text>
               </TouchableOpacity>
             </View>
+            {dueTasks.length > 0 && (
+              <View style={s.pickerControls}>
+                <View style={s.pickerControlRow}>
+                  <Text style={s.pickerControlLabel}>並び替え</Text>
+                  {([
+                    { k: 'manual' as const, l: '手動' },
+                    { k: 'priority' as const, l: '優先度' },
+                    { k: 'name' as const, l: '名前' },
+                  ]).map(o => (
+                    <TouchableOpacity
+                      key={o.k}
+                      style={[s.pickerChip, pickerSortKey === o.k && s.pickerChipActive]}
+                      onPress={() => setPickerSortKey(o.k)}
+                    >
+                      <Text style={[s.pickerChipText, pickerSortKey === o.k && s.pickerChipTextActive]}>{o.l}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <View style={s.pickerControlRow}>
+                  <Text style={s.pickerControlLabel}>絞り込み</Text>
+                  <TouchableOpacity
+                    style={[s.pickerChip, !pickerIconFilterOpen && !pickerIconFilter && s.pickerChipActive]}
+                    onPress={() => { setPickerIconFilter(null); setPickerIconFilterOpen(false); }}
+                  >
+                    <Text style={[s.pickerChipText, !pickerIconFilterOpen && !pickerIconFilter && s.pickerChipTextActive]}>すべて</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[s.pickerChip, (pickerIconFilterOpen || pickerIconFilter) && s.pickerChipActive]}
+                    onPress={() => setPickerIconFilterOpen(p => !p)}
+                  >
+                    <Text style={[s.pickerChipText, (pickerIconFilterOpen || pickerIconFilter) && s.pickerChipTextActive]}>
+                      アイコン{pickerIconFilter ? ` ${pickerIconFilter}` : ''} {pickerIconFilterOpen ? '▲' : '▼'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                {pickerIconFilterOpen && (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.pickerIconFilterScroll}>
+                    {[...iconGroups.keys()].map(icon => (
+                      <TouchableOpacity
+                        key={icon}
+                        style={[s.pickerIconChip, pickerIconFilter === icon && s.pickerIconChipActive]}
+                        onPress={() => setPickerIconFilter(prev => prev === icon ? null : icon)}
+                      >
+                        <Text style={s.pickerIconChipText}>{icon}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                )}
+              </View>
+            )}
             <ScrollView keyboardShouldPersistTaps="handled" bounces={false}>
               {dueTasks.length === 0 ? (
                 <View style={s.pickerEmpty}>
                   <Text style={s.pickerEmptyText}>この日のタスクがありません</Text>
                 </View>
+              ) : pickerVisibleTasks.length === 0 ? (
+                <View style={s.pickerEmpty}>
+                  <Text style={s.pickerEmptyText}>該当するタスクがありません</Text>
+                </View>
               ) : (
                 (() => {
                   const seenIcons = new Set<string>();
-                  return dueTasks.map(t => {
+                  return pickerVisibleTasks.map(t => {
                     const added = addedIds.includes(t.id);
                     const icon = t.icon;
                     const groupIds = icon ? iconGroups.get(icon) ?? [] : [];
