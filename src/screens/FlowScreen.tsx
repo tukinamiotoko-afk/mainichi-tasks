@@ -118,7 +118,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   flowViewport: { flex: 1, overflow: 'hidden' },
 
   // ── view mode (compact) ──
-  viewContent: { alignItems: 'center', paddingTop: 20, paddingBottom: 24, paddingHorizontal: 40, overflow: 'visible' },
+  viewContent: { alignItems: 'center', paddingTop: 0, paddingBottom: 24, paddingHorizontal: 40, overflow: 'visible' },
   viewContentZoomed: { paddingHorizontal: 14 },
   flowZoomWrap: { width: '100%', alignItems: 'center', alignSelf: 'center', transformOrigin: 'top' },
   viewTerminator: { backgroundColor: C.termBg, borderWidth: 1.5, borderColor: C.termBorder, borderRadius: 18, paddingHorizontal: 22, paddingVertical: 7 },
@@ -132,7 +132,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   viewSlotEmptyText: { flex: 1, color: C.muted, fontSize: 12 },
 
   // ── edit mode (full size) ──
-  editContent: { alignItems: 'center', paddingTop: 24, paddingBottom: 24, paddingHorizontal: 24 },
+  editContent: { alignItems: 'center', paddingTop: 0, paddingBottom: 24, paddingHorizontal: 24 },
   editContentZoomed: { paddingHorizontal: 12 },
   terminator: { backgroundColor: C.termBg, borderWidth: 1.5, borderColor: C.termBorder, borderRadius: 22, paddingHorizontal: 30, paddingVertical: 10 },
   terminatorText: { color: C.termText, fontSize: 14, fontWeight: '800', letterSpacing: 1 },
@@ -1750,7 +1750,7 @@ export default function FlowScreen({ navigation }: Props) {
               s.pickerSheet,
               s.pickerSheetTop,
               {
-                marginTop: insets.top + 12,
+                marginTop: insets.top,
                 transform: [{ translateY: flowListAnim.interpolate({ inputRange: [0, 1], outputRange: [-28, 0] }) }],
                 opacity: flowListAnim,
               },
