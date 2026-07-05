@@ -110,7 +110,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   // ── view mode (compact) ──
   viewContent: { alignItems: 'center', paddingTop: 20, paddingBottom: 24, paddingHorizontal: 40, overflow: 'visible' },
   viewContentZoomed: { paddingHorizontal: 14 },
-  flowZoomWrap: { width: '100%', alignItems: 'center' },
+  flowZoomWrap: { width: '100%', alignItems: 'center', alignSelf: 'center' },
   viewTerminator: { backgroundColor: C.termBg, borderWidth: 1.5, borderColor: C.termBorder, borderRadius: 18, paddingHorizontal: 22, paddingVertical: 7 },
   viewTerminatorText: { color: C.termText, fontSize: 12, fontWeight: '800', letterSpacing: 1 },
   viewSlotWrap: { width: '100%', overflow: 'visible' },
