@@ -16,8 +16,10 @@ export type TimeLog = { id: number; task_id: number; title: string; date: string
 export type TimerSetting = { task_id: number; target_seconds: number };
 export type FlowProject = { id: number; title: string; sort_order: number };
 export type FlowStep = { id: number; project_id: number; title: string; sort_order: number };
+export type FlowChart = { id: number; title: string; sort_order: number };
 export type FlowBranch = {
   id: number;
+  flow_chart_id: number;
   after_task_id: number | null;
   question: string;
   yes_label: string;
@@ -117,7 +119,31 @@ export async function migrateDb(db: SQLite.SQLiteDatabase): Promise<void> {
       no_label TEXT NOT NULL DEFAULT 'いいえ',
       no_text TEXT
     );
+    CREATE TABLE IF NOT EXISTS flow_charts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      sort_order INTEGER DEFAULT 0
+    );
+    CREATE TABLE IF NOT EXISTS flow_chart_orders (
+      flow_chart_id INTEGER NOT NULL,
+      task_id INTEGER NOT NULL,
+      position INTEGER NOT NULL,
+      PRIMARY KEY (flow_chart_id, task_id)
+    );
   `);
+  try { await db.execAsync('ALTER TABLE flow_branches ADD COLUMN flow_chart_id INTEGER'); } catch {}
+
+  // ensure at least one flow chart exists, and backfill any ownerless branches to it
+  const chartCount = await db.getFirstAsync<{ c: number }>('SELECT COUNT(*) as c FROM flow_charts');
+  let defaultChartId: number;
+  if (!chartCount || chartCount.c === 0) {
+    const r = await db.runAsync('INSERT INTO flow_charts (title, sort_order) VALUES (?, 0)', ['フロー1']);
+    defaultChartId = r.lastInsertRowId;
+  } else {
+    const first = await db.getFirstAsync<{ id: number }>('SELECT id FROM flow_charts ORDER BY sort_order ASC, id ASC LIMIT 1');
+    defaultChartId = first!.id;
+  }
+  await db.runAsync('UPDATE flow_branches SET flow_chart_id = ? WHERE flow_chart_id IS NULL', [defaultChartId]);
 }
 
 export async function getSetting(db: SQLite.SQLiteDatabase, key: string): Promise<string | null> {
@@ -408,19 +434,19 @@ export async function reorderFlowSteps(db: SQLite.SQLiteDatabase, orderedIds: nu
   });
 }
 
-export async function getFlowBranches(db: SQLite.SQLiteDatabase): Promise<FlowBranch[]> {
-  return db.getAllAsync<FlowBranch>('SELECT * FROM flow_branches ORDER BY id');
+export async function getFlowBranches(db: SQLite.SQLiteDatabase, flowChartId: number): Promise<FlowBranch[]> {
+  return db.getAllAsync<FlowBranch>('SELECT * FROM flow_branches WHERE flow_chart_id = ? ORDER BY id', [flowChartId]);
 }
 
 export async function addFlowBranch(db: SQLite.SQLiteDatabase, b: Omit<FlowBranch, 'id'>): Promise<number> {
   const r = await db.runAsync(
-    'INSERT INTO flow_branches (after_task_id, question, yes_label, yes_text, no_label, no_text, branch_side) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    [b.after_task_id, b.question, b.yes_label, b.yes_text, b.no_label, b.no_text, b.branch_side ?? 'left'],
+    'INSERT INTO flow_branches (flow_chart_id, after_task_id, question, yes_label, yes_text, no_label, no_text, branch_side) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    [b.flow_chart_id, b.after_task_id, b.question, b.yes_label, b.yes_text, b.no_label, b.no_text, b.branch_side ?? 'left'],
   );
   return r.lastInsertRowId;
 }
 
-export async function updateFlowBranch(db: SQLite.SQLiteDatabase, id: number, b: Omit<FlowBranch, 'id'>): Promise<void> {
+export async function updateFlowBranch(db: SQLite.SQLiteDatabase, id: number, b: Omit<FlowBranch, 'id' | 'flow_chart_id'>): Promise<void> {
   await db.runAsync(
     'UPDATE flow_branches SET after_task_id=?, question=?, yes_label=?, yes_text=?, no_label=?, no_text=?, branch_side=? WHERE id=?',
     [b.after_task_id, b.question, b.yes_label, b.yes_text, b.no_label, b.no_text, b.branch_side ?? 'left', id],
@@ -429,4 +455,45 @@ export async function updateFlowBranch(db: SQLite.SQLiteDatabase, id: number, b:
 
 export async function deleteFlowBranch(db: SQLite.SQLiteDatabase, id: number): Promise<void> {
   await db.runAsync('DELETE FROM flow_branches WHERE id=?', [id]);
+}
+
+export async function getFlowCharts(db: SQLite.SQLiteDatabase): Promise<FlowChart[]> {
+  return db.getAllAsync<FlowChart>('SELECT * FROM flow_charts ORDER BY sort_order ASC, id ASC');
+}
+
+export async function addFlowChart(db: SQLite.SQLiteDatabase, title: string): Promise<number> {
+  const row = await db.getFirstAsync<{ next_order: number | null }>(
+    'SELECT COALESCE(MAX(sort_order), -1) + 1 as next_order FROM flow_charts'
+  );
+  const r = await db.runAsync('INSERT INTO flow_charts (title, sort_order) VALUES (?, ?)', [title, row?.next_order ?? 0]);
+  return r.lastInsertRowId;
+}
+
+export async function renameFlowChart(db: SQLite.SQLiteDatabase, id: number, title: string): Promise<void> {
+  await db.runAsync('UPDATE flow_charts SET title = ? WHERE id = ?', [title, id]);
+}
+
+export async function deleteFlowChart(db: SQLite.SQLiteDatabase, id: number): Promise<void> {
+  await db.runAsync('DELETE FROM flow_charts WHERE id = ?', [id]);
+  await db.runAsync('DELETE FROM flow_branches WHERE flow_chart_id = ?', [id]);
+  await db.runAsync('DELETE FROM flow_chart_orders WHERE flow_chart_id = ?', [id]);
+}
+
+export async function getFlowChartOrder(db: SQLite.SQLiteDatabase, flowChartId: number): Promise<Map<number, number>> {
+  const rows = await db.getAllAsync<{ task_id: number; position: number }>(
+    'SELECT task_id, position FROM flow_chart_orders WHERE flow_chart_id = ?', [flowChartId]
+  );
+  return new Map(rows.map(r => [r.task_id, r.position]));
+}
+
+export async function updateFlowChartOrder(db: SQLite.SQLiteDatabase, flowChartId: number, orderedIds: number[]): Promise<void> {
+  await db.withTransactionAsync(async () => {
+    await db.runAsync('DELETE FROM flow_chart_orders WHERE flow_chart_id = ?', [flowChartId]);
+    for (let i = 0; i < orderedIds.length; i++) {
+      await db.runAsync(
+        'INSERT INTO flow_chart_orders (flow_chart_id, task_id, position) VALUES (?, ?, ?)',
+        [flowChartId, orderedIds[i], i]
+      );
+    }
+  });
 }

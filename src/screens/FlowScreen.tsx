@@ -11,7 +11,11 @@ import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import { RootStackParamList } from '../../App';
-import { Task, getToday, getTasks, updateTaskSortOrders, getFlowBranches, addFlowBranch, updateFlowBranch, deleteFlowBranch } from '../db/database';
+import {
+  Task, getToday, getTasks, getFlowBranches, addFlowBranch, updateFlowBranch, deleteFlowBranch,
+  FlowChart, getFlowCharts, addFlowChart, renameFlowChart, deleteFlowChart,
+  getFlowChartOrder, updateFlowChartOrder, getSetting, setSetting,
+} from '../db/database';
 import { isDueToday, WEEKDAYS } from '../constants/taskMeta';
 import { GRAD_START, GRAD_END } from '../constants/theme';
 import TabBar from '../components/TabBar';
@@ -22,6 +26,7 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 }
 
 const pad = (n: number) => String(n).padStart(2, '0');
+const CURRENT_FLOW_CHART_KEY = 'currentFlowChartId';
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'Flow'> };
 type SimpleItems = { taskIds: number[]; notes: string[] };
 type PathAfter = 'merge' | 'end';
@@ -92,13 +97,18 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   root: { flex: 1, backgroundColor: C.body },
 
   header: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16 },
-  navRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  navBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
-  navArrow: { color: '#ffffff', fontSize: 24, fontWeight: '800', marginTop: -2 },
-  navCenter: { flex: 1, alignItems: 'center' },
+  navRow: { alignItems: 'center' },
+  dateCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.14)', borderRadius: 22, paddingVertical: 4, paddingHorizontal: 4 },
+  navBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  navArrow: { color: '#ffffff', fontSize: 22, fontWeight: '800', marginTop: -2 },
+  navCenter: { alignItems: 'center', paddingHorizontal: 16 },
   navDateText: { color: '#ffffff', fontSize: 15, fontWeight: '800' },
   navTodayHint: { color: 'rgba(255,255,255,0.75)', fontSize: 10, fontWeight: '700', marginTop: 1 },
+  actionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginTop: 12 },
   navRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  flowListBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.18)' },
+  flowListBtnText: { color: '#ffffff', fontSize: 13, fontWeight: '800' },
+  flowListBtnArrow: { color: 'rgba(255,255,255,0.85)', fontSize: 10, fontWeight: '800' },
   editBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.18)' },
   editBtnText: { color: '#ffffff', fontSize: 13, fontWeight: '800' },
   saveBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.9)' },
@@ -175,6 +185,19 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   pickerCheckText: { color: '#ffffff', fontSize: 14, fontWeight: '900' },
   pickerEmpty: { padding: 40, alignItems: 'center' },
   pickerEmptyText: { color: C.muted, fontSize: 14 },
+
+  // ── flow chart list/add sheet ──
+  flowChartRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: C.grid, gap: 8 },
+  flowChartRowActive: { backgroundColor: '#ede9fe' },
+  flowChartTitle: { flex: 1, color: C.ink, fontSize: 15, fontWeight: '700' },
+  flowChartTitleActive: { color: '#4c1d95' },
+  flowChartRenameInput: { flex: 1, borderWidth: 1.5, borderColor: '#7c3aed', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, fontSize: 14, color: C.ink, backgroundColor: C.body },
+  flowChartIconBtn: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  flowChartIconText: { fontSize: 13 },
+  flowChartAddRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20, paddingVertical: 16 },
+  flowChartAddInput: { flex: 1, borderWidth: 1.5, borderColor: C.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9, fontSize: 14, color: C.ink, backgroundColor: C.body },
+  flowChartAddBtn: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10, backgroundColor: '#7c3aed' },
+  flowChartAddBtnText: { color: '#ffffff', fontSize: 13, fontWeight: '800' },
 
   editCard: { marginTop: 20, width: '100%', paddingVertical: 16, borderRadius: 14, borderWidth: 1.5, borderColor: C.primary, backgroundColor: C.primarySoft, alignItems: 'center', justifyContent: 'center' },
   editCardText: { color: C.primary, fontSize: 14, fontWeight: '800', letterSpacing: 0.5 },
@@ -358,6 +381,13 @@ export default function FlowScreen({ navigation }: Props) {
   const [isEditing, setIsEditing] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [branches, setBranches] = useState<BranchNode[]>([]);
+  const [flowCharts, setFlowCharts] = useState<FlowChart[]>([]);
+  const [currentChartId, setCurrentChartId] = useState<number | null>(null);
+  const currentChartIdRef = useRef<number | null>(null);
+  const [flowListOpen, setFlowListOpen] = useState(false);
+  const [newChartName, setNewChartName] = useState('');
+  const [renamingChartId, setRenamingChartId] = useState<number | null>(null);
+  const [renameChartDraft, setRenameChartDraft] = useState('');
   const [insertBranchMode, setInsertBranchMode] = useState(false);
   const [branchEditorOpen, setBranchEditorOpen] = useState(false);
   const [branchDraft, setBranchDraft] = useState<BranchNode | null>(null);
@@ -370,6 +400,7 @@ export default function FlowScreen({ navigation }: Props) {
   const [noRouteSubDraft, setNoRouteSubDraft] = useState<SubBranch | null>(null);
   const [noRouteSubNoteDraft, setNoRouteSubNoteDraft] = useState({ yes: '', no: '' });
   const [manualFlowScale, setManualFlowScale] = useState<number | null>(null);
+  const [autoFitScale, setAutoFitScale] = useState<number | null>(null);
   const [isPinching, setIsPinching] = useState(false);
 
   // ── drag-to-reorder state ──
@@ -406,11 +437,32 @@ export default function FlowScreen({ navigation }: Props) {
   };
 
   const load = useCallback(async () => {
+    let charts = await getFlowCharts(db);
+    if (charts.length === 0) {
+      await addFlowChart(db, 'フロー1');
+      charts = await getFlowCharts(db);
+    }
+    setFlowCharts(charts);
+
+    let chartId = currentChartIdRef.current;
+    if (chartId === null || !charts.some(c => c.id === chartId)) {
+      const saved = await getSetting(db, CURRENT_FLOW_CHART_KEY);
+      const savedId = saved ? Number(saved) : null;
+      chartId = (savedId !== null && charts.some(c => c.id === savedId)) ? savedId : charts[0].id;
+    }
+    currentChartIdRef.current = chartId;
+    setCurrentChartId(chartId);
+
     const ts = await getTasks(db);
     const due = ts.filter(t => isDueToday(t, new Date(`${selectedDate}T00:00:00`)));
-    const sorted = [...due].sort((a, b) =>
-      a.sort_order !== b.sort_order ? a.sort_order - b.sort_order : a.id - b.id
-    );
+    const orderMap = await getFlowChartOrder(db, chartId);
+    const sorted = [...due].sort((a, b) => {
+      const pa = orderMap.has(a.id) ? orderMap.get(a.id)! : Infinity;
+      const pb = orderMap.has(b.id) ? orderMap.get(b.id)! : Infinity;
+      if (pa !== pb) return pa - pb;
+      if (a.sort_order !== b.sort_order) return a.sort_order - b.sort_order;
+      return a.id - b.id;
+    });
     setDueTasks(due);
     const ids = sorted.map(t => t.id);
     setAddedIds(ids);
@@ -419,7 +471,7 @@ export default function FlowScreen({ navigation }: Props) {
     setIsEditing(false);
     setInsertBranchMode(false);
     panRespMap.current.clear();
-    const branchRows = await getFlowBranches(db);
+    const branchRows = await getFlowBranches(db, chartId);
     setBranches(branchRows.map(b => ({
       id: b.id,
       insertAfterIdx: b.after_task_id ?? -1,
@@ -430,6 +482,55 @@ export default function FlowScreen({ navigation }: Props) {
   }, [db, selectedDate]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  const switchChart = useCallback(async (id: number) => {
+    if (id === currentChartIdRef.current) { setFlowListOpen(false); return; }
+    await setSetting(db, CURRENT_FLOW_CHART_KEY, String(id));
+    currentChartIdRef.current = id;
+    setFlowListOpen(false);
+    await load();
+  }, [db, load]);
+
+  const createFlowChart = useCallback(async () => {
+    const title = newChartName.trim() || `フロー${flowCharts.length + 1}`;
+    const id = await addFlowChart(db, title);
+    await setSetting(db, CURRENT_FLOW_CHART_KEY, String(id));
+    currentChartIdRef.current = id;
+    setNewChartName('');
+    setFlowListOpen(false);
+    await load();
+  }, [db, newChartName, flowCharts.length, load]);
+
+  const startRenameChart = (c: FlowChart) => {
+    setRenamingChartId(c.id);
+    setRenameChartDraft(c.title);
+  };
+  const commitRenameChart = useCallback(async () => {
+    if (renamingChartId === null) return;
+    const t = renameChartDraft.trim();
+    if (t) {
+      await renameFlowChart(db, renamingChartId, t);
+      setFlowCharts(prev => prev.map(c => c.id === renamingChartId ? { ...c, title: t } : c));
+    }
+    setRenamingChartId(null);
+  }, [db, renamingChartId, renameChartDraft]);
+
+  const removeFlowChart = useCallback((c: FlowChart) => {
+    if (flowCharts.length <= 1) {
+      Alert.alert('削除できません', '最後の1つのフローチャートは削除できません。');
+      return;
+    }
+    Alert.alert('フローチャートを削除', `「${c.title}」を削除しますか？分岐の設定も削除されます。`, [
+      { text: 'キャンセル', style: 'cancel' },
+      {
+        text: '削除', style: 'destructive', onPress: async () => {
+          await deleteFlowChart(db, c.id);
+          if (currentChartIdRef.current === c.id) currentChartIdRef.current = null;
+          await load();
+        },
+      },
+    ]);
+  }, [db, flowCharts.length, load]);
 
   const taskById = useMemo(() => new Map(dueTasks.map(t => [t.id, t])), [dueTasks]);
   const tray = useMemo(() => addedIds.filter(id => !slots.includes(id)), [addedIds, slots]);
@@ -483,7 +584,7 @@ export default function FlowScreen({ navigation }: Props) {
     () => branches.some(b => b.no.notes.length > 0 || b.no.taskIds.length > 0),
     [branches]
   );
-  const autoFlowScale = hasSideBranch ? 0.82 : 1;
+  const autoFlowScale = hasSideBranch ? (isEditing ? 0.82 : (autoFitScale ?? 0.82)) : 1;
   const flowScale = manualFlowScale ?? autoFlowScale;
   const flowLaneWidth = Math.max(
     280,
@@ -498,6 +599,7 @@ export default function FlowScreen({ navigation }: Props) {
   ];
   useEffect(() => {
     setManualFlowScale(null);
+    setAutoFitScale(null);
     flowPan.setValue({ x: 0, y: 0 });
     flowPanOffsetRef.current = { x: 0, y: 0 };
   }, [selectedDate, flowPan]);
@@ -682,7 +784,9 @@ export default function FlowScreen({ navigation }: Props) {
     try {
       const placedIds = slots.filter((id): id is number => id !== null);
       const trayIds = addedIds.filter(id => !slots.includes(id));
-      await updateTaskSortOrders(db, [...placedIds, ...trayIds]);
+      if (currentChartIdRef.current !== null) {
+        await updateFlowChartOrder(db, currentChartIdRef.current, [...placedIds, ...trayIds]);
+      }
       setIsEditing(false);
       setInsertBranchMode(false);
       setSelectedCardId(null);
@@ -776,7 +880,8 @@ export default function FlowScreen({ navigation }: Props) {
       await updateFlowBranch(db, branchDraft.id!, data);
       setBranches(prev => prev.map(b => b.id === branchDraft!.id ? { ...branchDraft! } : b));
     } else {
-      const newId = await addFlowBranch(db, data);
+      if (currentChartIdRef.current === null) return;
+      const newId = await addFlowBranch(db, { ...data, flow_chart_id: currentChartIdRef.current });
       setBranches(prev => [...prev, { ...branchDraft!, id: newId }]);
     }
     setBranchEditorOpen(false);
@@ -927,6 +1032,51 @@ export default function FlowScreen({ navigation }: Props) {
   }, [branches, getMergeTargetIdx]);
 
   useEffect(() => { scheduleMergeMeasure(); }, [scheduleMergeMeasure, slots, isEditing, dueTasks]);
+
+  // ── initial auto-fit zoom (view mode): make sure the NO-route's right
+  // edge (and any nested sub-branch) is visible on first open ──
+  const fitEdgeRefs = useRef<Map<string, View>>(new Map());
+  const fitMeasureReq = useRef(0);
+
+  const scheduleFitMeasure = useCallback(() => {
+    const req = ++fitMeasureReq.current;
+    requestAnimationFrame(async () => {
+      if (req !== fitMeasureReq.current) return;
+      const container = flowContentRef.current;
+      if (!container) return;
+      let maxRight = 0;
+      for (const node of fitEdgeRefs.current.values()) {
+        const m = await measureInFlow(node, container);
+        if (m) maxRight = Math.max(maxRight, m.x + m.width);
+      }
+      if (req !== fitMeasureReq.current) return;
+      const half = flowLaneWidth / 2;
+      const rightExtent = maxRight - half;
+      let scale = 1;
+      if (rightExtent > 0) {
+        scale = Math.max(0.4, Math.min(1, (viewportWidth / 2 - 16) / rightExtent));
+      }
+      setAutoFitScale(prev => (prev !== null && Math.abs(prev - scale) < 0.005) ? prev : scale);
+    });
+  }, [flowLaneWidth, viewportWidth]);
+
+  useEffect(() => {
+    if (!isEditing) scheduleFitMeasure();
+  }, [scheduleFitMeasure, slots, dueTasks, isEditing, branches]);
+
+  const renderFitEdgeMarker = (key: string) => (
+    <View
+      ref={node => {
+        if (node) fitEdgeRefs.current.set(key, node);
+        else fitEdgeRefs.current.delete(key);
+      }}
+      collapsable={false}
+      onLayout={scheduleFitMeasure}
+      style={{ position: 'absolute', right: 0, top: 0, width: 1, height: 1 }}
+      pointerEvents="none"
+    />
+  );
+
   const estimateSubItemStackHeight = (items: SimpleItems, compact: boolean) => {
     const count = countSimpleItems(items);
     if (count === 0) return compact ? 18 : 20;
@@ -1039,6 +1189,7 @@ export default function FlowScreen({ navigation }: Props) {
             {renderSubItems(sub.no, compact)}
             {sub.noReturnsToMain && countSimpleItems(sub.no) > 0 && branchId != null ? renderMergeStemMarker(branchId) : null}
           </View>
+          {compact && branchId != null ? renderFitEdgeMarker(`sub${branchId}`) : null}
         </View>
       ) : (
         <View style={[s.subPaths, compact ? s.subPathsCompact : s.subPathsWide]}>
@@ -1052,6 +1203,7 @@ export default function FlowScreen({ navigation }: Props) {
             {renderSubItems(sub.no, compact)}
             {sub.noReturnsToMain && countSimpleItems(sub.no) > 0 && branchId != null ? renderMergeStemMarker(branchId) : null}
           </View>
+          {compact && branchId != null ? renderFitEdgeMarker(`sub${branchId}`) : null}
         </View>
       )}
     </View>
@@ -1141,6 +1293,7 @@ export default function FlowScreen({ navigation }: Props) {
             {renderPathItems(b.no, true)}
             {b.no.sub && renderSubDiamond(b.no.sub, undefined, true, b.id)}
             {!b.no.sub && b.id !== null && getMergeTargetIdx(b) >= 0 ? renderMergeStemMarker(b.id) : null}
+            {renderFitEdgeMarker(`no${b.id ?? b.insertAfterIdx}`)}
           </View>
         </View>
         <View style={s.viewBranchNoMergeLine} pointerEvents="none" />
@@ -1294,9 +1447,6 @@ export default function FlowScreen({ navigation }: Props) {
       <View style={s.viewTerminator}>
         <Text style={s.viewTerminatorText}>終了</Text>
       </View>
-      <TouchableOpacity style={s.editCard} onPress={() => setIsEditing(true)} activeOpacity={0.8}>
-        <Text style={s.editCardText}>編集</Text>
-      </TouchableOpacity>
     </>
   );
 
@@ -1393,34 +1543,44 @@ export default function FlowScreen({ navigation }: Props) {
 
       <LinearGradient colors={grad.header} start={GRAD_START} end={GRAD_END} style={[s.header, { paddingTop: insets.top + 12 }]}>
         <View style={s.navRow}>
-          <TouchableOpacity style={s.navBtn} onPress={() => shiftSelected(-1)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Text style={s.navArrow}>‹</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={s.navCenter} onPress={() => setShowDatePicker(true)} activeOpacity={0.7}>
-            <Text style={s.navDateText}>{dateLabel}</Text>
-            <Text style={s.navTodayHint}>タップで日付変更</Text>
-          </TouchableOpacity>
-          <View style={s.navRight}>
-            {isEditing ? (
-              <>
-                <TouchableOpacity
-                  style={[s.branchBtn, insertBranchMode && s.branchBtnActive]}
-                  onPress={() => setInsertBranchMode(p => !p)}
-                >
-                  <Text style={[s.branchBtnText, insertBranchMode && s.branchBtnActiveText]}>分岐</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={s.saveBtn} onPress={saveOrder} disabled={saving}>
-                  <Text style={s.saveBtnText}>{saving ? '…' : '保存'}</Text>
-                </TouchableOpacity>
-              </>
-            ) : (
-              <TouchableOpacity style={s.editBtn} onPress={() => setIsEditing(true)}>
-                <Text style={s.editBtnText}>編集</Text>
-              </TouchableOpacity>
-            )}
+          <View style={s.dateCard}>
+            <TouchableOpacity style={s.navBtn} onPress={() => shiftSelected(-1)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Text style={s.navArrow}>‹</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.navCenter} onPress={() => setShowDatePicker(true)} activeOpacity={0.7}>
+              <Text style={s.navDateText}>{dateLabel}</Text>
+              <Text style={s.navTodayHint}>タップで日付変更</Text>
+            </TouchableOpacity>
             <TouchableOpacity style={s.navBtn} onPress={() => shiftSelected(1)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Text style={s.navArrow}>›</Text>
             </TouchableOpacity>
+          </View>
+          <View style={s.actionRow}>
+            <TouchableOpacity style={s.flowListBtn} onPress={() => setFlowListOpen(true)}>
+              <Text style={s.flowListBtnText} numberOfLines={1}>
+                {flowCharts.find(c => c.id === currentChartId)?.title ?? 'フロー'}
+              </Text>
+              <Text style={s.flowListBtnArrow}>▾</Text>
+            </TouchableOpacity>
+            <View style={s.navRight}>
+              {isEditing ? (
+                <>
+                  <TouchableOpacity
+                    style={[s.branchBtn, insertBranchMode && s.branchBtnActive]}
+                    onPress={() => setInsertBranchMode(p => !p)}
+                  >
+                    <Text style={[s.branchBtnText, insertBranchMode && s.branchBtnActiveText]}>分岐</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={s.saveBtn} onPress={saveOrder} disabled={saving}>
+                    <Text style={s.saveBtnText}>{saving ? '…' : '保存'}</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <TouchableOpacity style={s.editBtn} onPress={() => setIsEditing(true)}>
+                  <Text style={s.editBtnText}>編集</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
         </View>
       </LinearGradient>
@@ -1558,6 +1718,71 @@ export default function FlowScreen({ navigation }: Props) {
                   );
                 })
               )}
+            </ScrollView>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Flow chart list / add sheet */}
+      <Modal visible={flowListOpen} transparent animationType="slide" onRequestClose={() => setFlowListOpen(false)}>
+        <TouchableOpacity style={s.pickerOverlay} activeOpacity={1} onPress={() => setFlowListOpen(false)}>
+          <TouchableOpacity activeOpacity={1} style={s.pickerSheet} onPress={() => {}}>
+            <View style={s.pickerHeader}>
+              <Text style={s.pickerTitle}>フローチャート</Text>
+              <TouchableOpacity onPress={() => setFlowListOpen(false)}>
+                <Text style={s.pickerDone}>完了</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView keyboardShouldPersistTaps="handled" bounces={false}>
+              {flowCharts.map(c => {
+                const active = c.id === currentChartId;
+                const isRenaming = renamingChartId === c.id;
+                return (
+                  <View key={c.id} style={[s.flowChartRow, active && s.flowChartRowActive]}>
+                    {isRenaming ? (
+                      <TextInput
+                        style={s.flowChartRenameInput}
+                        value={renameChartDraft}
+                        onChangeText={setRenameChartDraft}
+                        autoFocus
+                        returnKeyType="done"
+                        onSubmitEditing={commitRenameChart}
+                        onBlur={commitRenameChart}
+                      />
+                    ) : (
+                      <TouchableOpacity style={{ flex: 1 }} onPress={() => switchChart(c.id)} activeOpacity={0.7}>
+                        <Text style={[s.flowChartTitle, active && s.flowChartTitleActive]} numberOfLines={1}>{c.title}</Text>
+                      </TouchableOpacity>
+                    )}
+                    {isRenaming ? (
+                      <TouchableOpacity style={s.flowChartIconBtn} onPress={commitRenameChart}>
+                        <Text style={s.flowChartIconText}>✓</Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <TouchableOpacity style={s.flowChartIconBtn} onPress={() => startRenameChart(c)}>
+                        <Text style={s.flowChartIconText}>✎</Text>
+                      </TouchableOpacity>
+                    )}
+                    <TouchableOpacity style={s.flowChartIconBtn} onPress={() => removeFlowChart(c)}>
+                      <Text style={s.flowChartIconText}>🗑</Text>
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
+              <View style={s.flowChartAddRow}>
+                <TextInput
+                  style={s.flowChartAddInput}
+                  value={newChartName}
+                  onChangeText={setNewChartName}
+                  placeholder="新しいフローチャート名"
+                  placeholderTextColor="#cbd5e1"
+                  returnKeyType="done"
+                  onSubmitEditing={createFlowChart}
+                />
+                <TouchableOpacity style={s.flowChartAddBtn} onPress={createFlowChart}>
+                  <Text style={s.flowChartAddBtnText}>＋ 追加</Text>
+                </TouchableOpacity>
+              </View>
             </ScrollView>
           </TouchableOpacity>
         </TouchableOpacity>
