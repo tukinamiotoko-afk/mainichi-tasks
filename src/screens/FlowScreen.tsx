@@ -457,20 +457,27 @@ export default function FlowScreen({ navigation }: Props) {
     return set;
   }, [branches, getMergeTargetIdx]);
 
-  const yesEligibleTasks = useMemo(() => {
-    if (!noRouteBranchParent) return dueTasks;
-    const allowedIds = new Set(
-      slots.slice(noRouteBranchParent.insertAfterIdx + 1).filter((id): id is number => id !== null)
-    );
-    return dueTasks.filter(t => allowedIds.has(t.id));
-  }, [noRouteBranchParent, slots, dueTasks]);
-  const mergeEligibleTasks = useMemo(() => {
-    if (!branchDraft) return dueTasks;
-    const allowedIds = new Set(
-      slots.slice(branchDraft.insertAfterIdx + 1).filter((id): id is number => id !== null)
-    );
-    return dueTasks.filter(t => allowedIds.has(t.id));
-  }, [branchDraft, slots, dueTasks]);
+  // picker lists follow the CURRENT slot order so drag-reordering is
+  // reflected immediately while editing
+  const tasksInSlotOrder = useCallback((afterIdx: number) => (
+    slots.slice(afterIdx + 1)
+      .filter((id): id is number => id !== null)
+      .map(id => taskById.get(id))
+      .filter((t): t is Task => !!t)
+  ), [slots, taskById]);
+  const yesEligibleTasks = useMemo(() => (
+    noRouteBranchParent ? tasksInSlotOrder(noRouteBranchParent.insertAfterIdx) : dueTasks
+  ), [noRouteBranchParent, tasksInSlotOrder, dueTasks]);
+  const mergeEligibleTasks = useMemo(() => (
+    branchDraft ? tasksInSlotOrder(branchDraft.insertAfterIdx) : dueTasks
+  ), [branchDraft, tasksInSlotOrder, dueTasks]);
+  const branchNoPickerTasks = useMemo(() => {
+    const placed = slots.filter((id): id is number => id !== null);
+    const placedSet = new Set(placed);
+    const inSlots = placed.map(id => taskById.get(id)).filter((t): t is Task => !!t);
+    const rest = dueTasks.filter(t => !placedSet.has(t.id));
+    return [...inSlots, ...rest];
+  }, [slots, taskById, dueTasks]);
   const hasSelection = selectedCardId !== null;
   const hasSideBranch = useMemo(
     () => branches.some(b => b.no.notes.length > 0 || b.no.taskIds.length > 0),
@@ -1843,9 +1850,9 @@ export default function FlowScreen({ navigation }: Props) {
               </TouchableOpacity>
             </View>
             <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}>
-              {dueTasks.length === 0 ? (
+              {branchNoPickerTasks.length === 0 ? (
                 <Text style={{ color: '#94a3b8', fontSize: 13, textAlign: 'center', paddingVertical: 24 }}>選択できるタスクがありません</Text>
-              ) : dueTasks.map(t => {
+              ) : branchNoPickerTasks.map(t => {
                 const inN = branchDraft?.no.taskIds.includes(t.id) ?? false;
                 return (
                   <View key={`bnt${t.id}`} style={s.branchTaskRow}>
