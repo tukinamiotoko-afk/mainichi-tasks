@@ -907,11 +907,28 @@ export default function HomeScreen({ navigation }: Props) {
     if (state.changed && state.taskId != null) {
       const startTasks = displayedTasksAtDragStart.current;
       const toIdx = Math.max(0, Math.min(startTasks.length - 1, state.currentIndex));
-      const ordered = [...startTasks];
-      const [moved] = ordered.splice(state.startIndex, 1);
-      ordered.splice(toIdx, 0, moved);
-      pendingTasks = ordered.map((task, idx) => ({ ...task, sort_order: idx }));
-      updateTaskSortOrders(db, pendingTasks.map((t) => t.id)).then(() => load());
+      const reorderedDisplayed = [...startTasks];
+      const [moved] = reorderedDisplayed.splice(state.startIndex, 1);
+      reorderedDisplayed.splice(toIdx, 0, moved);
+
+      // reorderedDisplayed only covers the filtered/displayed subset; overlay
+      // its new order onto the full task list (in place of that same subset)
+      // so no task outside the display filter gets dropped, and the write
+      // below needs no follow-up reload to reconcile — avoiding a second,
+      // heavier setTasks right after the drop animation finishes
+      const displayedIds = new Set(startTasks.map((t) => t.id));
+      const fullSorted = [...tasksRef.current].sort((a, b) =>
+        a.sort_order !== b.sort_order ? a.sort_order - b.sort_order : a.id - b.id
+      );
+      let cursor = 0;
+      const merged = fullSorted.map((task) => {
+        if (!displayedIds.has(task.id)) return task;
+        const next = reorderedDisplayed[cursor];
+        cursor += 1;
+        return next;
+      });
+      pendingTasks = merged.map((task, idx) => ({ ...task, sort_order: idx }));
+      updateTaskSortOrders(db, pendingTasks.map((t) => t.id));
     }
 
     // Spring the dragged card from its release position to the slot-aligned

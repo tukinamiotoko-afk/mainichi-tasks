@@ -210,11 +210,16 @@ export async function updateTask(db: SQLite.SQLiteDatabase, id: number, fields: 
 }
 
 export async function updateTaskSortOrders(db: SQLite.SQLiteDatabase, orderedIds: number[]): Promise<void> {
-  await db.withTransactionAsync(async () => {
-    for (let index = 0; index < orderedIds.length; index += 1) {
-      await db.runAsync('UPDATE tasks SET sort_order = ? WHERE id = ?', [index, orderedIds[index]]);
-    }
-  });
+  if (orderedIds.length === 0) return;
+  // one statement instead of one round-trip per task, so the write lands
+  // before the drag-release animation finishes
+  const whens = orderedIds.map(() => 'WHEN ? THEN ?').join(' ');
+  const placeholders = orderedIds.map(() => '?').join(',');
+  const caseParams = orderedIds.flatMap((id, index) => [id, index]);
+  await db.runAsync(
+    `UPDATE tasks SET sort_order = CASE id ${whens} END WHERE id IN (${placeholders})`,
+    [...caseParams, ...orderedIds]
+  );
 }
 
 export async function deleteTask(db: SQLite.SQLiteDatabase, id: number): Promise<string[]> {
