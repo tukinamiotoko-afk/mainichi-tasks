@@ -172,6 +172,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   addBtnText: { color: '#ffffff', fontSize: 13, fontWeight: '800' },
 
   pickerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  pickerOverlayTop: { justifyContent: 'flex-start' },
   pickerSheet: { backgroundColor: C.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '75%' },
   pickerHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: C.grid },
   pickerTitle: { flex: 1, color: C.ink, fontSize: 16, fontWeight: '800' },
@@ -330,6 +331,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
 
   // ── branch editor modal ──
   branchEditorSheet: { backgroundColor: C.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '85%' },
+  branchEditorSheetTop: { borderTopLeftRadius: 0, borderTopRightRadius: 0, borderBottomLeftRadius: 20, borderBottomRightRadius: 20, overflow: 'hidden' },
   branchEditorSection: { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 6 },
   branchEditorLabel: { color: C.muted, fontSize: 11, fontWeight: '800', letterSpacing: 0.5, marginBottom: 6 },
   branchEditorInput: { borderWidth: 1.5, borderColor: C.border, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, fontSize: 15, color: C.ink, backgroundColor: C.body },
@@ -402,6 +404,7 @@ export default function FlowScreen({ navigation }: Props) {
   const [manualFlowScale, setManualFlowScale] = useState<number | null>(null);
   const [autoFitScale, setAutoFitScale] = useState<number | null>(null);
   const [isPinching, setIsPinching] = useState(false);
+  const topEditorAnim = useRef(new Animated.Value(0)).current;
 
   // ── drag-to-reorder state ──
   const [draggingIdx, setDraggingIdx] = useState<number | null>(null);
@@ -425,6 +428,13 @@ export default function FlowScreen({ navigation }: Props) {
   if (shiftAnims.current.length > slots.length) shiftAnims.current = shiftAnims.current.slice(0, slots.length);
 
   useEffect(() => { panRespMap.current.clear(); }, [slots.length]);
+  useEffect(() => {
+    Animated.timing(topEditorAnim, {
+      toValue: branchEditorOpen || noRouteBranchEditorOpen ? 1 : 0,
+      duration: branchEditorOpen || noRouteBranchEditorOpen ? 220 : 160,
+      useNativeDriver: true,
+    }).start();
+  }, [branchEditorOpen, noRouteBranchEditorOpen, topEditorAnim]);
 
   const isToday = selectedDate === today;
   const selDateObj = useMemo(() => new Date(`${selectedDate}T00:00:00`), [selectedDate]);
@@ -1789,9 +1799,20 @@ export default function FlowScreen({ navigation }: Props) {
       </Modal>
 
       {/* Branch editor modal */}
-      <Modal visible={branchEditorOpen} transparent animationType="slide" onRequestClose={() => { setBranchEditorOpen(false); setBranchDraft(null); }}>
-        <TouchableOpacity style={s.pickerOverlay} activeOpacity={1} onPress={() => { setBranchEditorOpen(false); setBranchDraft(null); }}>
-          <TouchableOpacity activeOpacity={1} style={s.branchEditorSheet} onPress={() => {}}>
+      <Modal visible={branchEditorOpen} transparent animationType="fade" onRequestClose={() => { setBranchEditorOpen(false); setBranchDraft(null); }}>
+        <TouchableOpacity style={[s.pickerOverlay, s.pickerOverlayTop]} activeOpacity={1} onPress={() => { setBranchEditorOpen(false); setBranchDraft(null); }}>
+          <Animated.View
+            style={[
+              s.branchEditorSheet,
+              s.branchEditorSheetTop,
+              {
+                marginTop: insets.top + 12,
+                transform: [{ translateY: topEditorAnim.interpolate({ inputRange: [0, 1], outputRange: [-28, 0] }) }],
+                opacity: topEditorAnim,
+              },
+            ]}
+          >
+            <TouchableOpacity activeOpacity={1} onPress={() => {}}>
             <View style={s.pickerHeader}>
               <Text style={s.pickerTitle}>分岐を設定</Text>
               <TouchableOpacity onPress={saveBranchDraft}>
@@ -1913,14 +1934,26 @@ export default function FlowScreen({ navigation }: Props) {
               ) : null}
 
             </ScrollView>
-          </TouchableOpacity>
+            </TouchableOpacity>
+          </Animated.View>
         </TouchableOpacity>
       </Modal>
 
       {/* No-route branch editor modal */}
-      <Modal visible={noRouteBranchEditorOpen} transparent animationType="slide" onRequestClose={closeNoRouteBranchEditor}>
-        <TouchableOpacity style={s.pickerOverlay} activeOpacity={1} onPress={closeNoRouteBranchEditor}>
-          <View style={s.branchEditorSheet} onStartShouldSetResponder={() => true}>
+      <Modal visible={noRouteBranchEditorOpen} transparent animationType="fade" onRequestClose={closeNoRouteBranchEditor}>
+        <TouchableOpacity style={[s.pickerOverlay, s.pickerOverlayTop]} activeOpacity={1} onPress={closeNoRouteBranchEditor}>
+          <Animated.View
+            style={[
+              s.branchEditorSheet,
+              s.branchEditorSheetTop,
+              {
+                marginTop: insets.top + 12,
+                transform: [{ translateY: topEditorAnim.interpolate({ inputRange: [0, 1], outputRange: [-28, 0] }) }],
+                opacity: topEditorAnim,
+              },
+            ]}
+            onStartShouldSetResponder={() => true}
+          >
             <View style={s.pickerHeader}>
               <Text style={s.pickerTitle}>{noRouteBranchParent?.no.sub ? '右側分岐を編集' : '右側分岐を追加'}</Text>
               <TouchableOpacity onPress={saveNoRouteBranchDraft}>
@@ -2004,7 +2037,7 @@ export default function FlowScreen({ navigation }: Props) {
               </View>
 
             </ScrollView>
-          </View>
+          </Animated.View>
         </TouchableOpacity>
       </Modal>
 
