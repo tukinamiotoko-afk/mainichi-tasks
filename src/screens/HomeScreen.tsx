@@ -1120,9 +1120,9 @@ export default function HomeScreen({ navigation }: Props) {
       Animated.spring(dragScale, { toValue: 1, useNativeDriver: true, tension: 220, friction: 14 }),
     ]).start(({ finished }) => {
       if (!finished) return;
+      shiftAnims.current.forEach((anim) => anim.setValue(0));
       if (tasks) setTasks(tasks);
       setActiveDragId(null);
-      // shiftAnims are ignored once activeDragId is null; startDrag resets them.
     });
   };
 
