@@ -490,6 +490,168 @@ function FreqCalendar({ freq, onceDate, onSelect, s }: {
   );
 }
 
+type TaskRowStyles = ReturnType<typeof makeStyles>;
+
+type TaskRowProps = {
+  item: Task;
+  isDone: boolean;
+  isDragging: boolean;
+  isSwiping: boolean;
+  reorderEnabled: boolean;
+  tagRight: boolean;
+  s: TaskRowStyles;
+  panHandlers: ReturnType<typeof PanResponder.create>['panHandlers'];
+  shiftAnim: Animated.Value;
+  dragY: Animated.Value;
+  dragScale: Animated.Value;
+  swipeAnim: Animated.Value;
+  onToggle: (id: number) => void;
+  onOpenDetail: (task: Task) => void;
+  onStartDrag: (id: number) => void;
+  onMeasureHeight: (h: number) => void;
+};
+
+// Fields that don't affect what a row looks like: ignoring them lets an
+// unaffected row's props compare equal after a reorder, even though every
+// task object is freshly spread with a new sort_order at that moment.
+const ROW_IGNORED_FIELDS = new Set<keyof Task>(['sort_order']);
+function taskContentEqual(a: Task, b: Task): boolean {
+  if (a === b) return true;
+  for (const key of Object.keys(a) as (keyof Task)[]) {
+    if (ROW_IGNORED_FIELDS.has(key)) continue;
+    if (a[key] !== b[key]) return false;
+  }
+  return true;
+}
+
+const TaskRow = React.memo(function TaskRow({
+  item, isDone, isDragging, isSwiping, reorderEnabled, tagRight, s,
+  panHandlers, shiftAnim, dragY, dragScale, swipeAnim,
+  onToggle, onOpenDetail, onStartDrag, onMeasureHeight,
+}: TaskRowProps) {
+  const swipeStyle = isSwiping
+    ? {
+        transform: [
+          { translateX: swipeAnim },
+          {
+            rotate: swipeAnim.interpolate({
+              inputRange: [-220, 0, 220],
+              outputRange: ['-5deg', '0deg', '5deg'],
+              extrapolate: 'clamp' as const,
+            }),
+          },
+          {
+            scale: swipeAnim.interpolate({
+              inputRange: [-220, 0, 220],
+              outputRange: [0.96, 1, 0.96],
+              extrapolate: 'clamp' as const,
+            }),
+          },
+        ],
+      }
+    : null;
+  const swipeBgStyle = isSwiping
+    ? {
+        opacity: swipeAnim.interpolate({
+          inputRange: [-SWIPE_DELETE_THRESHOLD, 0, SWIPE_DELETE_THRESHOLD],
+          outputRange: [1, 0, 1],
+          extrapolate: 'clamp' as const,
+        }),
+      }
+    : { opacity: 0 };
+  const dragStyle = isDragging
+    ? {
+        transform: [{ translateY: dragY }, { scale: dragScale }],
+        zIndex: 30,
+        elevation: 8,
+        shadowOpacity: 0.18,
+        shadowRadius: 10,
+      }
+    : null;
+  // always bound (harmless at rest, since it's reset to 0 whenever no drag
+  // is active) so this row's props don't have to change just because some
+  // OTHER row started or stopped dragging
+  const shiftStyle = !isDragging && !isSwiping
+    ? { transform: [{ translateY: shiftAnim }] }
+    : null;
+  const priority = priorityMeta(item.priority);
+
+  return (
+    <View style={s.swipeWrap} onLayout={(e) => onMeasureHeight(e.nativeEvent.layout.height)}>
+      <Animated.View style={[s.swipeDeleteBg, swipeBgStyle]}>
+        <Text style={s.swipeDeleteText}>削除</Text>
+      </Animated.View>
+      <Animated.View
+        style={[
+          s.taskCard,
+          { backgroundColor: priority.cardColor, borderColor: priority.borderColor },
+          isDone && s.taskCardDone,
+          shiftStyle,
+          swipeStyle,
+          dragStyle,
+        ]}
+        {...panHandlers}
+      >
+        {(() => {
+          const tagEl = (
+            <TouchableOpacity style={s.tagBtn} onPress={() => onOpenDetail(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Text style={[s.tagIcon, !item.icon && s.tagIconEmpty]}>{item.icon ?? '🏷'}</Text>
+            </TouchableOpacity>
+          );
+          const checkEl = (
+            <TouchableOpacity
+              style={[s.checkBox, isDone && s.checkBoxDone]}
+              onPress={() => onToggle(item.id)}
+              hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+            >
+              {isDone && <Text style={s.checkMark}>✓</Text>}
+            </TouchableOpacity>
+          );
+          return (
+            <>
+              {tagRight ? checkEl : tagEl}
+              <TouchableOpacity
+                style={s.taskBody}
+                onPress={() => onOpenDetail(item)}
+                onLongPress={reorderEnabled ? () => onStartDrag(item.id) : undefined}
+                delayLongPress={250}
+                activeOpacity={0.7}
+              >
+                <View style={s.taskTextWrap}>
+                  <Text style={[s.taskTitle, isDone && s.taskTitleDone]} numberOfLines={2}>{item.title}</Text>
+                  <View style={s.taskMetaRow}>
+                    {item.scheduled_time && <Text style={s.scheduleTag}>{item.notify ? '🔔 ' : ''}{item.scheduled_time}</Text>}
+                    <Text style={s.freqTag}>{frequencyLabel(item)}</Text>
+                  </View>
+                </View>
+                {isDone && <View style={s.doneBadge}><Text style={s.doneBadgeText}>完了</Text></View>}
+              </TouchableOpacity>
+              {tagRight ? tagEl : checkEl}
+            </>
+          );
+        })()}
+      </Animated.View>
+    </View>
+  );
+}, (prev, next) => (
+  taskContentEqual(prev.item, next.item) &&
+  prev.isDone === next.isDone &&
+  prev.isDragging === next.isDragging &&
+  prev.isSwiping === next.isSwiping &&
+  prev.reorderEnabled === next.reorderEnabled &&
+  prev.tagRight === next.tagRight &&
+  prev.s === next.s &&
+  prev.panHandlers === next.panHandlers &&
+  prev.shiftAnim === next.shiftAnim &&
+  prev.dragY === next.dragY &&
+  prev.dragScale === next.dragScale &&
+  prev.swipeAnim === next.swipeAnim &&
+  prev.onToggle === next.onToggle &&
+  prev.onOpenDetail === next.onOpenDetail &&
+  prev.onStartDrag === next.onStartDrag &&
+  prev.onMeasureHeight === next.onMeasureHeight
+));
+
 export default function HomeScreen({ navigation }: Props) {
   const db = useSQLiteContext();
   const insets = useSafeAreaInsets();
@@ -500,6 +662,8 @@ export default function HomeScreen({ navigation }: Props) {
   const [tagRight, setTagRight] = useState(false);
   const tasksRef = useRef<Task[]>([]);
   const [completedIds, setCompletedIds] = useState<Set<number>>(new Set());
+  const completedIdsRef = useRef<Set<number>>(completedIds);
+  const displayedTasksRef = useRef<Task[]>([]);
   const [showThumb, setShowThumb] = useState(false);
   const thumbAnim = useRef(new Animated.Value(0)).current;
   const thumbOpacity = useRef(new Animated.Value(0)).current;
@@ -590,6 +754,10 @@ export default function HomeScreen({ navigation }: Props) {
   }, [tasks]);
 
   useEffect(() => {
+    completedIdsRef.current = completedIds;
+  }, [completedIds]);
+
+  useEffect(() => {
     if (Platform.OS === 'android') {
       UIManager.setLayoutAnimationEnabledExperimental?.(true);
     }
@@ -632,15 +800,15 @@ export default function HomeScreen({ navigation }: Props) {
     ]).start(() => setShowThumb(false));
   };
 
-  const toggle = async (id: number) => {
-    if (completedIds.has(id)) {
+  const toggle = useCallback(async (id: number) => {
+    if (completedIdsRef.current.has(id)) {
       await markIncomplete(db, id, selectedDate);
     } else {
       await markComplete(db, id, selectedDate);
       triggerCelebration();
     }
     load();
-  };
+  }, [db, selectedDate, load]);
 
   const resetAddDraft = () => {
     setNewTitle('');
@@ -700,11 +868,11 @@ export default function HomeScreen({ navigation }: Props) {
     setTimePickerFor(null);
   };
 
-  const openDetail = (task: Task) => {
+  const openDetail = useCallback((task: Task) => {
     setDetailTask(task);
     setDetailTitle(task.title);
     setDetailPicker(null);
-  };
+  }, []);
 
   const handleSaveTitle = async () => {
     if (!detailTask || !detailTitle.trim()) return;
@@ -822,6 +990,7 @@ export default function HomeScreen({ navigation }: Props) {
     }
     return list;
   })();
+  displayedTasksRef.current = displayedTasks;
 
   const persistTaskOrder = async () => {
     const ordered = [...tasksRef.current].sort((a, b) => {
@@ -848,12 +1017,18 @@ export default function HomeScreen({ navigation }: Props) {
     });
   };
 
-  const startDrag = (taskId: number, index: number) => {
+  // reads the latest list via a ref (rather than closing over displayedTasks
+  // directly) and resolves the index by id, so this callback can stay
+  // referentially stable — required for TaskRow's memoization to hold
+  const startDrag = useCallback((taskId: number) => {
+    const current = displayedTasksRef.current;
+    const index = current.findIndex((t) => t.id === taskId);
+    if (index < 0) return;
     swipeState.current.taskId = null;
     setSwipingId(null);
     swipeAnim.setValue(0);
     setActiveDragId(taskId);
-    displayedTasksAtDragStart.current = displayedTasks;
+    displayedTasksAtDragStart.current = current;
     dragState.current = { taskId, startIndex: index, currentIndex: index, changed: false };
     currentDragYRef.current = 0;
     dragY.setValue(0);
@@ -864,7 +1039,7 @@ export default function HomeScreen({ navigation }: Props) {
       tension: 220,
       friction: 14,
     }).start();
-  };
+  }, []);
 
   const updateDrag = (dy: number) => {
     const state = dragState.current;
@@ -1020,6 +1195,9 @@ export default function HomeScreen({ navigation }: Props) {
     }
     return pr;
   };
+  const handleRowLayout = useCallback((h: number) => {
+    if (h > 10) dragSlotRef.current = h + DRAG_GAP;
+  }, []);
   const clampFab = (x: number, y: number) => ({
     x: Math.max(8, Math.min(x, screen.width - 60)),
     y: Math.max(100, Math.min(y, screen.height - insets.bottom - 124)),
@@ -1370,117 +1548,26 @@ export default function HomeScreen({ navigation }: Props) {
             <Text style={s.emptyBody}>{total > 0 ? '絞り込み条件を変えてみてください' : '右下の ＋ から追加できます'}</Text>
           </View>
         }
-        renderItem={({ item, index }) => {
-          const isDone = completedIds.has(item.id);
-          const panResponder = getPanResponder(item.id);
-          const isDragging = activeDragId === item.id;
-          const swipeStyle = swipingId === item.id
-            ? {
-                transform: [
-                  { translateX: swipeAnim },
-                  {
-                    rotate: swipeAnim.interpolate({
-                      inputRange: [-220, 0, 220],
-                      outputRange: ['-5deg', '0deg', '5deg'],
-                      extrapolate: 'clamp',
-                    }),
-                  },
-                  {
-                    scale: swipeAnim.interpolate({
-                      inputRange: [-220, 0, 220],
-                      outputRange: [0.96, 1, 0.96],
-                      extrapolate: 'clamp',
-                    }),
-                  },
-                ],
-              }
-            : null;
-          const swipeBgStyle = swipingId === item.id
-            ? {
-                opacity: swipeAnim.interpolate({
-                  inputRange: [-SWIPE_DELETE_THRESHOLD, 0, SWIPE_DELETE_THRESHOLD],
-                  outputRange: [1, 0, 1],
-                  extrapolate: 'clamp',
-                }),
-              }
-            : { opacity: 0 };
-          const dragStyle = isDragging
-            ? {
-                transform: [{ translateY: dragY }, { scale: dragScale }],
-                zIndex: 30,
-                elevation: 8,
-                shadowOpacity: 0.18,
-                shadowRadius: 10,
-              }
-            : null;
-          const shiftStyle = (activeDragId !== null && !isDragging && swipingId !== item.id)
-            ? { transform: [{ translateY: getShiftAnim(item.id) }] }
-            : null;
-          const priority = priorityMeta(item.priority);
-          return (
-            <View
-              style={s.swipeWrap}
-              onLayout={(e) => {
-                const h = e.nativeEvent.layout.height;
-                if (h > 10) dragSlotRef.current = h + DRAG_GAP;
-              }}
-            >
-              <Animated.View style={[s.swipeDeleteBg, swipeBgStyle]}>
-                <Text style={s.swipeDeleteText}>削除</Text>
-              </Animated.View>
-              <Animated.View
-                style={[
-                  s.taskCard,
-                  { backgroundColor: priority.cardColor, borderColor: priority.borderColor },
-                  isDone && s.taskCardDone,
-                  shiftStyle,
-                  swipeStyle,
-                  dragStyle,
-                ]}
-                {...panResponder.panHandlers}
-              >
-              {(() => {
-                const tagEl = (
-                  <TouchableOpacity style={s.tagBtn} onPress={() => openDetail(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Text style={[s.tagIcon, !item.icon && s.tagIconEmpty]}>{item.icon ?? '🏷'}</Text>
-                  </TouchableOpacity>
-                );
-                const checkEl = (
-                  <TouchableOpacity
-                    style={[s.checkBox, isDone && s.checkBoxDone]}
-                    onPress={() => toggle(item.id)}
-                    hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
-                  >
-                    {isDone && <Text style={s.checkMark}>✓</Text>}
-                  </TouchableOpacity>
-                );
-                return (
-                  <>
-                    {tagRight ? checkEl : tagEl}
-                    <TouchableOpacity
-                      style={s.taskBody}
-                      onPress={() => openDetail(item)}
-                      onLongPress={reorderEnabled ? () => startDrag(item.id, index) : undefined}
-                      delayLongPress={250}
-                      activeOpacity={0.7}
-                    >
-                      <View style={s.taskTextWrap}>
-                        <Text style={[s.taskTitle, isDone && s.taskTitleDone]} numberOfLines={2}>{item.title}</Text>
-                        <View style={s.taskMetaRow}>
-                          {item.scheduled_time && <Text style={s.scheduleTag}>{item.notify ? '🔔 ' : ''}{item.scheduled_time}</Text>}
-                          <Text style={s.freqTag}>{frequencyLabel(item)}</Text>
-                        </View>
-                      </View>
-                      {isDone && <View style={s.doneBadge}><Text style={s.doneBadgeText}>完了</Text></View>}
-                    </TouchableOpacity>
-                    {tagRight ? tagEl : checkEl}
-                  </>
-                );
-              })()}
-              </Animated.View>
-            </View>
-          );
-        }}
+        renderItem={({ item }) => (
+          <TaskRow
+            item={item}
+            isDone={completedIds.has(item.id)}
+            isDragging={activeDragId === item.id}
+            isSwiping={swipingId === item.id}
+            reorderEnabled={reorderEnabled}
+            tagRight={tagRight}
+            s={s}
+            panHandlers={getPanResponder(item.id).panHandlers}
+            shiftAnim={getShiftAnim(item.id)}
+            dragY={dragY}
+            dragScale={dragScale}
+            swipeAnim={swipeAnim}
+            onToggle={toggle}
+            onOpenDetail={openDetail}
+            onStartDrag={startDrag}
+            onMeasureHeight={handleRowLayout}
+          />
+        )}
         ListFooterComponent={<View style={{ height: 80 }} />}
       />
 
