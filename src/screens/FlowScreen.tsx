@@ -423,6 +423,10 @@ export default function FlowScreen({ navigation }: Props) {
   const pinchStartScaleRef = useRef(1);
   const flowPan = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
   const flowPanOffsetRef = useRef({ x: 0, y: 0 });
+  const clampFlowPan = useCallback((next: { x: number; y: number }) => ({
+    x: next.x,
+    y: Math.min(next.y, 0),
+  }), []);
 
   slotsRef.current = slots;
 
@@ -658,28 +662,30 @@ export default function FlowScreen({ navigation }: Props) {
     ),
     onPanResponderGrant: () => {
       flowPan.stopAnimation((value: any) => {
-        flowPanOffsetRef.current = { x: value.x, y: value.y };
+        flowPanOffsetRef.current = clampFlowPan({ x: value.x, y: value.y });
       });
     },
     onPanResponderMove: (_, gesture) => {
-      flowPan.setValue({
+      flowPan.setValue(clampFlowPan({
+        x: flowPanOffsetRef.current.x + gesture.dx,
+        y: flowPanOffsetRef.current.y + gesture.dy,
+      }));
+    },
+    onPanResponderRelease: (_, gesture) => {
+      flowPanOffsetRef.current = clampFlowPan({
         x: flowPanOffsetRef.current.x + gesture.dx,
         y: flowPanOffsetRef.current.y + gesture.dy,
       });
-    },
-    onPanResponderRelease: (_, gesture) => {
-      flowPanOffsetRef.current = {
-        x: flowPanOffsetRef.current.x + gesture.dx,
-        y: flowPanOffsetRef.current.y + gesture.dy,
-      };
+      flowPan.setValue(flowPanOffsetRef.current);
     },
     onPanResponderTerminate: (_, gesture) => {
-      flowPanOffsetRef.current = {
+      flowPanOffsetRef.current = clampFlowPan({
         x: flowPanOffsetRef.current.x + gesture.dx,
         y: flowPanOffsetRef.current.y + gesture.dy,
-      };
+      });
+      flowPan.setValue(flowPanOffsetRef.current);
     },
-  }), [flowPan, isPinching]);
+  }), [clampFlowPan, flowPan, isPinching]);
 
   const getSlotPan = useCallback((slotIdx: number) => {
     if (panRespMap.current.has(slotIdx)) return panRespMap.current.get(slotIdx)!;
