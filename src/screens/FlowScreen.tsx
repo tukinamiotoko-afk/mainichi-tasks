@@ -187,6 +187,8 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   pickerCheckText: { color: '#ffffff', fontSize: 14, fontWeight: '900' },
   pickerEmpty: { padding: 40, alignItems: 'center' },
   pickerEmptyText: { color: C.muted, fontSize: 14 },
+  pickerIconGroupRow: { paddingHorizontal: 20, paddingVertical: 10, backgroundColor: '#f5f3ff', borderBottomWidth: 1, borderBottomColor: C.grid },
+  pickerIconGroupText: { color: '#7c3aed', fontSize: 12, fontWeight: '800' },
 
   // ── flow chart list/add sheet ──
   flowChartRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: C.grid, gap: 8 },
@@ -196,10 +198,13 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   flowChartRenameInput: { flex: 1, borderWidth: 1.5, borderColor: '#7c3aed', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, fontSize: 14, color: C.ink, backgroundColor: C.body },
   flowChartIconBtn: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   flowChartIconText: { fontSize: 13 },
-  flowChartAddRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20, paddingVertical: 16 },
+  flowChartAddRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20, paddingTop: 16 },
   flowChartAddInput: { flex: 1, borderWidth: 1.5, borderColor: C.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9, fontSize: 14, color: C.ink, backgroundColor: C.body },
-  flowChartAddBtn: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10, backgroundColor: '#7c3aed' },
+  flowChartAddChoiceRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 20, paddingTop: 10, paddingBottom: 16 },
+  flowChartAddBtn: { flex: 1, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10, backgroundColor: '#7c3aed', alignItems: 'center' },
   flowChartAddBtnText: { color: '#ffffff', fontSize: 13, fontWeight: '800' },
+  flowChartAddBtnOutline: { backgroundColor: C.body, borderWidth: 1.5, borderColor: '#7c3aed' },
+  flowChartAddBtnOutlineText: { color: '#7c3aed' },
 
   editCard: { marginTop: 20, width: '100%', paddingVertical: 16, borderRadius: 14, borderWidth: 1.5, borderColor: C.primary, backgroundColor: C.primarySoft, alignItems: 'center', justifyContent: 'center' },
   editCardText: { color: C.primary, fontSize: 14, fontWeight: '800', letterSpacing: 0.5 },
@@ -506,15 +511,21 @@ export default function FlowScreen({ navigation }: Props) {
     await load();
   }, [db, load]);
 
-  const createFlowChart = useCallback(async () => {
+  const createFlowChart = useCallback(async (fromTaskList: boolean) => {
     const title = newChartName.trim() || `フロー${flowCharts.length + 1}`;
     const id = await addFlowChart(db, title);
+    if (fromTaskList && dueTasks.length > 0) {
+      const orderedIds = [...dueTasks]
+        .sort((a, b) => a.sort_order !== b.sort_order ? a.sort_order - b.sort_order : a.id - b.id)
+        .map(t => t.id);
+      await updateFlowChartOrder(db, id, orderedIds);
+    }
     await setSetting(db, CURRENT_FLOW_CHART_KEY, String(id));
     currentChartIdRef.current = id;
     setNewChartName('');
     setFlowListOpen(false);
     await load();
-  }, [db, newChartName, flowCharts.length, load]);
+  }, [db, newChartName, flowCharts.length, dueTasks, load]);
 
   const startRenameChart = (c: FlowChart) => {
     setRenamingChartId(c.id);
@@ -548,6 +559,16 @@ export default function FlowScreen({ navigation }: Props) {
   }, [db, flowCharts.length, load]);
 
   const taskById = useMemo(() => new Map(dueTasks.map(t => [t.id, t])), [dueTasks]);
+  const iconGroups = useMemo(() => {
+    const map = new Map<string, number[]>();
+    for (const t of dueTasks) {
+      if (!t.icon) continue;
+      const arr = map.get(t.icon) ?? [];
+      arr.push(t.id);
+      map.set(t.icon, arr);
+    }
+    return map;
+  }, [dueTasks]);
   const tray = useMemo(() => addedIds.filter(id => !slots.includes(id)), [addedIds, slots]);
   const getMergeTargetIdx = useCallback((b: BranchNode) => {
     const sub = b.no.sub;
@@ -773,6 +794,37 @@ export default function FlowScreen({ navigation }: Props) {
     } else {
       setAddedIds(prev => [...prev, id]);
       setSlots(prev => [...prev, null]);
+    }
+  };
+
+  const toggleIconGroup = (icon: string) => {
+    const ids = iconGroups.get(icon) ?? [];
+    if (ids.length === 0) return;
+    const idSet = new Set(ids);
+    const allAdded = ids.every(id => addedIds.includes(id));
+    if (allAdded) {
+      setSlots(prev => {
+        let next = [...prev];
+        for (const id of ids) {
+          const idx = next.indexOf(id);
+          if (idx >= 0) {
+            next = [...next.slice(0, idx), ...next.slice(idx + 1)];
+            continue;
+          }
+          let removedPlaceholder = false;
+          for (let i = next.length - 1; i >= 0; i--) {
+            if (next[i] === null) { next = [...next.slice(0, i), ...next.slice(i + 1)]; removedPlaceholder = true; break; }
+          }
+          if (!removedPlaceholder) next = next.slice(0, -1);
+        }
+        return next;
+      });
+      setAddedIds(prev => prev.filter(id => !idSet.has(id)));
+      if (selectedCardId !== null && idSet.has(selectedCardId)) setSelectedCardId(null);
+    } else {
+      const newIds = ids.filter(id => !addedIds.includes(id));
+      setAddedIds(prev => [...prev, ...newIds]);
+      setSlots(prev => [...prev, ...newIds.map(() => null)]);
     }
   };
 
@@ -1716,24 +1768,41 @@ export default function FlowScreen({ navigation }: Props) {
                   <Text style={s.pickerEmptyText}>この日のタスクがありません</Text>
                 </View>
               ) : (
-                dueTasks.map(t => {
-                  const added = addedIds.includes(t.id);
-                  return (
-                    <TouchableOpacity
-                      key={t.id}
-                      style={[s.pickerRow, added && s.pickerRowAdded]}
-                      onPress={() => togglePicker(t.id)}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={[s.pickerRowText, added && s.pickerRowTextAdded]} numberOfLines={2}>
-                        {t.icon ? `${t.icon} ` : ''}{t.title}
-                      </Text>
-                      <View style={[s.pickerCheck, added && s.pickerCheckOn]}>
-                        {added && <Text style={s.pickerCheckText}>✓</Text>}
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })
+                (() => {
+                  const seenIcons = new Set<string>();
+                  return dueTasks.map(t => {
+                    const added = addedIds.includes(t.id);
+                    const icon = t.icon;
+                    const groupIds = icon ? iconGroups.get(icon) ?? [] : [];
+                    const isGroupable = groupIds.length > 1;
+                    const showGroupHeader = isGroupable && icon !== null && !seenIcons.has(icon);
+                    if (isGroupable && icon !== null) seenIcons.add(icon);
+                    const groupAllAdded = isGroupable && groupIds.every(id => addedIds.includes(id));
+                    return (
+                      <React.Fragment key={t.id}>
+                        {showGroupHeader && (
+                          <TouchableOpacity style={s.pickerIconGroupRow} onPress={() => toggleIconGroup(icon!)} activeOpacity={0.7}>
+                            <Text style={s.pickerIconGroupText}>
+                              {icon} をまとめて{groupAllAdded ? '解除' : '追加'}（{groupIds.length}件）
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+                        <TouchableOpacity
+                          style={[s.pickerRow, added && s.pickerRowAdded]}
+                          onPress={() => togglePicker(t.id)}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={[s.pickerRowText, added && s.pickerRowTextAdded]} numberOfLines={2}>
+                            {t.icon ? `${t.icon} ` : ''}{t.title}
+                          </Text>
+                          <View style={[s.pickerCheck, added && s.pickerCheckOn]}>
+                            {added && <Text style={s.pickerCheckText}>✓</Text>}
+                          </View>
+                        </TouchableOpacity>
+                      </React.Fragment>
+                    );
+                  });
+                })()
               )}
             </ScrollView>
           </TouchableOpacity>
@@ -1805,10 +1874,14 @@ export default function FlowScreen({ navigation }: Props) {
                   placeholder="新しいフローチャート名"
                   placeholderTextColor="#cbd5e1"
                   returnKeyType="done"
-                  onSubmitEditing={createFlowChart}
                 />
-                <TouchableOpacity style={s.flowChartAddBtn} onPress={createFlowChart}>
-                  <Text style={s.flowChartAddBtnText}>＋ 追加</Text>
+              </View>
+              <View style={s.flowChartAddChoiceRow}>
+                <TouchableOpacity style={s.flowChartAddBtn} onPress={() => createFlowChart(true)}>
+                  <Text style={s.flowChartAddBtnText}>タスク一覧から作成</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[s.flowChartAddBtn, s.flowChartAddBtnOutline]} onPress={() => createFlowChart(false)}>
+                  <Text style={[s.flowChartAddBtnText, s.flowChartAddBtnOutlineText]}>ゼロから作成</Text>
                 </TouchableOpacity>
               </View>
             </ScrollView>
