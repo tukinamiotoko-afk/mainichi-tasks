@@ -349,6 +349,21 @@ export async function getTotalTimeForDate(db: SQLite.SQLiteDatabase, date: strin
   return row?.total ?? 0;
 }
 
+export type TimeLogTotal = { task_id: number; title: string; icon: string | null; total_seconds: number };
+
+export async function getTimeLogTotalsInRange(
+  db: SQLite.SQLiteDatabase, startDate: string, endDate: string
+): Promise<TimeLogTotal[]> {
+  return db.getAllAsync<TimeLogTotal>(
+    `SELECT l.task_id, t.title, t.icon, SUM(l.duration_seconds) as total_seconds
+     FROM time_logs l JOIN tasks t ON l.task_id = t.id
+     WHERE l.date >= ? AND l.date <= ?
+     GROUP BY l.task_id
+     ORDER BY total_seconds DESC`,
+    [startDate, endDate]
+  );
+}
+
 export async function deleteTimeLog(db: SQLite.SQLiteDatabase, id: number): Promise<void> {
   await db.runAsync('DELETE FROM time_logs WHERE id = ?', [id]);
 }

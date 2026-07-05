@@ -11,6 +11,7 @@ import {
   Task, getToday, subtractDays, daysBetween, getTasks,
   getCompletionCountInRange, getFirstCompletionDate, getCompletionsForMonth,
   getSetting, setSetting,
+  TimeLog, TimeLogTotal, getTimeLogsForDate, getTimeLogTotalsInRange,
 } from '../db/database';
 import { GRAD_START, GRAD_END } from '../constants/theme';
 import TabBar from '../components/TabBar';
@@ -20,12 +21,27 @@ const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
 const PAGE_PAD = 12;
 const GRID_GAP = 10;
 
-type Mode = 'rate' | 'calendar';
+type Mode = 'rate' | 'calendar' | 'timer';
 type Period = '7日' | '30日' | '全期間' | '任意';
 type FreqFilter = 'すべて' | '毎日' | 'その他';
 type DropdownKey = 'period' | 'freq';
+type TimerSubMode = 'daily' | 'summary';
 type Rate = { task: Task; completed: number; total: number; rate: number };
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'Stats'> };
+
+function formatDuration(totalSeconds: number): string {
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  if (h > 0) return `${h}時間${m}分`;
+  if (m > 0) return `${m}分${s}秒`;
+  return `${s}秒`;
+}
+
+function formatClock(iso: string): string {
+  const d = new Date(iso);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
 
 function toDateString(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -102,6 +118,8 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   barFill: { height: '100%' },
   empty: { flex: 1, backgroundColor: C.body, alignItems: 'center', justifyContent: 'center' },
   emptyText: { color: C.muted, fontSize: 14, fontWeight: '600' },
+  timerDuration: { color: C.primary, fontSize: 13, fontWeight: '800' },
+  timerClock: { color: C.muted, fontSize: 12, fontWeight: '600' },
 
   calBody: { flex: 1, backgroundColor: C.body },
   gridPage: { padding: PAGE_PAD, flexDirection: 'row', flexWrap: 'wrap', gap: GRID_GAP },
@@ -180,6 +198,12 @@ export default function StatsScreen({ navigation }: Props) {
   };
   const [doneByTask, setDoneByTask] = useState<Record<number, Set<number>>>({});
 
+  // ── Timer history state ──
+  const [timerSubMode, setTimerSubMode] = useState<TimerSubMode>('daily');
+  const [timerDate, setTimerDate] = useState(today);
+  const [dayLogs, setDayLogs] = useState<TimeLog[]>([]);
+  const [timeTotals, setTimeTotals] = useState<TimeLogTotal[]>([]);
+
   const loadRates = useCallback(async () => {
     const allTasks = await getTasks(db);
     const tasks = freqFilter === 'すべて'
@@ -220,7 +244,21 @@ export default function StatsScreen({ navigation }: Props) {
     setDoneByTask(map);
   }, [db, year, month]);
 
-  useFocusEffect(useCallback(() => { loadRates(); loadCalendar(); }, [loadRates, loadCalendar]));
+  const loadDayLogs = useCallback(async () => {
+    setDayLogs(await getTimeLogsForDate(db, timerDate));
+  }, [db, timerDate]);
+
+  const loadTimeTotals = useCallback(async () => {
+    let start: string;
+    const end = period === '任意' ? toDateString(customEnd) : today;
+    if (period === '7日') start = subtractDays(today, 6);
+    else if (period === '30日') start = subtractDays(today, 29);
+    else if (period === '全期間') start = '0000-01-01';
+    else start = toDateString(customStart);
+    setTimeTotals(await getTimeLogTotalsInRange(db, start, end));
+  }, [db, period, today, customStart, customEnd]);
+
+  useFocusEffect(useCallback(() => { loadRates(); loadCalendar(); loadDayLogs(); loadTimeTotals(); }, [loadRates, loadCalendar, loadDayLogs, loadTimeTotals]));
 
   const periodLabel = (): string => {
     if (period === '7日') return '直近7日間';
@@ -289,9 +327,9 @@ export default function StatsScreen({ navigation }: Props) {
         onLayout={(e) => setHeaderHeight(e.nativeEvent.layout.height + insets.top)}
       >
         <View style={s.segRow}>
-          {(['rate', 'calendar'] as Mode[]).map((m) => (
+          {(['rate', 'calendar', 'timer'] as Mode[]).map((m) => (
             <TouchableOpacity key={m} style={[s.segChip, mode === m && s.segChipActive]} onPress={() => { setOpenDropdown(null); setMode(m); }}>
-              <Text style={[s.segText, mode === m && s.segTextActive]}>{m === 'rate' ? '実行率' : 'カレンダー'}</Text>
+              <Text style={[s.segText, mode === m && s.segTextActive]}>{m === 'rate' ? '実行率' : m === 'calendar' ? 'カレンダー' : 'タイマー'}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -324,7 +362,7 @@ export default function StatsScreen({ navigation }: Props) {
               <Text style={s.selectorArrow}>{openDropdown === 'freq' ? '▲' : '▼'}</Text>
             </TouchableOpacity>
           </View>
-        ) : (
+        ) : mode === 'calendar' ? (
           <>
             <View style={s.monthNav}>
               <TouchableOpacity onPress={prevMonth} style={s.navBtn}>
@@ -342,6 +380,41 @@ export default function StatsScreen({ navigation }: Props) {
                 </TouchableOpacity>
               ))}
             </View>
+          </>
+        ) : (
+          <>
+            <View style={s.chipRow}>
+              {([{ k: 'daily' as const, l: '日別' }, { k: 'summary' as const, l: '集計' }]).map((o) => (
+                <TouchableOpacity key={o.k} style={[s.chip, timerSubMode === o.k && s.chipActive]} onPress={() => setTimerSubMode(o.k)}>
+                  <Text style={[s.chipText, timerSubMode === o.k && s.chipTextActive]}>{o.l}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            {timerSubMode === 'daily' ? (
+              <View style={s.monthNav}>
+                <TouchableOpacity onPress={() => setTimerDate(subtractDays(timerDate, 1))} style={s.navBtn}>
+                  <Text style={s.navBtnText}>‹</Text>
+                </TouchableOpacity>
+                <Text style={s.monthLabel}>{timerDate}{timerDate === today ? '（今日）' : ''}</Text>
+                <TouchableOpacity onPress={() => setTimerDate(subtractDays(timerDate, -1))} style={s.navBtn}>
+                  <Text style={s.navBtnText}>›</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={s.selectorRow}>
+                <TouchableOpacity
+                  style={[s.selectorBtn, openDropdown === 'period' && s.selectorBtnOpen]}
+                  onPress={() => toggleDropdown('period')}
+                  activeOpacity={0.8}
+                >
+                  <View style={s.selectorLeft}>
+                    <Text style={s.selectorLabel}>期間</Text>
+                    <Text style={s.selectorValue} numberOfLines={1}>{periodDisplay}</Text>
+                  </View>
+                  <Text style={s.selectorArrow}>{openDropdown === 'period' ? '▲' : '▼'}</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </>
         )}
       </LinearGradient>
@@ -451,7 +524,7 @@ export default function StatsScreen({ navigation }: Props) {
             />
           )}
         </>
-      ) : (
+      ) : mode === 'calendar' ? (
         <ScrollView style={s.calBody} contentContainerStyle={[s.gridPage, { paddingBottom: 24 }]}>
           {calTasks.length === 0 ? (
             <View style={[s.calEmpty, { width: '100%' }]}>
@@ -480,6 +553,72 @@ export default function StatsScreen({ navigation }: Props) {
             })
           )}
         </ScrollView>
+      ) : timerSubMode === 'daily' ? (
+        dayLogs.length === 0 ? (
+          <View style={s.empty}>
+            <Text style={s.emptyText}>この日の記録はありません</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={dayLogs}
+            keyExtractor={(item) => String(item.id)}
+            style={s.list}
+            contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: 24 }}
+            ListHeaderComponent={<Text style={s.metaLabel}>合計 {formatDuration(dayLogs.reduce((sum, l) => sum + l.duration_seconds, 0))}</Text>}
+            renderItem={({ item }) => (
+              <View style={s.rateCard}>
+                <View style={s.rateHeader}>
+                  <Text style={s.rateTitle} numberOfLines={1}>{item.title}</Text>
+                  <Text style={s.timerDuration}>{formatDuration(item.duration_seconds)}</Text>
+                </View>
+                <Text style={s.timerClock}>{formatClock(item.started_at)} 〜 {formatClock(item.ended_at)}</Text>
+              </View>
+            )}
+          />
+        )
+      ) : (
+        <>
+          {period === '任意' && (
+            <View style={s.customBar}>
+              <Text style={s.customLabel}>期間：</Text>
+              <TouchableOpacity style={s.dateBtn} onPress={() => setShowStartPicker(true)}>
+                <Text style={s.dateBtnText}>{toDateString(customStart)}</Text>
+              </TouchableOpacity>
+              <Text style={s.customTilde}>〜</Text>
+              <TouchableOpacity style={s.dateBtn} onPress={() => setShowEndPicker(true)}>
+                <Text style={s.dateBtnText}>{toDateString(customEnd)}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={loadTimeTotals} activeOpacity={0.85}>
+                <LinearGradient colors={grad.brand} start={GRAD_START} end={GRAD_END} style={s.applyBtn}>
+                  <Text style={s.applyBtnText}>適用</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          )}
+          {timeTotals.length === 0 ? (
+            <View style={s.empty}>
+              <Text style={s.emptyText}>この期間の記録はありません</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={timeTotals}
+              keyExtractor={(item) => String(item.task_id)}
+              style={s.list}
+              contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: 24 }}
+              ListHeaderComponent={<Text style={s.metaLabel}>{periodLabel()}</Text>}
+              renderItem={({ item }) => (
+                <View style={s.rateCard}>
+                  <View style={s.rateHeader}>
+                    <Text style={s.rateTitle} numberOfLines={1}>
+                      {item.icon ? `${item.icon} ` : ''}{item.title}
+                    </Text>
+                    <Text style={s.timerDuration}>{formatDuration(item.total_seconds)}</Text>
+                  </View>
+                </View>
+              )}
+            />
+          )}
+        </>
       )}
 
       <TabBar current="Stats" navigation={navigation} />
