@@ -1636,7 +1636,7 @@ export default function FlowScreen({ navigation }: Props) {
   );
 
   return (
-    <View style={[s.root, { paddingBottom: insets.bottom }]}>
+    <View style={s.root}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
       <LinearGradient colors={grad.header} start={GRAD_START} end={GRAD_END} style={[s.header, { paddingTop: insets.top + 12 }]}>
