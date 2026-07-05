@@ -362,7 +362,6 @@ export default function FlowScreen({ navigation }: Props) {
   const [branchEditorOpen, setBranchEditorOpen] = useState(false);
   const [branchDraft, setBranchDraft] = useState<BranchNode | null>(null);
   const [branchNoteDraft, setBranchNoteDraft] = useState({ yes: '', no: '' });
-  const [subNoteDraft, setSubNoteDraft] = useState({ yes: '', no: '' });
   const [noRouteBranchEditorOpen, setNoRouteBranchEditorOpen] = useState(false);
   const [branchNoTasksExpanded, setBranchNoTasksExpanded] = useState(false);
   const [mergeTaskExpanded, setMergeTaskExpanded] = useState(false);
@@ -691,7 +690,6 @@ export default function FlowScreen({ navigation }: Props) {
   const editBranch = (b: BranchNode) => {
     setBranchDraft({ id: b.id, insertAfterIdx: b.insertAfterIdx, question: b.question, yes: { ...b.yes }, no: { ...b.no } });
     setBranchNoteDraft({ yes: '', no: '' });
-    setSubNoteDraft({ yes: '', no: '' });
     setBranchEditorOpen(true);
   };
   const openNoRouteBranchEditor = (b: BranchNode) => {
@@ -775,7 +773,6 @@ export default function FlowScreen({ navigation }: Props) {
     setBranchEditorOpen(false);
     setBranchDraft(null);
     setBranchNoteDraft({ yes: '', no: '' });
-    setSubNoteDraft({ yes: '', no: '' });
     if (isNew) setInsertBranchMode(false);
   };
   const toggleBranchY = (id: number) => setBranchDraft(p => p ? ({
@@ -800,41 +797,14 @@ export default function FlowScreen({ navigation }: Props) {
     setBranchDraft(p => p ? { ...p, no: { ...p.no, mergeTaskId: p.no.mergeTaskId === id ? undefined : id } } : p);
   };
   const setNoAfterMode = (mode: 'end' | 'merge' | 'sub') => {
-    if (mode === 'sub') setSubNoteDraft({ yes: '', no: '' });
     setBranchDraft(p => {
       if (!p) return p;
       if (mode === 'sub') return { ...p, no: { ...p.no, sub: p.no.sub ?? emptySubBranch(), after: undefined } };
       return { ...p, no: { ...p.no, sub: undefined, after: mode === 'end' ? 'end' : undefined } };
     });
   };
-  const setSubNoReturnToMain = (enabled: boolean) => {
-    setBranchDraft(p => p?.no.sub ? { ...p, no: { ...p.no, sub: { ...p.no.sub, noReturnsToMain: enabled } } } : p);
-  };
   const setSubQ = (q: string) => {
     setBranchDraft(p => p?.no.sub ? { ...p, no: { ...p.no, sub: { ...p.no.sub, question: q } } } : p);
-  };
-  const toggleSubTask = (path: 'yes' | 'no', id: number) => {
-    setBranchDraft(p => {
-      if (!p?.no.sub) return p;
-      const cur = p.no.sub[path].taskIds;
-      const next = cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id];
-      return { ...p, no: { ...p.no, sub: { ...p.no.sub, [path]: { ...p.no.sub[path], taskIds: next } } } };
-    });
-  };
-  const addSubNote = (path: 'yes' | 'no') => {
-    const note = subNoteDraft[path].trim();
-    if (!note) return;
-    setBranchDraft(p => {
-      if (!p?.no.sub) return p;
-      return { ...p, no: { ...p.no, sub: { ...p.no.sub, [path]: { ...p.no.sub[path], notes: [...p.no.sub[path].notes, note] } } } };
-    });
-    setSubNoteDraft(prev => ({ ...prev, [path]: '' }));
-  };
-  const removeSubNote = (path: 'yes' | 'no', idx: number) => {
-    setBranchDraft(p => {
-      if (!p?.no.sub) return p;
-      return { ...p, no: { ...p.no, sub: { ...p.no.sub, [path]: { ...p.no.sub[path], notes: p.no.sub[path].notes.filter((_, i) => i !== idx) } } } };
-    });
   };
   const setNoRouteSubQ = (q: string) => {
     setNoRouteSubDraft(p => p ? { ...p, question: q } : p);
@@ -1692,69 +1662,19 @@ export default function FlowScreen({ navigation }: Props) {
                 ) : null}
               </View>
 
-              {/* Sub-branch section */}
+              {/* Sub-branch section: question only — details are edited from the
+                  sub-branch's 編集 button on the flow diagram */}
               {branchDraft?.no.sub ? (
               <View style={[s.branchEditorSection, { borderTopWidth: 1, borderTopColor: '#fed7aa', marginTop: 8, paddingTop: 16 }]}>
-                <Text style={s.branchEditorLabel}>サブ分岐の設定</Text>
-                  <>
-                    <TextInput
-                      style={s.branchEditorInput}
-                      value={branchDraft.no.sub.question}
-                      onChangeText={setSubQ}
-                      placeholder="サブ分岐の内容（例: やり直す？）"
-                      placeholderTextColor="#cbd5e1"
-                    />
-                    <Text style={[s.branchEditorLabel, { marginTop: 12, color: '#b91c1c' }]}>いいえで続けるカード</Text>
-                    <View style={s.branchNoteList}>
-                      {(branchDraft.no.sub.no.notes ?? []).map((note, idx) => (
-                        <TouchableOpacity key={`sn${note}${idx}`} style={s.branchNoteChip} onPress={() => removeSubNote('no', idx)} activeOpacity={0.75}>
-                          <Text style={s.branchNoteChipText} numberOfLines={1}>{note}</Text>
-                          <Text style={s.branchNoteChipX}>×</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                    <View style={s.branchNoteAddRow}>
-                      <TextInput style={s.branchNoteInput} value={subNoteDraft.no} onChangeText={t => setSubNoteDraft(p => ({ ...p, no: t }))} placeholder="いいえルートの内容" placeholderTextColor="#cbd5e1" returnKeyType="done" onSubmitEditing={() => addSubNote('no')} />
-                      <TouchableOpacity style={s.branchNoteAddBtn} onPress={() => addSubNote('no')}><Text style={s.branchNoteAddText}>追加</Text></TouchableOpacity>
-                    </View>
-                    <Text style={[s.branchEditorLabel, { marginTop: 12, color: '#15803d' }]}>はいで左に戻るタスク</Text>
-                    <View style={s.branchNoteList}>
-                      {(branchDraft.no.sub.yes.notes ?? []).map((note, idx) => (
-                        <TouchableOpacity key={`sy${note}${idx}`} style={s.branchNoteChip} onPress={() => removeSubNote('yes', idx)} activeOpacity={0.75}>
-                          <Text style={s.branchNoteChipText} numberOfLines={1}>{note}</Text>
-                          <Text style={s.branchNoteChipX}>×</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                    <View style={s.branchNoteAddRow}>
-                      <TextInput style={s.branchNoteInput} value={subNoteDraft.yes} onChangeText={t => setSubNoteDraft(p => ({ ...p, yes: t }))} placeholder="はいルートの内容" placeholderTextColor="#cbd5e1" returnKeyType="done" onSubmitEditing={() => addSubNote('yes')} />
-                      <TouchableOpacity style={s.branchNoteAddBtn} onPress={() => addSubNote('yes')}><Text style={s.branchNoteAddText}>追加</Text></TouchableOpacity>
-                    </View>
-                    <Text style={[s.branchEditorLabel, { marginTop: 12 }]}>サブタスクの終着点</Text>
-                    <View style={s.branchReturnRow}>
-                      <TouchableOpacity style={[s.branchReturnBtn, !branchDraft.no.sub.noReturnsToMain && s.branchReturnBtnOn]} onPress={() => setSubNoReturnToMain(false)}>
-                        <Text style={[s.branchReturnBtnText, !branchDraft.no.sub.noReturnsToMain && s.branchReturnBtnTextOn]}>そのまま終了</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity style={[s.branchReturnBtn, branchDraft.no.sub.noReturnsToMain && s.branchReturnBtnOn]} onPress={() => setSubNoReturnToMain(true)}>
-                        <Text style={[s.branchReturnBtnText, branchDraft.no.sub.noReturnsToMain && s.branchReturnBtnTextOn]}>メインに合流</Text>
-                      </TouchableOpacity>
-                    </View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
-                      <Text style={[s.branchEditorLabel, { flex: 1 }]}>タスク（いいえルート）</Text>
-                      <View style={s.branchCheckLabels}><Text style={s.branchCheckLabelN}>いいえ</Text></View>
-                    </View>
-                    {dueTasks.map(t => {
-                      const inSN = branchDraft?.no.sub?.no.taskIds.includes(t.id) ?? false;
-                      return (
-                        <View key={`st${t.id}`} style={s.branchTaskRow}>
-                          <Text style={s.branchTaskText} numberOfLines={2}>{t.icon ? `${t.icon} ` : ''}{t.title}</Text>
-                          <TouchableOpacity style={[s.branchCheckN, inSN && s.branchCheckNOn]} onPress={() => toggleSubTask('no', t.id)}>
-                            {inSN && <Text style={s.branchCheckText}>✓</Text>}
-                          </TouchableOpacity>
-                        </View>
-                      );
-                    })}
-                  </>
+                <Text style={s.branchEditorLabel}>サブ分岐の内容</Text>
+                <TextInput
+                  style={s.branchEditorInput}
+                  value={branchDraft.no.sub.question}
+                  onChangeText={setSubQ}
+                  placeholder="サブ分岐の内容（例: やり直す？）"
+                  placeholderTextColor="#cbd5e1"
+                />
+                <Text style={{ color: '#94a3b8', fontSize: 10, marginTop: 6 }}>カードや戻り先などの詳細は、フロー図のサブ分岐の「編集」ボタンから設定できます</Text>
               </View>
               ) : null}
 
