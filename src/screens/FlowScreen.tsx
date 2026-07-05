@@ -470,7 +470,10 @@ export default function FlowScreen({ navigation }: Props) {
     const ts = await getTasks(db);
     const due = ts.filter(t => isDueToday(t, new Date(`${selectedDate}T00:00:00`)));
     const orderMap = await getFlowChartOrder(db, chartId);
-    const sorted = [...due].sort((a, b) => {
+    // a chart with no saved order yet has never been placed/saved — start it
+    // blank instead of auto-filling every due task, so new flows begin from
+    // zero; due tasks remain available to add manually from the tray
+    const sorted = orderMap.size === 0 ? [] : [...due].sort((a, b) => {
       const pa = orderMap.has(a.id) ? orderMap.get(a.id)! : Infinity;
       const pb = orderMap.has(b.id) ? orderMap.get(b.id)! : Infinity;
       if (pa !== pb) return pa - pb;
