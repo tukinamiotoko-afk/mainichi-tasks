@@ -735,6 +735,7 @@ export default function HomeScreen({ navigation }: Props) {
   const s = useMemo(() => makeStyles(C), [C]);
   const screen = Dimensions.get('window');
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [tasksLoaded, setTasksLoaded] = useState(false);
   const [tagRight, setTagRight] = useState(false);
   const tasksRef = useRef<Task[]>([]);
   const [completedIds, setCompletedIds] = useState<Set<number>>(new Set());
@@ -842,6 +843,7 @@ export default function HomeScreen({ navigation }: Props) {
     setTasks(ts);
     setCompletedIds(new Set(ids));
     setTagRight(layout === 'tag_right');
+    setTasksLoaded(true);
   }, [db, selectedDate]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -1742,10 +1744,12 @@ export default function HomeScreen({ navigation }: Props) {
         style={s.list}
         contentContainerStyle={{ padding: 16, gap: 10 }}
         ListEmptyComponent={
-          <View style={s.empty}>
-            <Text style={s.emptyTitle}>{total > 0 ? '該当なし' : 'タスクなし'}</Text>
-            <Text style={s.emptyBody}>{total > 0 ? '絞り込み条件を変えてみてください' : '右下の ＋ から追加できます'}</Text>
-          </View>
+          tasksLoaded ? (
+            <View style={s.empty}>
+              <Text style={s.emptyTitle}>{total > 0 ? '該当なし' : 'タスクなし'}</Text>
+              <Text style={s.emptyBody}>{total > 0 ? '絞り込み条件を変えてみてください' : '右下の ＋ から追加できます'}</Text>
+            </View>
+          ) : null
         }
         renderItem={({ item }) => (
           <TaskRow

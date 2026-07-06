@@ -179,6 +179,7 @@ export default function StatsScreen({ navigation }: Props) {
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
   const [rates, setRates] = useState<Rate[]>([]);
+  const [ratesLoaded, setRatesLoaded] = useState(false);
 
   // ── Calendar state ──
   const now = new Date();
@@ -186,6 +187,7 @@ export default function StatsScreen({ navigation }: Props) {
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [columns, setColumns] = useState<1 | 2>(2);
   const [calTasks, setCalTasks] = useState<Task[]>([]);
+  const [calTasksLoaded, setCalTasksLoaded] = useState(false);
 
   useEffect(() => {
     getSetting(db, 'calendar_columns').then((v) => {
@@ -209,7 +211,7 @@ export default function StatsScreen({ navigation }: Props) {
     const tasks = freqFilter === 'すべて'
       ? allTasks
       : allTasks.filter((t) => (freqFilter === '毎日' ? t.freq_type === 'daily' : t.freq_type !== 'daily'));
-    if (tasks.length === 0) { setRates([]); return; }
+    if (tasks.length === 0) { setRates([]); setRatesLoaded(true); return; }
     const computed = await Promise.all(tasks.map(async (task) => {
       let startDate: string;
       let totalDays: number;
@@ -228,6 +230,7 @@ export default function StatsScreen({ navigation }: Props) {
       return { task, completed, total: Math.max(totalDays, 1), rate: completed / Math.max(totalDays, 1) };
     }));
     setRates(computed);
+    setRatesLoaded(true);
   }, [db, period, freqFilter, today, customStart, customEnd]);
 
   const loadCalendar = useCallback(async () => {
@@ -242,6 +245,7 @@ export default function StatsScreen({ navigation }: Props) {
     }
     setCalTasks(allTasks);
     setDoneByTask(map);
+    setCalTasksLoaded(true);
   }, [db, year, month]);
 
   const loadDayLogs = useCallback(async () => {
@@ -489,9 +493,11 @@ export default function StatsScreen({ navigation }: Props) {
           )}
 
           {rates.length === 0 ? (
-            <View style={s.empty}>
-              <Text style={s.emptyText}>タスクがありません</Text>
-            </View>
+            ratesLoaded ? (
+              <View style={s.empty}>
+                <Text style={s.emptyText}>タスクがありません</Text>
+              </View>
+            ) : null
           ) : (
             <FlatList
               data={rates}
@@ -527,10 +533,12 @@ export default function StatsScreen({ navigation }: Props) {
       ) : mode === 'calendar' ? (
         <ScrollView style={s.calBody} contentContainerStyle={[s.gridPage, { paddingBottom: 24 }]}>
           {calTasks.length === 0 ? (
-            <View style={[s.calEmpty, { width: '100%' }]}>
-              <Text style={s.calEmptyTitle}>タスクがありません</Text>
-              <Text style={s.calEmptyBody}>タスク画面で追加すると、ここに月別の記録が出ます</Text>
-            </View>
+            calTasksLoaded ? (
+              <View style={[s.calEmpty, { width: '100%' }]}>
+                <Text style={s.calEmptyTitle}>タスクがありません</Text>
+                <Text style={s.calEmptyBody}>タスク画面で追加すると、ここに月別の記録が出ます</Text>
+              </View>
+            ) : null
           ) : (
             calTasks.map((task) => {
               const count = doneByTask[task.id]?.size ?? 0;
