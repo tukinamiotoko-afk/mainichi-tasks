@@ -339,8 +339,6 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   sheetBg: { flex: 1, backgroundColor: 'transparent', justifyContent: 'flex-end' },
   sheet: { backgroundColor: C.sheetBg, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1.5, borderColor: C.sheetBorder, padding: 20, paddingTop: 12, gap: 8, maxHeight: '88%' },
   sheetHandle: { width: 40, height: 4, backgroundColor: C.border, borderRadius: 2, alignSelf: 'center', marginBottom: 12 },
-  sheetDeleteBtn: { position: 'absolute', top: 10, right: 14, backgroundColor: '#fee2e2', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 6, zIndex: 10 },
-  sheetDeleteText: { color: '#dc2626', fontSize: 12, fontWeight: '800' },
   sheetSection: { color: C.muted, fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
   sheetTitleRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   sheetTitleInput: { flex: 1, borderWidth: 1, borderColor: C.border, borderRadius: 10, padding: 12, fontSize: 15, color: C.onDark, backgroundColor: C.body },
@@ -349,8 +347,14 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   timerDurationInput: { width: 56, borderWidth: 1, borderColor: C.border, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, fontSize: 14, color: C.onDark, backgroundColor: C.body, textAlign: 'center' },
   timerDurationLabel: { color: C.muted, fontSize: 12, fontWeight: '700' },
   sheetSaveBtn: { backgroundColor: C.primary, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 12, alignItems: 'center', justifyContent: 'center' },
-  sheetSaveBtnDisabled: { backgroundColor: C.border },
   sheetSaveBtnText: { color: C.onPrimary, fontSize: 13, fontWeight: '700' },
+
+  detailScreen: { flex: 1, backgroundColor: C.body },
+  detailHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: C.border, backgroundColor: C.card },
+  detailHeaderTitle: { color: C.onDark, fontSize: 16, fontWeight: '800' },
+  detailCloseText: { fontSize: 22, color: C.muted, paddingHorizontal: 4 },
+  detailDeleteBtn: { marginTop: 24, backgroundColor: '#fee2e2', borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
+  detailDeleteText: { color: '#dc2626', fontSize: 14, fontWeight: '800' },
 
   // Schedule (time + notify)
   scheduleCard: { backgroundColor: C.scheduleCardBg, borderRadius: 14, padding: 14, gap: 8 },
@@ -1006,10 +1010,15 @@ export default function HomeScreen({ navigation }: Props) {
   }, []);
 
   const handleSaveTitle = async () => {
-    if (!detailTask || !detailTitle.trim()) return;
+    if (!detailTask || !detailTitle.trim() || detailTitle === detailTask.title) return;
     await updateTask(db, detailTask.id, { title: detailTitle.trim() });
     setDetailTask(t => t ? { ...t, title: detailTitle.trim() } : null);
     load();
+  };
+
+  const handleDetailSave = async () => {
+    await handleSaveTitle();
+    setDetailTask(null);
   };
 
   // Persist a change to the open task; reschedule reminders when relevant.
@@ -1979,40 +1988,33 @@ export default function HomeScreen({ navigation }: Props) {
         </View>
       </Modal>
 
-      {/* Task detail bottom sheet */}
-      <Modal visible={!!detailTask} transparent animationType="slide" onRequestClose={() => setDetailTask(null)}>
-        <View style={{ flex: 1 }}>
-          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setDetailTask(null)} />
-          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-            <View style={[s.sheet, { maxHeight: screen.height * 0.85 }]}>
-                <View style={s.sheetHandle} />
-                {detailTask && (
-                  <TouchableOpacity style={s.sheetDeleteBtn} onPress={() => handleDelete(detailTask)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Text style={s.sheetDeleteText}>🗑 削除</Text>
-                  </TouchableOpacity>
-                )}
-                <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}>
+      {/* Task detail — full-screen editor */}
+      <Modal visible={!!detailTask} animationType="slide" onRequestClose={() => setDetailTask(null)}>
+        <View style={[s.detailScreen, { paddingTop: insets.top }]}>
+          <View style={s.detailHeader}>
+            <TouchableOpacity onPress={() => setDetailTask(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Text style={s.detailCloseText}>✕</Text>
+            </TouchableOpacity>
+            <Text style={s.detailHeaderTitle}>タスクを編集</Text>
+            <TouchableOpacity onPress={handleDetailSave} activeOpacity={0.85}>
+              <LinearGradient colors={grad.brand} start={GRAD_START} end={GRAD_END} style={s.sheetSaveBtn}>
+                <Text style={s.sheetSaveBtnText}>保存</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+                <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 16 }}>
                   {detailTask && (
                     <>
                       {/* Task name (top) */}
                       <Text style={s.sheetSection}>タスク名</Text>
-                      <View style={s.sheetTitleRow}>
-                        <TextInput
-                          style={s.sheetTitleInput}
-                          value={detailTitle}
-                          onChangeText={setDetailTitle}
-                          returnKeyType="done"
-                          onSubmitEditing={handleSaveTitle}
-                        />
-                        <TouchableOpacity onPress={handleSaveTitle} disabled={detailTitle === detailTask.title} activeOpacity={0.85}>
-                          <LinearGradient
-                            colors={detailTitle === detailTask.title ? [C.border, C.border] : grad.brand}
-                            start={GRAD_START} end={GRAD_END} style={s.sheetSaveBtn}
-                          >
-                            <Text style={s.sheetSaveBtnText}>保存</Text>
-                          </LinearGradient>
-                        </TouchableOpacity>
-                      </View>
+                      <TextInput
+                        style={s.sheetTitleInput}
+                        value={detailTitle}
+                        onChangeText={setDetailTitle}
+                        returnKeyType="done"
+                        onSubmitEditing={handleSaveTitle}
+                      />
                       <TextInput
                         style={s.noteInput}
                         value={detailTask.note ?? ''}
@@ -2094,11 +2096,14 @@ export default function HomeScreen({ navigation }: Props) {
                         (mins) => patchDetail({ auto_timer_minutes: mins }),
                       )}
 
+                      <TouchableOpacity style={s.detailDeleteBtn} onPress={() => handleDelete(detailTask)}>
+                        <Text style={s.detailDeleteText}>🗑 このタスクを削除</Text>
+                      </TouchableOpacity>
+
                       <View style={{ height: 12 }} />
                     </>
                   )}
                 </ScrollView>
-            </View>
           </KeyboardAvoidingView>
         </View>
       </Modal>
