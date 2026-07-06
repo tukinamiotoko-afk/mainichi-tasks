@@ -1841,7 +1841,7 @@ export default function FlowScreen({ navigation }: Props) {
                 )}
               </View>
             )}
-            <ScrollView keyboardShouldPersistTaps="handled" bounces={false}>
+            <ScrollView keyboardShouldPersistTaps="handled" bounces={false} contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}>
               {dueTasks.length === 0 ? (
                 <View style={s.pickerEmpty}>
                   <Text style={s.pickerEmptyText}>この日のタスクがありません</Text>
@@ -2203,7 +2203,7 @@ export default function FlowScreen({ navigation }: Props) {
                 <Text style={s.pickerDone}>完了</Text>
               </TouchableOpacity>
             </View>
-            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}>
+            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: insets.bottom + 24 }}>
               {yesEligibleTasks.length === 0 ? (
                 <Text style={{ color: '#94a3b8', fontSize: 13, textAlign: 'center', paddingVertical: 24 }}>選択できるタスクがありません</Text>
               ) : yesEligibleTasks.map(t => {
@@ -2232,7 +2232,7 @@ export default function FlowScreen({ navigation }: Props) {
                 <Text style={s.pickerDone}>完了</Text>
               </TouchableOpacity>
             </View>
-            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}>
+            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: insets.bottom + 24 }}>
               {mergeEligibleTasks.length === 0 ? (
                 <Text style={{ color: '#94a3b8', fontSize: 13, textAlign: 'center', paddingVertical: 24 }}>選択できるタスクがありません</Text>
               ) : mergeEligibleTasks.map(t => {
@@ -2261,7 +2261,7 @@ export default function FlowScreen({ navigation }: Props) {
                 <Text style={s.pickerDone}>完了</Text>
               </TouchableOpacity>
             </View>
-            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}>
+            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: insets.bottom + 24 }}>
               {branchNoPickerTasks.length === 0 ? (
                 <Text style={{ color: '#94a3b8', fontSize: 13, textAlign: 'center', paddingVertical: 24 }}>選択できるタスクがありません</Text>
               ) : branchNoPickerTasks.map(t => {
