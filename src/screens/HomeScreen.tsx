@@ -1225,14 +1225,15 @@ export default function HomeScreen({ navigation }: Props) {
   const endDrag = () => {
     const state = dragState.current;
     const rawDy = currentDragYRef.current;
+    const startTasks = displayedTasksAtDragStart.current;
+    const dragStartIndex = state.startIndex;
+    const finalIndex = Math.max(0, Math.min(startTasks.length - 1, state.currentIndex));
 
     let pendingTasks: Task[] | null = null;
     if (state.changed && state.taskId != null) {
-      const startTasks = displayedTasksAtDragStart.current;
-      const toIdx = Math.max(0, Math.min(startTasks.length - 1, state.currentIndex));
       const reorderedDisplayed = [...startTasks];
-      const [moved] = reorderedDisplayed.splice(state.startIndex, 1);
-      reorderedDisplayed.splice(toIdx, 0, moved);
+      const [moved] = reorderedDisplayed.splice(dragStartIndex, 1);
+      reorderedDisplayed.splice(finalIndex, 0, moved);
 
       // reorderedDisplayed only covers the filtered/displayed subset; overlay
       // its new order onto the full task list (in place of that same subset)
@@ -1254,19 +1255,34 @@ export default function HomeScreen({ navigation }: Props) {
       updateTaskSortOrders(db, pendingTasks.map((t) => t.id));
     }
 
-    // Spring the dragged card from its release position to the slot-aligned
-    // target. Only after the spring lands do we apply the React state changes
-    // (setTasks + setActiveDragId), so there is no native/JS frame where cards
-    // briefly snap back to their pre-drag positions.
-    const targetDy = (state.currentIndex - state.startIndex) * dragSlotRef.current;
+    // Spring the dragged card AND every card it displaced into their final,
+    // fully-settled positions together, so the drop reads as one continuous
+    // motion instead of the dragged card alone finishing while its neighbors
+    // sit frozen until it lands. Each neighbor's target here is exactly the
+    // offset the reorder below will bake into its real position, so handing
+    // off from transform to real order (in the completion callback) is
+    // seamless — no snap-back frame, no jump.
+    const slot = dragSlotRef.current;
+    const targetDy = (finalIndex - dragStartIndex) * slot;
     dragState.current = { taskId: null, startIndex: 0, currentIndex: 0, changed: false };
     dragY.setValue(rawDy);
 
-    const tasks = pendingTasks;
-    Animated.parallel([
+    const settleAnimations = [
       Animated.spring(dragY, { toValue: targetDy, useNativeDriver: true, tension: 220, friction: 14 }),
       Animated.spring(dragScale, { toValue: 1, useNativeDriver: true, tension: 220, friction: 14 }),
-    ]).start(({ finished }) => {
+    ];
+    startTasks.forEach((task, i) => {
+      if (task.id === state.taskId) return;
+      let finalShift = 0;
+      if (finalIndex > dragStartIndex && i > dragStartIndex && i <= finalIndex) finalShift = -slot;
+      else if (finalIndex < dragStartIndex && i >= finalIndex && i < dragStartIndex) finalShift = slot;
+      settleAnimations.push(
+        Animated.spring(getShiftAnim(task.id), { toValue: finalShift, useNativeDriver: true, tension: 220, friction: 14 })
+      );
+    });
+
+    const tasks = pendingTasks;
+    Animated.parallel(settleAnimations).start(({ finished }) => {
       if (!finished) return;
       shiftAnims.current.forEach((anim) => anim.setValue(0));
       if (tasks) setTasks(tasks);
