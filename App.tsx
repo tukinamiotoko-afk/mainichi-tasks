@@ -13,6 +13,7 @@ import ScheduleScreen from './src/screens/ScheduleScreen';
 import FlowScreen from './src/screens/FlowScreen';
 import { migrateDb } from './src/db/database';
 import { ThemeProvider } from './src/contexts/ThemeContext';
+import { TimerProvider } from './src/contexts/TimerContext';
 
 // Show banners/sounds even when the app is in the foreground.
 Notifications.setNotificationHandler({
@@ -71,7 +72,9 @@ export default function App() {
   return (
     <SQLiteProvider databaseName="daily_tasks.db" onInit={migrateDb}>
       <ThemeProvider>
-        <AppNavigation />
+        <TimerProvider>
+          <AppNavigation />
+        </TimerProvider>
       </ThemeProvider>
     </SQLiteProvider>
   );

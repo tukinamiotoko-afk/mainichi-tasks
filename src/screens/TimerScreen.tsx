@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, StatusBar, Alert, ScrollView, Modal, Dimensions, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSQLiteContext } from 'expo-sqlite';
@@ -6,28 +6,13 @@ import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import { RootStackParamList } from '../../App';
-import {
-  Task,
-  addTimeLog,
-  getTasks,
-  getToday,
-  markComplete,
-  getTimerSettingForTask,
-  saveTimerSettingForTask,
-} from '../db/database';
+import { Task, getTasks } from '../db/database';
 import { GRAD, GRAD_START, GRAD_END } from '../constants/theme';
 import TabBar from '../components/TabBar';
 import { useTheme, ColorSet } from '../contexts/ThemeContext';
+import { useTimerActions, useTimerState, useTimerClock, timerSeconds, displayTimerSeconds } from '../contexts/TimerContext';
 
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'Timer'> };
-type TimerMode = 'stopwatch' | 'timer';
-type TimerItem = {
-  task: Task;
-  baseSeconds: number;
-  startedAtMs: number | null;
-  startedAtIso: string | null;
-  targetSeconds: number;
-};
 
 const makeStyles = (C: ColorSet) => StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: C.body },
@@ -99,27 +84,17 @@ function formatDuration(totalSeconds: number, alwaysHours = false): string {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-function timerSeconds(item: TimerItem, now: number): number {
-  if (!item.startedAtMs) return item.baseSeconds;
-  return item.baseSeconds + Math.floor((now - item.startedAtMs) / 1000);
-}
-
-function displayTimerSeconds(item: TimerItem, now: number, mode: TimerMode, targetSeconds: number): number {
-  const elapsed = timerSeconds(item, now);
-  return mode === 'timer' ? Math.max(targetSeconds - elapsed, 0) : elapsed;
-}
-
 export default function TimerScreen({ navigation }: Props) {
   const db = useSQLiteContext();
   const insets = useSafeAreaInsets();
   const { C, grad } = useTheme();
   const s = useMemo(() => makeStyles(C), [C]);
-  const today = getToday();
   const sheetHeight = Math.max(360, Math.round(Dimensions.get('window').height * 0.82));
 
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [timers, setTimers] = useState<TimerItem[]>([]);
-  const [mode, setMode] = useState<TimerMode>('stopwatch');
+  const { timers, mode } = useTimerState();
+  const { addTimer: addTimerAction, removeTimer, startTimer, pauseTimer, saveTimer, updateTargetSeconds, setMode } = useTimerActions();
+  const now = useTimerClock();
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerSortKey, setPickerSortKey] = useState<'manual' | 'priority' | 'name'>('manual');
   const [pickerIconFilterOpen, setPickerIconFilterOpen] = useState(false);
@@ -130,24 +105,16 @@ export default function TimerScreen({ navigation }: Props) {
     setPickerIconFilterOpen(false);
     setPickerIconFilter(null);
   };
-  const [now, setNow] = useState(Date.now());
   const [minuteInputs, setMinuteInputs] = useState<Record<number, string>>({});
-  const savingRef = useRef<Set<number>>(new Set());
 
   const runningCount = timers.filter((item) => item.startedAtMs).length;
 
   const load = useCallback(async () => {
     const loadedTasks = await getTasks(db);
     setTasks(loadedTasks);
-    setTimers((current) => current.filter((item) => loadedTasks.some((task) => task.id === item.task.id)));
   }, [db]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
-
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 500);
-    return () => clearInterval(id);
-  }, []);
 
   const availableTasks = tasks.filter((task) => !timers.some((item) => item.task.id === task.id));
   const iconGroups = useMemo(() => {
@@ -169,69 +136,19 @@ export default function TimerScreen({ navigation }: Props) {
   }, [availableTasks, pickerIconFilter, pickerSortKey]);
 
   const addTimer = async (task: Task) => {
-    const saved = await getTimerSettingForTask(db, task.id);
-    const target = saved?.target_seconds ?? 25 * 60;
-    setTimers((current) => {
-      if (current.some((item) => item.task.id === task.id)) return current;
-      return [...current, { task, baseSeconds: 0, startedAtMs: null, startedAtIso: null, targetSeconds: target }];
-    });
+    const target = await addTimerAction(task);
     setMinuteInputs((prev) => ({ ...prev, [task.id]: String(Math.round(target / 60)) }));
     setPickerOpen(false);
   };
 
-  const removeTimer = (taskId: number) => {
+  const handleRemoveTimer = (taskId: number) => {
     const timer = timers.find((item) => item.task.id === taskId);
     if (timer?.startedAtMs) {
       Alert.alert('計測中です', '保存してから外してください。');
       return;
     }
-    setTimers((current) => current.filter((item) => item.task.id !== taskId));
+    removeTimer(taskId);
   };
-
-  const startTimer = (taskId: number) => {
-    const startedAtMs = Date.now();
-    const startedAtIso = new Date(startedAtMs).toISOString();
-    setTimers((current) => current.map((item) => (
-      item.task.id === taskId && !item.startedAtMs ? { ...item, startedAtMs, startedAtIso } : item
-    )));
-  };
-
-  const pauseTimer = (taskId: number) => {
-    const stamp = Date.now();
-    setTimers((current) => current.map((item) => (
-      item.task.id === taskId && item.startedAtMs
-        ? { ...item, baseSeconds: timerSeconds(item, stamp), startedAtMs: null, startedAtIso: null }
-        : item
-    )));
-  };
-
-  const saveTimer = async (taskId: number) => {
-    const timer = timers.find((item) => item.task.id === taskId);
-    if (!timer || savingRef.current.has(taskId)) return;
-    const endedAtMs = Date.now();
-    const elapsed = timerSeconds(timer, endedAtMs);
-    const duration = mode === 'timer' ? Math.min(elapsed, timer.targetSeconds) : elapsed;
-    if (duration <= 0) return;
-    savingRef.current.add(taskId);
-    const endedAt = new Date(endedAtMs).toISOString();
-    const startedAt = timer.startedAtIso ?? new Date(endedAtMs - duration * 1000).toISOString();
-    await addTimeLog(db, taskId, duration, startedAt, endedAt);
-    await markComplete(db, taskId, today);
-    setTimers((current) => current.map((item) => (
-      item.task.id === taskId ? { ...item, baseSeconds: 0, startedAtMs: null, startedAtIso: null } : item
-    )));
-    await load();
-    savingRef.current.delete(taskId);
-  };
-
-  useEffect(() => {
-    if (mode !== 'timer') return;
-    timers.forEach((item) => {
-      if (item.startedAtMs && timerSeconds(item, now) >= item.targetSeconds) {
-        saveTimer(item.task.id);
-      }
-    });
-  }, [mode, now, timers]);
 
   return (
     <View style={s.safeArea}>
@@ -281,7 +198,7 @@ export default function TimerScreen({ navigation }: Props) {
                   <Text style={s.timerTitle} numberOfLines={1}>{item.task.title}</Text>
                   <Text style={s.timerState}>{running ? '計測中' : seconds > 0 ? '一時停止中' : '待機中'}</Text>
                 </View>
-                <TouchableOpacity style={s.removeBtn} onPress={() => removeTimer(item.task.id)}>
+                <TouchableOpacity style={s.removeBtn} onPress={() => handleRemoveTimer(item.task.id)}>
                   <Text style={s.removeText}>×</Text>
                 </TouchableOpacity>
               </View>
@@ -294,11 +211,8 @@ export default function TimerScreen({ navigation }: Props) {
                     onBlur={async () => {
                       const mins = parseInt(minuteInputs[item.task.id] ?? '25', 10);
                       const secs = Math.max(1, isNaN(mins) ? 25 : mins) * 60;
-                      setTimers((current) => current.map((t) =>
-                        t.task.id === item.task.id ? { ...t, targetSeconds: secs } : t
-                      ));
                       setMinuteInputs((prev) => ({ ...prev, [item.task.id]: String(Math.round(secs / 60)) }));
-                      await saveTimerSettingForTask(db, item.task.id, secs);
+                      await updateTargetSeconds(item.task.id, secs);
                     }}
                     keyboardType="number-pad"
                     returnKeyType="done"

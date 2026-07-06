@@ -24,6 +24,7 @@ import {
 import { GRAD_START, GRAD_END } from '../constants/theme';
 import TabBar from '../components/TabBar';
 import { useTheme, ColorSet } from '../contexts/ThemeContext';
+import { useTimerActions } from '../contexts/TimerContext';
 
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'Home'> };
 
@@ -271,6 +272,14 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   sheetTitleRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   sheetTitleInput: { flex: 1, borderWidth: 1, borderColor: C.border, borderRadius: 10, padding: 12, fontSize: 15, color: C.onDark, backgroundColor: C.body },
   noteInput: { borderWidth: 1, borderColor: C.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9, fontSize: 13, color: C.onDark, backgroundColor: C.body },
+  timerActionRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
+  timerActionBtn: { flex: 1, borderWidth: 1.5, borderColor: C.primary, borderRadius: 10, paddingVertical: 10, alignItems: 'center', backgroundColor: C.primarySoft },
+  timerActionBtnText: { color: C.primary, fontSize: 13, fontWeight: '800' },
+  timerDurationRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
+  timerDurationInput: { width: 56, borderWidth: 1, borderColor: C.border, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, fontSize: 14, color: C.onDark, backgroundColor: C.body, textAlign: 'center' },
+  timerDurationLabel: { color: C.muted, fontSize: 12, fontWeight: '700' },
+  timerDurationGo: { paddingHorizontal: 16, paddingVertical: 9, borderRadius: 10 },
+  timerDurationGoText: { color: C.onPrimary, fontSize: 13, fontWeight: '900' },
   sheetSaveBtn: { backgroundColor: C.primary, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 12, alignItems: 'center', justifyContent: 'center' },
   sheetSaveBtnDisabled: { backgroundColor: C.border },
   sheetSaveBtnText: { color: C.onPrimary, fontSize: 13, fontWeight: '700' },
@@ -885,11 +894,37 @@ export default function HomeScreen({ navigation }: Props) {
     setTimePickerFor(null);
   };
 
+  const { addTimer: startTimerFor, isTiming } = useTimerActions();
+  const [timerDurationPromptOpen, setTimerDurationPromptOpen] = useState(false);
+  const [timerDurationMinutes, setTimerDurationMinutes] = useState('25');
+
   const openDetail = useCallback((task: Task) => {
     setDetailTask(task);
     setDetailTitle(task.title);
     setDetailPicker(null);
+    setTimerDurationPromptOpen(false);
+    setTimerDurationMinutes('25');
   }, []);
+
+  const handleStartStopwatch = useCallback(async (task: Task) => {
+    if (isTiming(task.id)) {
+      Alert.alert('計測中です', 'すでにこのタスクは計測中です。タイマー画面でご確認ください。');
+      return;
+    }
+    await startTimerFor(task, { autoStart: true, mode: 'stopwatch' });
+    Alert.alert('計測を開始しました', 'タイマー画面でいつでも確認・停止できます。');
+  }, [isTiming, startTimerFor]);
+
+  const handleStartCustomTimer = useCallback(async (task: Task) => {
+    if (isTiming(task.id)) {
+      Alert.alert('計測中です', 'すでにこのタスクは計測中です。タイマー画面でご確認ください。');
+      return;
+    }
+    const mins = Math.max(1, parseInt(timerDurationMinutes, 10) || 25);
+    await startTimerFor(task, { autoStart: true, mode: 'timer', targetSeconds: mins * 60 });
+    setTimerDurationPromptOpen(false);
+    Alert.alert('タイマーを開始しました', `${mins}分のタイマーを開始しました。タイマー画面でいつでも確認できます。`);
+  }, [isTiming, startTimerFor, timerDurationMinutes]);
 
   const handleSaveTitle = async () => {
     if (!detailTask || !detailTitle.trim()) return;
@@ -1826,6 +1861,40 @@ export default function HomeScreen({ navigation }: Props) {
                         placeholderTextColor="#9ca3af"
                         returnKeyType="done"
                       />
+
+                      {/* Timer / stopwatch (arbitrary duration) */}
+                      <Text style={[s.sheetSection, { marginTop: 16 }]}>計測</Text>
+                      <View style={s.timerActionRow}>
+                        <TouchableOpacity style={s.timerActionBtn} onPress={() => handleStartStopwatch(detailTask)} activeOpacity={0.8}>
+                          <Text style={s.timerActionBtnText}>▶ ストップウォッチ</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={s.timerActionBtn}
+                          onPress={() => setTimerDurationPromptOpen((p) => !p)}
+                          activeOpacity={0.8}
+                        >
+                          <Text style={s.timerActionBtnText}>⏱ タイマー {timerDurationPromptOpen ? '▲' : '▼'}</Text>
+                        </TouchableOpacity>
+                      </View>
+                      {timerDurationPromptOpen && (
+                        <View style={s.timerDurationRow}>
+                          <TextInput
+                            style={s.timerDurationInput}
+                            value={timerDurationMinutes}
+                            onChangeText={(v) => setTimerDurationMinutes(v.replace(/[^0-9]/g, ''))}
+                            keyboardType="number-pad"
+                            maxLength={3}
+                            placeholder="25"
+                            placeholderTextColor="#9ca3af"
+                          />
+                          <Text style={s.timerDurationLabel}>分で開始</Text>
+                          <TouchableOpacity onPress={() => handleStartCustomTimer(detailTask)} activeOpacity={0.85}>
+                            <LinearGradient colors={grad.brand} start={GRAD_START} end={GRAD_END} style={s.timerDurationGo}>
+                              <Text style={s.timerDurationGoText}>開始</Text>
+                            </LinearGradient>
+                          </TouchableOpacity>
+                        </View>
+                      )}
 
                       {/* Notification time + notify (second) */}
                       <Text style={[s.sheetSection, { marginTop: 16 }]}>通知</Text>
