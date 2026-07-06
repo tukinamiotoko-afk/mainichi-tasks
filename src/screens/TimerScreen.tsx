@@ -77,6 +77,17 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   pickerIcon: { width: 30, textAlign: 'center', fontSize: 18 },
   pickerText: { flex: 1, color: C.onDark, fontSize: 14, fontWeight: '800' },
   pickerAdd: { color: C.primary, fontSize: 12, fontWeight: '900' },
+  pickerControlRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 },
+  pickerControlLabel: { color: C.muted, fontSize: 11, fontWeight: '800', marginRight: 2 },
+  pickerChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, borderWidth: 1.5, borderColor: C.border, backgroundColor: C.body },
+  pickerChipActive: { borderColor: C.primary, backgroundColor: C.primarySoft },
+  pickerChipText: { color: C.muted, fontSize: 12, fontWeight: '700' },
+  pickerChipTextActive: { color: C.primary },
+  pickerIconFilterScroll: { marginTop: 2 },
+  pickerIconFilterContent: { paddingRight: 8 },
+  pickerIconChip: { width: 40, height: 40, borderRadius: 12, borderWidth: 1.5, borderColor: C.border, backgroundColor: C.body, alignItems: 'center', justifyContent: 'center', marginRight: 8 },
+  pickerIconChipActive: { borderColor: C.primary, backgroundColor: C.primarySoft },
+  pickerIconChipText: { fontSize: 18 },
 });
 
 function formatDuration(totalSeconds: number, alwaysHours = false): string {
@@ -110,6 +121,15 @@ export default function TimerScreen({ navigation }: Props) {
   const [timers, setTimers] = useState<TimerItem[]>([]);
   const [mode, setMode] = useState<TimerMode>('stopwatch');
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerSortKey, setPickerSortKey] = useState<'manual' | 'priority' | 'name'>('manual');
+  const [pickerIconFilterOpen, setPickerIconFilterOpen] = useState(false);
+  const [pickerIconFilter, setPickerIconFilter] = useState<string | null>(null);
+  const closePicker = () => {
+    setPickerOpen(false);
+    setPickerSortKey('manual');
+    setPickerIconFilterOpen(false);
+    setPickerIconFilter(null);
+  };
   const [now, setNow] = useState(Date.now());
   const [minuteInputs, setMinuteInputs] = useState<Record<number, string>>({});
   const savingRef = useRef<Set<number>>(new Set());
@@ -130,6 +150,23 @@ export default function TimerScreen({ navigation }: Props) {
   }, []);
 
   const availableTasks = tasks.filter((task) => !timers.some((item) => item.task.id === task.id));
+  const iconGroups = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const t of availableTasks) {
+      if (!t.icon) continue;
+      map.set(t.icon, (map.get(t.icon) ?? 0) + 1);
+    }
+    return map;
+  }, [availableTasks]);
+  const visibleTasks = useMemo(() => {
+    let list = pickerIconFilter ? availableTasks.filter((t) => t.icon === pickerIconFilter) : availableTasks;
+    if (pickerSortKey === 'priority') {
+      list = [...list].sort((a, b) => (b.priority - a.priority) || (a.sort_order - b.sort_order));
+    } else if (pickerSortKey === 'name') {
+      list = [...list].sort((a, b) => a.title.localeCompare(b.title, 'ja'));
+    }
+    return list;
+  }, [availableTasks, pickerIconFilter, pickerSortKey]);
 
   const addTimer = async (task: Task) => {
     const saved = await getTimerSettingForTask(db, task.id);
@@ -289,19 +326,73 @@ export default function TimerScreen({ navigation }: Props) {
         })}
       </ScrollView>
 
-      <Modal visible={pickerOpen} transparent animationType="slide" onRequestClose={() => setPickerOpen(false)} statusBarTranslucent>
+      <Modal visible={pickerOpen} transparent animationType="slide" onRequestClose={closePicker} statusBarTranslucent>
         <View style={s.modalBg}>
-          <TouchableOpacity style={s.modalBackdrop} activeOpacity={1} onPress={() => setPickerOpen(false)} />
+          <TouchableOpacity style={s.modalBackdrop} activeOpacity={1} onPress={closePicker} />
           <View style={[s.pickerSheet, { height: sheetHeight, paddingBottom: insets.bottom + 18 }]}>
             <View style={s.sheetHandle} />
             <Text style={s.pickerTitle}>測るタスクを追加</Text>
+            {availableTasks.length > 0 && (
+              <>
+                <View style={s.pickerControlRow}>
+                  <Text style={s.pickerControlLabel}>並び替え</Text>
+                  {([
+                    { k: 'manual' as const, l: '手動' },
+                    { k: 'priority' as const, l: '優先度' },
+                    { k: 'name' as const, l: '名前' },
+                  ]).map((o) => (
+                    <TouchableOpacity
+                      key={o.k}
+                      style={[s.pickerChip, pickerSortKey === o.k && s.pickerChipActive]}
+                      onPress={() => setPickerSortKey(o.k)}
+                    >
+                      <Text style={[s.pickerChipText, pickerSortKey === o.k && s.pickerChipTextActive]}>{o.l}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <View style={s.pickerControlRow}>
+                  <Text style={s.pickerControlLabel}>絞り込み</Text>
+                  <TouchableOpacity
+                    style={[s.pickerChip, !pickerIconFilterOpen && !pickerIconFilter && s.pickerChipActive]}
+                    onPress={() => { setPickerIconFilter(null); setPickerIconFilterOpen(false); }}
+                  >
+                    <Text style={[s.pickerChipText, !pickerIconFilterOpen && !pickerIconFilter && s.pickerChipTextActive]}>すべて</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[s.pickerChip, (pickerIconFilterOpen || pickerIconFilter) && s.pickerChipActive]}
+                    onPress={() => setPickerIconFilterOpen((p) => !p)}
+                  >
+                    <Text style={[s.pickerChipText, (pickerIconFilterOpen || pickerIconFilter) && s.pickerChipTextActive]}>
+                      アイコン{pickerIconFilter ? ` ${pickerIconFilter}` : ''} {pickerIconFilterOpen ? '▲' : '▼'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                {pickerIconFilterOpen && (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.pickerIconFilterScroll} contentContainerStyle={s.pickerIconFilterContent}>
+                    {[...iconGroups.keys()].map((icon) => (
+                      <TouchableOpacity
+                        key={icon}
+                        style={[s.pickerIconChip, pickerIconFilter === icon && s.pickerIconChipActive]}
+                        onPress={() => setPickerIconFilter((prev) => prev === icon ? null : icon)}
+                      >
+                        <Text style={s.pickerIconChipText}>{icon}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                )}
+              </>
+            )}
             <ScrollView style={s.pickerList} showsVerticalScrollIndicator contentContainerStyle={{ gap: 8, paddingBottom: 24 }}>
               {availableTasks.length === 0 ? (
                 <View style={s.emptyBox}>
                   <Text style={s.emptyTitle}>追加できるタスクがありません</Text>
                   <Text style={s.emptyBody}>タスク画面で追加するか、計測中カードを外してください</Text>
                 </View>
-              ) : availableTasks.map((task) => (
+              ) : visibleTasks.length === 0 ? (
+                <View style={s.emptyBox}>
+                  <Text style={s.emptyTitle}>該当するタスクがありません</Text>
+                </View>
+              ) : visibleTasks.map((task) => (
                 <TouchableOpacity key={task.id} style={s.pickerItem} onPress={() => addTimer(task)}>
                   <Text style={s.pickerIcon}>{task.icon ?? '⏱'}</Text>
                   <Text style={s.pickerText} numberOfLines={2}>{task.title}</Text>
