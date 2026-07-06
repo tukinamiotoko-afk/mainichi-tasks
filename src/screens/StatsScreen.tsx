@@ -493,11 +493,9 @@ export default function StatsScreen({ navigation }: Props) {
           )}
 
           {rates.length === 0 ? (
-            ratesLoaded ? (
-              <View style={s.empty}>
-                <Text style={s.emptyText}>タスクがありません</Text>
-              </View>
-            ) : null
+            <View style={s.empty}>
+              {ratesLoaded && <Text style={s.emptyText}>タスクがありません</Text>}
+            </View>
           ) : (
             <FlatList
               data={rates}
