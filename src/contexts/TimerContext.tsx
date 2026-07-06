@@ -1,7 +1,8 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, ReactNode } from 'react';
 import { useSQLiteContext } from 'expo-sqlite';
+import * as Notifications from 'expo-notifications';
 import {
-  Task, addTimeLog, getToday, markComplete, getTimerSettingForTask, saveTimerSettingForTask,
+  Task, addTimeLog, getToday, markComplete, getTimerSettingForTask, saveTimerSettingForTask, getTaskById,
 } from '../db/database';
 
 export type TimerMode = 'stopwatch' | 'timer';
@@ -123,6 +124,26 @@ export function TimerProvider({ children }: { children: ReactNode }) {
   }, [db]);
 
   const isTiming = useCallback((taskId: number) => timersRef.current.some((t) => t.task.id === taskId), []);
+
+  // tapping an auto-timer notification starts the matching task's timer/stopwatch
+  const handleAutoTimerResponse = useCallback(async (data: any) => {
+    if (!data || data.kind !== 'auto-timer' || typeof data.taskId !== 'number') return;
+    const task = await getTaskById(db, data.taskId);
+    if (!task) return;
+    const timerMode: TimerMode = data.mode === 'timer' ? 'timer' : 'stopwatch';
+    const targetSeconds = timerMode === 'timer' ? Math.max(60, (Number(data.minutes) || 25) * 60) : undefined;
+    await addTimer(task, { autoStart: true, mode: timerMode, targetSeconds });
+  }, [db, addTimer]);
+
+  useEffect(() => {
+    Notifications.getLastNotificationResponseAsync().then((response) => {
+      if (response) handleAutoTimerResponse(response.notification.request.content.data);
+    });
+    const sub = Notifications.addNotificationResponseReceivedListener((response) => {
+      handleAutoTimerResponse(response.notification.request.content.data);
+    });
+    return () => sub.remove();
+  }, [handleAutoTimerResponse]);
 
   // auto-stop-and-save a countdown once it reaches its target
   useEffect(() => {

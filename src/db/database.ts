@@ -9,6 +9,8 @@ export type Task = {
   freq_week: number | null; freq_weekday: number | null; freq_day: number | null;
   once_date: string | null; freq_dates: string | null;
   note: string | null;
+  auto_timer_enabled: number; auto_timer_time: string | null;
+  auto_timer_mode: string; auto_timer_minutes: number; auto_timer_notify_id: string | null;
 };
 export type NotificationSetting = { id: number; time: string; notification_type: string; identifier: string | null; task_id: number | null };
 export type CompletionDetail = { task_id: number; title: string; icon: string | null; date: string; completed_at: string | null };
@@ -97,6 +99,11 @@ export async function migrateDb(db: SQLite.SQLiteDatabase): Promise<void> {
   try { await db.execAsync("ALTER TABLE tasks ADD COLUMN notify_type TEXT NOT NULL DEFAULT 'push'"); } catch {}
   try { await db.execAsync('ALTER TABLE tasks ADD COLUMN freq_dates TEXT'); } catch {}
   try { await db.execAsync('ALTER TABLE tasks ADD COLUMN note TEXT'); } catch {}
+  try { await db.execAsync('ALTER TABLE tasks ADD COLUMN auto_timer_enabled INTEGER NOT NULL DEFAULT 0'); } catch {}
+  try { await db.execAsync('ALTER TABLE tasks ADD COLUMN auto_timer_time TEXT'); } catch {}
+  try { await db.execAsync("ALTER TABLE tasks ADD COLUMN auto_timer_mode TEXT NOT NULL DEFAULT 'stopwatch'"); } catch {}
+  try { await db.execAsync('ALTER TABLE tasks ADD COLUMN auto_timer_minutes INTEGER NOT NULL DEFAULT 25'); } catch {}
+  try { await db.execAsync('ALTER TABLE tasks ADD COLUMN auto_timer_notify_id TEXT'); } catch {}
   try { await db.execAsync("ALTER TABLE flow_branches ADD COLUMN branch_side TEXT NOT NULL DEFAULT 'left'"); } catch {}
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS flow_projects (
@@ -175,6 +182,11 @@ export async function getTasks(db: SQLite.SQLiteDatabase): Promise<Task[]> {
   return db.getAllAsync<Task>('SELECT * FROM tasks ORDER BY sort_order ASC, id ASC');
 }
 
+export async function getTaskById(db: SQLite.SQLiteDatabase, id: number): Promise<Task | null> {
+  const row = await db.getFirstAsync<Task>('SELECT * FROM tasks WHERE id = ?', [id]);
+  return row ?? null;
+}
+
 export type TaskFields = {
   title?: string; icon?: string | null; priority?: number;
   scheduled_time?: string | null; notify?: number; notify_id?: string | null; notify_type?: string;
@@ -182,11 +194,14 @@ export type TaskFields = {
   freq_week?: number | null; freq_weekday?: number | null; freq_day?: number | null;
   once_date?: string | null; freq_dates?: string | null;
   note?: string | null;
+  auto_timer_enabled?: number; auto_timer_time?: string | null;
+  auto_timer_mode?: string; auto_timer_minutes?: number; auto_timer_notify_id?: string | null;
 };
 
 const TASK_COLUMNS: (keyof TaskFields)[] = [
   'title', 'icon', 'priority', 'scheduled_time', 'notify', 'notify_id', 'notify_type',
   'freq_type', 'freq_days', 'freq_week', 'freq_weekday', 'freq_day', 'once_date', 'freq_dates', 'note',
+  'auto_timer_enabled', 'auto_timer_time', 'auto_timer_mode', 'auto_timer_minutes', 'auto_timer_notify_id',
 ];
 
 export async function addTask(db: SQLite.SQLiteDatabase, title: string): Promise<number> {
@@ -226,8 +241,8 @@ export async function deleteTask(db: SQLite.SQLiteDatabase, id: number): Promise
   const rows = await db.getAllAsync<{ identifier: string | null }>(
     'SELECT identifier FROM notification_settings WHERE task_id = ?', [id]
   );
-  const taskRow = await db.getFirstAsync<{ notify_id: string | null }>(
-    'SELECT notify_id FROM tasks WHERE id = ?', [id]
+  const taskRow = await db.getFirstAsync<{ notify_id: string | null; auto_timer_notify_id: string | null }>(
+    'SELECT notify_id, auto_timer_notify_id FROM tasks WHERE id = ?', [id]
   );
   await db.runAsync('DELETE FROM tasks WHERE id = ?', [id]);
   await db.runAsync('DELETE FROM completions WHERE task_id = ?', [id]);
@@ -236,6 +251,7 @@ export async function deleteTask(db: SQLite.SQLiteDatabase, id: number): Promise
   await db.runAsync('DELETE FROM timer_settings WHERE task_id = ?', [id]);
   const ids = rows.map(r => r.identifier).filter(Boolean) as string[];
   if (taskRow?.notify_id) ids.push(...taskRow.notify_id.split(',').filter(Boolean));
+  if (taskRow?.auto_timer_notify_id) ids.push(...taskRow.auto_timer_notify_id.split(',').filter(Boolean));
   return ids;
 }
 

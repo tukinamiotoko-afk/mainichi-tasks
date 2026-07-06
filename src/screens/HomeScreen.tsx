@@ -24,7 +24,6 @@ import {
 import { GRAD_START, GRAD_END } from '../constants/theme';
 import TabBar from '../components/TabBar';
 import { useTheme, ColorSet } from '../contexts/ThemeContext';
-import { useTimerActions } from '../contexts/TimerContext';
 
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'Home'> };
 
@@ -62,6 +61,25 @@ type Schedulable = {
   notify: number;
   notify_id?: string | null;
   notify_type?: string;
+  freq_type: FreqType;
+  freq_days: string | null;
+  freq_week: number | null;
+  freq_weekday: number | null;
+  freq_day: number | null;
+  once_date?: string | null;
+  freq_dates?: string | null;
+};
+
+// Minimal shape required to schedule a task's auto-timer trigger.
+type AutoTimerSchedulable = {
+  id: number;
+  title: string;
+  icon: string | null;
+  auto_timer_enabled: number;
+  auto_timer_time: string | null;
+  auto_timer_mode: string;
+  auto_timer_minutes: number;
+  auto_timer_notify_id?: string | null;
   freq_type: FreqType;
   freq_days: string | null;
   freq_week: number | null;
@@ -135,6 +153,60 @@ async function rescheduleTask(task: Schedulable): Promise<string | null> {
   await cancelIds(task.notify_id);
   if (!task.notify || !task.scheduled_time) return null;
   const ids = await scheduleTaskNotifs(task);
+  return ids.length ? ids.join(',') : null;
+}
+
+// Schedule the notification that, when tapped, starts an automatic
+// timer/stopwatch measurement for the task. The notification carries the
+// task id + mode + duration in its data payload so the tap handler (in
+// TimerContext) can start the right measurement without any other state.
+async function scheduleAutoTimerNotifs(task: AutoTimerSchedulable): Promise<string[]> {
+  if (!task.auto_timer_time) return [];
+  const [h, m] = task.auto_timer_time.split(':').map(Number);
+  const modeLabel = task.auto_timer_mode === 'timer' ? 'タイマー' : 'ストップウォッチ';
+  const body = `${task.icon ? task.icon + ' ' : ''}${task.title} の${modeLabel}計測を開始する時間です（タップで開始）`;
+  const content = {
+    title: '毎日タスク', body,
+    sound: true,
+    android: { channelId: 'full' },
+    data: { kind: 'auto-timer', taskId: task.id, mode: task.auto_timer_mode, minutes: task.auto_timer_minutes },
+  } as any;
+  const ids: string[] = [];
+  try {
+    if (task.freq_type === 'daily') {
+      ids.push(await Notifications.scheduleNotificationAsync({ content, trigger: { hour: h, minute: m, repeats: true } as any }));
+    } else if (task.freq_type === 'weekly') {
+      for (const d of parseDays(task.freq_days)) {
+        ids.push(await Notifications.scheduleNotificationAsync({ content, trigger: { weekday: d + 1, hour: h, minute: m, repeats: true } as any }));
+      }
+    } else if (task.freq_type === 'monthly_day') {
+      ids.push(await Notifications.scheduleNotificationAsync({ content, trigger: { day: task.freq_day ?? 1, hour: h, minute: m, repeats: true } as any }));
+    } else if (task.freq_type === 'monthly_nth') {
+      const when = nextNthWeekdayDate(task.freq_week ?? 1, task.freq_weekday ?? 0, h, m);
+      ids.push(await Notifications.scheduleNotificationAsync({ content, trigger: { date: when } as any }));
+    } else if (task.freq_type === 'once') {
+      const when = task.once_date ? new Date(`${task.once_date}T${task.auto_timer_time}:00`) : new Date();
+      if (when.getTime() > Date.now()) {
+        ids.push(await Notifications.scheduleNotificationAsync({ content, trigger: { date: when } as any }));
+      }
+    } else if (task.freq_type === 'dates') {
+      for (const ds of parseDateList(task.freq_dates)) {
+        const when = new Date(`${ds}T${task.auto_timer_time}:00`);
+        if (when.getTime() > Date.now()) {
+          ids.push(await Notifications.scheduleNotificationAsync({ content, trigger: { date: when } as any }));
+        }
+      }
+    }
+  } catch {
+    // ignore scheduling failures (e.g. permission revoked); UI still works.
+  }
+  return ids;
+}
+
+async function rescheduleAutoTimer(task: AutoTimerSchedulable): Promise<string | null> {
+  await cancelIds(task.auto_timer_notify_id);
+  if (!task.auto_timer_enabled || !task.auto_timer_time) return null;
+  const ids = await scheduleAutoTimerNotifs(task);
   return ids.length ? ids.join(',') : null;
 }
 
@@ -272,14 +344,9 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   sheetTitleRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
   sheetTitleInput: { flex: 1, borderWidth: 1, borderColor: C.border, borderRadius: 10, padding: 12, fontSize: 15, color: C.onDark, backgroundColor: C.body },
   noteInput: { borderWidth: 1, borderColor: C.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9, fontSize: 13, color: C.onDark, backgroundColor: C.body },
-  timerActionRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
-  timerActionBtn: { flex: 1, borderWidth: 1.5, borderColor: C.primary, borderRadius: 10, paddingVertical: 10, alignItems: 'center', backgroundColor: C.primarySoft },
-  timerActionBtnText: { color: C.primary, fontSize: 13, fontWeight: '800' },
   timerDurationRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
   timerDurationInput: { width: 56, borderWidth: 1, borderColor: C.border, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, fontSize: 14, color: C.onDark, backgroundColor: C.body, textAlign: 'center' },
   timerDurationLabel: { color: C.muted, fontSize: 12, fontWeight: '700' },
-  timerDurationGo: { paddingHorizontal: 16, paddingVertical: 9, borderRadius: 10 },
-  timerDurationGoText: { color: C.onPrimary, fontSize: 13, fontWeight: '900' },
   sheetSaveBtn: { backgroundColor: C.primary, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 12, alignItems: 'center', justifyContent: 'center' },
   sheetSaveBtnDisabled: { backgroundColor: C.border },
   sheetSaveBtnText: { color: C.onPrimary, fontSize: 13, fontWeight: '700' },
@@ -751,6 +818,10 @@ export default function HomeScreen({ navigation }: Props) {
   const [newOnceDate, setNewOnceDate] = useState<string>(today);
   const [newFreqDates, setNewFreqDates] = useState<string[]>([]);
   const [newNote, setNewNote] = useState('');
+  const [newAutoTimerEnabled, setNewAutoTimerEnabled] = useState(false);
+  const [newAutoTimerTime, setNewAutoTimerTime] = useState<string | null>(null);
+  const [newAutoTimerMode, setNewAutoTimerMode] = useState<'stopwatch' | 'timer'>('stopwatch');
+  const [newAutoTimerMinutes, setNewAutoTimerMinutes] = useState(25);
 
   // Task detail sheet
   const [detailTask, setDetailTask] = useState<Task | null>(null);
@@ -758,7 +829,7 @@ export default function HomeScreen({ navigation }: Props) {
   const [detailPicker, setDetailPicker] = useState<MetaPicker>(null);
 
   // Shared time editor (numeric input)
-  const [timePickerFor, setTimePickerFor] = useState<'add' | 'edit' | null>(null);
+  const [timePickerFor, setTimePickerFor] = useState<'add' | 'edit' | 'autoTimerAdd' | 'autoTimerEdit' | null>(null);
   const [hourInput, setHourInput] = useState('8');
   const [minuteInput, setMinuteInput] = useState('00');
 
@@ -797,6 +868,10 @@ export default function HomeScreen({ navigation }: Props) {
         if (t.notify && t.scheduled_time && t.freq_type === 'monthly_nth') {
           const notify_id = await rescheduleTask(t);
           await updateTask(db, t.id, { notify_id });
+        }
+        if (t.auto_timer_enabled && t.auto_timer_time && t.freq_type === 'monthly_nth') {
+          const auto_timer_notify_id = await rescheduleAutoTimer(t);
+          await updateTask(db, t.id, { auto_timer_notify_id });
         }
       }
     })();
@@ -852,6 +927,10 @@ export default function HomeScreen({ navigation }: Props) {
     setNewOnceDate(today);
     setNewFreqDates([]);
     setNewNote('');
+    setNewAutoTimerEnabled(false);
+    setNewAutoTimerTime(null);
+    setNewAutoTimerMode('stopwatch');
+    setNewAutoTimerMinutes(25);
   };
 
   const handleAdd = async () => {
@@ -872,6 +951,10 @@ export default function HomeScreen({ navigation }: Props) {
       once_date: newFreqType === 'once' ? newOnceDate : null,
       freq_dates: newFreqType === 'dates' ? newFreqDates.slice().sort().join(',') : null,
       note: newNote.trim() || null,
+      auto_timer_enabled: newAutoTimerEnabled ? 1 : 0,
+      auto_timer_time: newAutoTimerTime,
+      auto_timer_mode: newAutoTimerMode,
+      auto_timer_minutes: newAutoTimerMinutes,
     };
     await updateTask(db, taskId, fields);
     if (newNotify && newTime) {
@@ -882,6 +965,16 @@ export default function HomeScreen({ navigation }: Props) {
         once_date: fields.once_date ?? null, freq_dates: fields.freq_dates ?? null,
       });
       await updateTask(db, taskId, { notify_id });
+    }
+    if (newAutoTimerEnabled && newAutoTimerTime) {
+      const auto_timer_notify_id = await rescheduleAutoTimer({
+        id: taskId, title, icon: newIcon,
+        auto_timer_enabled: 1, auto_timer_time: newAutoTimerTime, auto_timer_mode: newAutoTimerMode, auto_timer_minutes: newAutoTimerMinutes,
+        freq_type: fields.freq_type!, freq_days: fields.freq_days ?? null,
+        freq_week: fields.freq_week ?? null, freq_weekday: fields.freq_weekday ?? null, freq_day: fields.freq_day ?? null,
+        once_date: fields.once_date ?? null, freq_dates: fields.freq_dates ?? null,
+      });
+      await updateTask(db, taskId, { auto_timer_notify_id });
     }
     resetAddDraft();
     setShowAdd(false);
@@ -894,37 +987,11 @@ export default function HomeScreen({ navigation }: Props) {
     setTimePickerFor(null);
   };
 
-  const { addTimer: startTimerFor, isTiming } = useTimerActions();
-  const [timerDurationPromptOpen, setTimerDurationPromptOpen] = useState(false);
-  const [timerDurationMinutes, setTimerDurationMinutes] = useState('25');
-
   const openDetail = useCallback((task: Task) => {
     setDetailTask(task);
     setDetailTitle(task.title);
     setDetailPicker(null);
-    setTimerDurationPromptOpen(false);
-    setTimerDurationMinutes('25');
   }, []);
-
-  const handleStartStopwatch = useCallback(async (task: Task) => {
-    if (isTiming(task.id)) {
-      Alert.alert('計測中です', 'すでにこのタスクは計測中です。タイマー画面でご確認ください。');
-      return;
-    }
-    await startTimerFor(task, { autoStart: true, mode: 'stopwatch' });
-    Alert.alert('計測を開始しました', 'タイマー画面でいつでも確認・停止できます。');
-  }, [isTiming, startTimerFor]);
-
-  const handleStartCustomTimer = useCallback(async (task: Task) => {
-    if (isTiming(task.id)) {
-      Alert.alert('計測中です', 'すでにこのタスクは計測中です。タイマー画面でご確認ください。');
-      return;
-    }
-    const mins = Math.max(1, parseInt(timerDurationMinutes, 10) || 25);
-    await startTimerFor(task, { autoStart: true, mode: 'timer', targetSeconds: mins * 60 });
-    setTimerDurationPromptOpen(false);
-    Alert.alert('タイマーを開始しました', `${mins}分のタイマーを開始しました。タイマー画面でいつでも確認できます。`);
-  }, [isTiming, startTimerFor, timerDurationMinutes]);
 
   const handleSaveTitle = async () => {
     if (!detailTask || !detailTitle.trim()) return;
@@ -939,11 +1006,17 @@ export default function HomeScreen({ navigation }: Props) {
     const merged = { ...detailTask, ...patch } as Task;
     await updateTask(db, detailTask.id, patch);
     const scheduleKeys: (keyof TaskFields)[] = ['scheduled_time', 'notify', 'notify_type', 'freq_type', 'freq_days', 'freq_week', 'freq_weekday', 'freq_day', 'once_date'];
+    const autoTimerKeys: (keyof TaskFields)[] = ['auto_timer_enabled', 'auto_timer_time', 'auto_timer_mode', 'auto_timer_minutes', 'freq_type', 'freq_days', 'freq_week', 'freq_weekday', 'freq_day', 'once_date'];
     let next = merged;
     if (scheduleKeys.some(k => k in patch)) {
       const notify_id = await rescheduleTask(merged);
       await updateTask(db, detailTask.id, { notify_id });
-      next = { ...merged, notify_id };
+      next = { ...next, notify_id };
+    }
+    if (autoTimerKeys.some(k => k in patch)) {
+      const auto_timer_notify_id = await rescheduleAutoTimer(next);
+      await updateTask(db, detailTask.id, { auto_timer_notify_id });
+      next = { ...next, auto_timer_notify_id };
     }
     setDetailTask(next);
     load();
@@ -965,7 +1038,7 @@ export default function HomeScreen({ navigation }: Props) {
     ]);
   };
 
-  const openTimeEditor = (target: 'add' | 'edit', current: string | null) => {
+  const openTimeEditor = (target: 'add' | 'edit' | 'autoTimerAdd' | 'autoTimerEdit', current: string | null) => {
     if (current) {
       const [h, m] = current.split(':');
       setHourInput(String(Number(h)));
@@ -985,6 +1058,8 @@ export default function HomeScreen({ navigation }: Props) {
     setTimePickerFor(null);
     if (target === 'add') setNewTime(time);
     else if (target === 'edit') await patchDetail({ scheduled_time: time });
+    else if (target === 'autoTimerAdd') setNewAutoTimerTime(time);
+    else if (target === 'autoTimerEdit') await patchDetail({ auto_timer_time: time });
   };
 
   const toggleNewNotify = async (value: boolean) => {
@@ -1330,6 +1405,71 @@ export default function HomeScreen({ navigation }: Props) {
               <Text style={[s.notifyTypeText, notifyType === 'alarm' && s.notifyTypeTextActive]}>⏰ アラート</Text>
             </TouchableOpacity>
           </View>
+        </>
+      )}
+    </View>
+  );
+
+  // Fires a notification at the set time; tapping it starts the measurement
+  // (see the response listener in TimerContext) — no in-app manual button.
+  const renderAutoTimer = (
+    enabled: boolean,
+    time: string | null,
+    mode: string,
+    minutes: number,
+    onToggleEnabled: (v: boolean) => void,
+    onPick: () => void,
+    onClear: () => void,
+    onSetMode: (m: 'stopwatch' | 'timer') => void,
+    onSetMinutes: (m: number) => void,
+  ) => (
+    <View style={s.scheduleCard}>
+      <View style={s.scheduleTopRow}>
+        <TouchableOpacity style={[s.metaSelectBtn, s.scheduleTimeBtn]} onPress={onPick} activeOpacity={0.8}>
+          <View style={s.metaSelectLeft}>
+            <Text style={s.metaSelectText}>開始時刻：{time ?? '未設定'}</Text>
+          </View>
+          <Text style={s.metaSelectArrow}>›</Text>
+        </TouchableOpacity>
+        <View style={s.scheduleToggleTop}>
+          <Text style={s.scheduleLabel}>有効にする</Text>
+          <Switch
+            value={enabled}
+            onValueChange={onToggleEnabled}
+            trackColor={{ true: C.primary, false: C.border }}
+            thumbColor="#ffffff"
+          />
+        </View>
+      </View>
+      {time && (
+        <TouchableOpacity onPress={onClear} style={s.clearTimeBtn}>
+          <Text style={s.clearTimeText}>時刻をクリア</Text>
+        </TouchableOpacity>
+      )}
+      {enabled && !time && <Text style={s.scheduleHint}>※ 自動計測には開始時刻の設定が必要です</Text>}
+      {enabled && (
+        <>
+          <View style={s.notifyTypeRow}>
+            <TouchableOpacity style={[s.notifyTypeChip, mode === 'stopwatch' && s.notifyTypeChipActive]} onPress={() => onSetMode('stopwatch')}>
+              <Text style={[s.notifyTypeText, mode === 'stopwatch' && s.notifyTypeTextActive]}>▶ ストップウォッチ</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[s.notifyTypeChip, mode === 'timer' && s.notifyTypeChipActive]} onPress={() => onSetMode('timer')}>
+              <Text style={[s.notifyTypeText, mode === 'timer' && s.notifyTypeTextActive]}>⏱ タイマー</Text>
+            </TouchableOpacity>
+          </View>
+          {mode === 'timer' && (
+            <View style={s.timerDurationRow}>
+              <TextInput
+                style={s.timerDurationInput}
+                value={String(minutes)}
+                onChangeText={(v) => onSetMinutes(Math.max(1, parseInt(v.replace(/[^0-9]/g, ''), 10) || 25))}
+                keyboardType="number-pad"
+                maxLength={3}
+              />
+              <Text style={s.timerDurationLabel}>分</Text>
+            </View>
+          )}
+          <Text style={s.scheduleHint}>指定時刻に通知が届き、タップするとその場で計測が始まります</Text>
         </>
       )}
     </View>
@@ -1784,6 +1924,20 @@ export default function HomeScreen({ navigation }: Props) {
                     returnKeyType="done"
                   />
 
+                  {/* Auto timer/stopwatch: fires a notification at the set time; tapping it starts the measurement */}
+                  <Text style={[s.sheetSection, { marginTop: 16 }]}>自動計測</Text>
+                  {renderAutoTimer(
+                    newAutoTimerEnabled,
+                    newAutoTimerTime,
+                    newAutoTimerMode,
+                    newAutoTimerMinutes,
+                    setNewAutoTimerEnabled,
+                    () => openTimeEditor('autoTimerAdd', newAutoTimerTime),
+                    () => setNewAutoTimerTime(null),
+                    setNewAutoTimerMode,
+                    setNewAutoTimerMinutes,
+                  )}
+
                   {/* Notification time + notify (second) */}
                   <Text style={[s.sheetSection, { marginTop: 16 }]}>通知</Text>
                   {renderSchedule(
@@ -1862,38 +2016,18 @@ export default function HomeScreen({ navigation }: Props) {
                         returnKeyType="done"
                       />
 
-                      {/* Timer / stopwatch (arbitrary duration) */}
-                      <Text style={[s.sheetSection, { marginTop: 16 }]}>計測</Text>
-                      <View style={s.timerActionRow}>
-                        <TouchableOpacity style={s.timerActionBtn} onPress={() => handleStartStopwatch(detailTask)} activeOpacity={0.8}>
-                          <Text style={s.timerActionBtnText}>▶ ストップウォッチ</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={s.timerActionBtn}
-                          onPress={() => setTimerDurationPromptOpen((p) => !p)}
-                          activeOpacity={0.8}
-                        >
-                          <Text style={s.timerActionBtnText}>⏱ タイマー {timerDurationPromptOpen ? '▲' : '▼'}</Text>
-                        </TouchableOpacity>
-                      </View>
-                      {timerDurationPromptOpen && (
-                        <View style={s.timerDurationRow}>
-                          <TextInput
-                            style={s.timerDurationInput}
-                            value={timerDurationMinutes}
-                            onChangeText={(v) => setTimerDurationMinutes(v.replace(/[^0-9]/g, ''))}
-                            keyboardType="number-pad"
-                            maxLength={3}
-                            placeholder="25"
-                            placeholderTextColor="#9ca3af"
-                          />
-                          <Text style={s.timerDurationLabel}>分で開始</Text>
-                          <TouchableOpacity onPress={() => handleStartCustomTimer(detailTask)} activeOpacity={0.85}>
-                            <LinearGradient colors={grad.brand} start={GRAD_START} end={GRAD_END} style={s.timerDurationGo}>
-                              <Text style={s.timerDurationGoText}>開始</Text>
-                            </LinearGradient>
-                          </TouchableOpacity>
-                        </View>
+                      {/* Auto timer/stopwatch: fires a notification at the set time; tapping it starts the measurement */}
+                      <Text style={[s.sheetSection, { marginTop: 16 }]}>自動計測</Text>
+                      {renderAutoTimer(
+                        !!detailTask.auto_timer_enabled,
+                        detailTask.auto_timer_time,
+                        detailTask.auto_timer_mode,
+                        detailTask.auto_timer_minutes,
+                        (v) => patchDetail({ auto_timer_enabled: v ? 1 : 0 }),
+                        () => openTimeEditor('autoTimerEdit', detailTask.auto_timer_time),
+                        () => patchDetail({ auto_timer_time: null }),
+                        (mode) => patchDetail({ auto_timer_mode: mode }),
+                        (mins) => patchDetail({ auto_timer_minutes: mins }),
                       )}
 
                       {/* Notification time + notify (second) */}
