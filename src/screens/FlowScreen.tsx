@@ -390,6 +390,7 @@ export default function FlowScreen({ navigation }: Props) {
   const today = getToday();
 
   const [selectedDate, setSelectedDate] = useState(today);
+  const [chartLoaded, setChartLoaded] = useState(false);
   const [dueTasks, setDueTasks] = useState<Task[]>([]);
   const [addedIds, setAddedIds] = useState<number[]>([]);
   const [slots, setSlots] = useState<(number | null)[]>([]);
@@ -519,6 +520,7 @@ export default function FlowScreen({ navigation }: Props) {
       yes: parseBranchPath(b.yes_text),
       no: parseBranchPath(b.no_text),
     })));
+    setChartLoaded(true);
   }, [db, selectedDate]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -1713,7 +1715,7 @@ export default function FlowScreen({ navigation }: Props) {
               style={[flowContentStyle, { width: flowLaneWidth }]}
               onLayout={scheduleMergeMeasure}
             >
-              {dueTasks.length === 0 ? (
+              {!chartLoaded ? null : dueTasks.length === 0 ? (
                 <View style={s.emptyFlow}>
                   <Text style={s.emptyTitle}>この日のフローはありません</Text>
                   <Text style={s.emptyBody}>頻度がこの日に当たるタスクがワークフローになります</Text>
