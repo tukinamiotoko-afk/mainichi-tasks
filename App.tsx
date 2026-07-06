@@ -5,6 +5,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SQLiteProvider } from 'expo-sqlite';
 import { StatusBar } from 'expo-status-bar';
 import * as Notifications from 'expo-notifications';
+import * as SplashScreen from 'expo-splash-screen';
 import HomeScreen from './src/screens/HomeScreen';
 import StatsScreen from './src/screens/StatsScreen';
 import NotificationScreen from './src/screens/NotificationScreen';
@@ -14,6 +15,10 @@ import FlowScreen from './src/screens/FlowScreen';
 import { migrateDb } from './src/db/database';
 import { ThemeProvider } from './src/contexts/ThemeContext';
 import { TimerProvider } from './src/contexts/TimerContext';
+
+// Kept visible until HomeScreen finishes its first task load, so the app
+// never shows a blank frame while waiting on the initial SQLite read.
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 // Show banners/sounds even when the app is in the foreground.
 Notifications.setNotificationHandler({

@@ -11,6 +11,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Notifications from 'expo-notifications';
+import * as SplashScreen from 'expo-splash-screen';
 import { RootStackParamList } from '../../App';
 import {
   Task, TaskFields, getToday, getTasks, addTask, updateTask, deleteTask,
@@ -834,16 +835,25 @@ export default function HomeScreen({ navigation }: Props) {
   const [hourInput, setHourInput] = useState('8');
   const [minuteInput, setMinuteInput] = useState('00');
 
+  const splashHiddenRef = useRef(false);
+
   const load = useCallback(async () => {
-    const [ts, ids, layout] = await Promise.all([
-      getTasks(db),
-      getCompletedTaskIds(db, selectedDate),
-      getSetting(db, 'card_layout'),
-    ]);
-    setTasks(ts);
-    setCompletedIds(new Set(ids));
-    setTagRight(layout === 'tag_right');
-    setTasksLoaded(true);
+    try {
+      const [ts, ids, layout] = await Promise.all([
+        getTasks(db),
+        getCompletedTaskIds(db, selectedDate),
+        getSetting(db, 'card_layout'),
+      ]);
+      setTasks(ts);
+      setCompletedIds(new Set(ids));
+      setTagRight(layout === 'tag_right');
+      setTasksLoaded(true);
+    } finally {
+      if (!splashHiddenRef.current) {
+        splashHiddenRef.current = true;
+        SplashScreen.hideAsync().catch(() => {});
+      }
+    }
   }, [db, selectedDate]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));

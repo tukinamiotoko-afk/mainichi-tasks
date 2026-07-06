@@ -16,7 +16,8 @@
     },
     "plugins": [
       "expo-sqlite",
-      "expo-notifications"
+      "expo-notifications",
+      "expo-splash-screen"
     ]
   }
 }
