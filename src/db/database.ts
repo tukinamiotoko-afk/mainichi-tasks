@@ -38,7 +38,7 @@ export async function migrateDb(db: SQLite.SQLiteDatabase): Promise<void> {
       title TEXT NOT NULL,
       sort_order INTEGER DEFAULT 0,
       icon TEXT,
-      priority INTEGER DEFAULT 1,
+      priority INTEGER DEFAULT -1,
       frequency TEXT NOT NULL DEFAULT '毎日',
       scheduled_time TEXT,
       notify INTEGER NOT NULL DEFAULT 0,
@@ -85,7 +85,7 @@ export async function migrateDb(db: SQLite.SQLiteDatabase): Promise<void> {
   try { await db.execAsync('ALTER TABLE completions ADD COLUMN completed_at TEXT'); } catch {}
   try { await db.execAsync('ALTER TABLE notification_settings ADD COLUMN task_id INTEGER'); } catch {}
   try { await db.execAsync('ALTER TABLE tasks ADD COLUMN icon TEXT'); } catch {}
-  try { await db.execAsync('ALTER TABLE tasks ADD COLUMN priority INTEGER DEFAULT 1'); } catch {}
+  try { await db.execAsync('ALTER TABLE tasks ADD COLUMN priority INTEGER DEFAULT -1'); } catch {}
   try { await db.execAsync("ALTER TABLE tasks ADD COLUMN frequency TEXT NOT NULL DEFAULT '毎日'"); } catch {}
   try { await db.execAsync('ALTER TABLE tasks ADD COLUMN scheduled_time TEXT'); } catch {}
   try { await db.execAsync('ALTER TABLE tasks ADD COLUMN notify INTEGER NOT NULL DEFAULT 0'); } catch {}

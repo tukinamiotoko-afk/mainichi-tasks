@@ -27,6 +27,7 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const CURRENT_FLOW_CHART_KEY = 'currentFlowChartId';
+const FLOW_GUIDE_SEEN_KEY = 'flowGuideSeen';
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'Flow'> };
 type SimpleItems = { taskIds: number[]; notes: string[] };
 type PathAfter = 'merge' | 'end';
@@ -159,6 +160,15 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   emptyBody: { color: C.muted, fontSize: 13, textAlign: 'center', paddingHorizontal: 24 },
   addFirstBtn: { marginTop: 8, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12, backgroundColor: '#7c3aed' },
   addFirstBtnText: { color: '#ffffff', fontSize: 14, fontWeight: '800' },
+
+  guideOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center', padding: 24 },
+  guideCard: { width: '100%', maxWidth: 360, backgroundColor: C.card, borderRadius: 20, padding: 22, gap: 14 },
+  guideTitle: { color: C.ink, fontSize: 18, fontWeight: '800', textAlign: 'center' },
+  guideStepRow: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
+  guideStepIcon: { fontSize: 18 },
+  guideStepText: { flex: 1, color: C.muted, fontSize: 13, lineHeight: 19 },
+  guideBtn: { marginTop: 4, borderRadius: 12, paddingVertical: 14, alignItems: 'center', backgroundColor: '#7c3aed' },
+  guideBtnText: { color: '#ffffff', fontSize: 14, fontWeight: '800' },
 
   tray: { borderTopWidth: 1, borderTopColor: C.grid, backgroundColor: C.card, paddingVertical: 10 },
   trayHint: { color: '#7c3aed', fontSize: 11, fontWeight: '700', paddingHorizontal: 16, marginBottom: 6 },
@@ -391,6 +401,7 @@ export default function FlowScreen({ navigation }: Props) {
 
   const [selectedDate, setSelectedDate] = useState(today);
   const [chartLoaded, setChartLoaded] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
   const [dueTasks, setDueTasks] = useState<Task[]>([]);
   const [addedIds, setAddedIds] = useState<number[]>([]);
   const [slots, setSlots] = useState<(number | null)[]>([]);
@@ -524,6 +535,18 @@ export default function FlowScreen({ navigation }: Props) {
   }, [db, selectedDate]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  // Show a one-time guide the very first time this screen is opened.
+  useEffect(() => {
+    getSetting(db, FLOW_GUIDE_SEEN_KEY).then((seen) => {
+      if (!seen) setShowGuide(true);
+    });
+  }, [db]);
+
+  const dismissGuide = useCallback(() => {
+    setShowGuide(false);
+    setSetting(db, FLOW_GUIDE_SEEN_KEY, '1');
+  }, [db]);
 
   const switchChart = useCallback(async (id: number) => {
     if (id === currentChartIdRef.current) { setFlowListOpen(false); return; }
@@ -2314,6 +2337,34 @@ export default function FlowScreen({ navigation }: Props) {
             />
           </TouchableOpacity>
         </TouchableOpacity>
+      </Modal>
+
+      {/* First-time guide */}
+      <Modal visible={showGuide} transparent animationType="fade" onRequestClose={dismissGuide}>
+        <View style={s.guideOverlay}>
+          <View style={s.guideCard}>
+            <Text style={s.guideTitle}>フローへようこそ</Text>
+            <View style={s.guideStepRow}>
+              <Text style={s.guideStepIcon}>📋</Text>
+              <Text style={s.guideStepText}>その日に該当するタスクが、カードとして流れ図に並びます。</Text>
+            </View>
+            <View style={s.guideStepRow}>
+              <Text style={s.guideStepIcon}>✅</Text>
+              <Text style={s.guideStepText}>カードをタップすると、そのタスクを完了にできます。</Text>
+            </View>
+            <View style={s.guideStepRow}>
+              <Text style={s.guideStepIcon}>↕️</Text>
+              <Text style={s.guideStepText}>「編集」を押すと、カードをドラッグして並び替えたり、タスクの追加・削除ができます。</Text>
+            </View>
+            <View style={s.guideStepRow}>
+              <Text style={s.guideStepIcon}>🔀</Text>
+              <Text style={s.guideStepText}>「分岐」を使うと、「はい/いいえ」で流れを2つに分けることもできます。</Text>
+            </View>
+            <TouchableOpacity style={s.guideBtn} onPress={dismissGuide} activeOpacity={0.85}>
+              <Text style={s.guideBtnText}>はじめる</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </Modal>
 
       <TabBar current="Flow" navigation={navigation} />
