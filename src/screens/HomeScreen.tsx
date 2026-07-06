@@ -1365,7 +1365,6 @@ export default function HomeScreen({ navigation }: Props) {
     time: string | null,
     notify: boolean,
     onPick: () => void,
-    onClear: () => void,
     onToggleNotify: (v: boolean) => void,
     notifyType: 'push' | 'alarm',
     onSetNotifyType: (t: 'push' | 'alarm') => void,
@@ -1388,11 +1387,6 @@ export default function HomeScreen({ navigation }: Props) {
           />
         </View>
       </View>
-      {time && (
-        <TouchableOpacity onPress={onClear} style={s.clearTimeBtn}>
-          <Text style={s.clearTimeText}>時間をクリア</Text>
-        </TouchableOpacity>
-      )}
       {notify && !time && <Text style={s.scheduleHint}>※ 通知するには時間を設定してください</Text>}
       {notify && (
         <>
@@ -1924,27 +1918,12 @@ export default function HomeScreen({ navigation }: Props) {
                     returnKeyType="done"
                   />
 
-                  {/* Auto timer/stopwatch: fires a notification at the set time; tapping it starts the measurement */}
-                  <Text style={[s.sheetSection, { marginTop: 16 }]}>自動計測</Text>
-                  {renderAutoTimer(
-                    newAutoTimerEnabled,
-                    newAutoTimerTime,
-                    newAutoTimerMode,
-                    newAutoTimerMinutes,
-                    setNewAutoTimerEnabled,
-                    () => openTimeEditor('autoTimerAdd', newAutoTimerTime),
-                    () => setNewAutoTimerTime(null),
-                    setNewAutoTimerMode,
-                    setNewAutoTimerMinutes,
-                  )}
-
                   {/* Notification time + notify (second) */}
                   <Text style={[s.sheetSection, { marginTop: 16 }]}>通知</Text>
                   {renderSchedule(
                     newTime,
                     newNotify,
                     () => openTimeEditor('add', newTime),
-                    () => setNewTime(null),
                     toggleNewNotify,
                     newNotifyType,
                     setNewNotifyType,
@@ -1964,6 +1943,20 @@ export default function HomeScreen({ navigation }: Props) {
                     setOnceDate: setNewOnceDate,
                     toggleDate: (ds) => setNewFreqDates((cur) => cur.includes(ds) ? cur.filter((x) => x !== ds) : [...cur, ds]),
                   }, addPicker, setAddPicker, newOnceDate, newFreqDates.slice().sort().join(','))}
+
+                  {/* Auto timer/stopwatch: fires a notification at the set time; tapping it starts the measurement */}
+                  <Text style={[s.sheetSection, { marginTop: 16 }]}>自動計測</Text>
+                  {renderAutoTimer(
+                    newAutoTimerEnabled,
+                    newAutoTimerTime,
+                    newAutoTimerMode,
+                    newAutoTimerMinutes,
+                    setNewAutoTimerEnabled,
+                    () => openTimeEditor('autoTimerAdd', newAutoTimerTime),
+                    () => setNewAutoTimerTime(null),
+                    setNewAutoTimerMode,
+                    setNewAutoTimerMinutes,
+                  )}
 
                   <View style={{ height: 12 }} />
                 </ScrollView>
@@ -2016,27 +2009,12 @@ export default function HomeScreen({ navigation }: Props) {
                         returnKeyType="done"
                       />
 
-                      {/* Auto timer/stopwatch: fires a notification at the set time; tapping it starts the measurement */}
-                      <Text style={[s.sheetSection, { marginTop: 16 }]}>自動計測</Text>
-                      {renderAutoTimer(
-                        !!detailTask.auto_timer_enabled,
-                        detailTask.auto_timer_time,
-                        detailTask.auto_timer_mode,
-                        detailTask.auto_timer_minutes,
-                        (v) => patchDetail({ auto_timer_enabled: v ? 1 : 0 }),
-                        () => openTimeEditor('autoTimerEdit', detailTask.auto_timer_time),
-                        () => patchDetail({ auto_timer_time: null }),
-                        (mode) => patchDetail({ auto_timer_mode: mode }),
-                        (mins) => patchDetail({ auto_timer_minutes: mins }),
-                      )}
-
                       {/* Notification time + notify (second) */}
                       <Text style={[s.sheetSection, { marginTop: 16 }]}>通知</Text>
                       {renderSchedule(
                         detailTask.scheduled_time,
                         !!detailTask.notify,
                         () => openTimeEditor('edit', detailTask.scheduled_time),
-                        () => patchDetail({ scheduled_time: null }),
                         toggleDetailNotify,
                         (detailTask.notify_type === 'alarm' ? 'alarm' : 'push'),
                         (t) => patchDetail({ notify_type: t }),
@@ -2086,6 +2064,20 @@ export default function HomeScreen({ navigation }: Props) {
                         setDetailPicker,
                         detailTask.once_date,
                         detailTask.freq_dates,
+                      )}
+
+                      {/* Auto timer/stopwatch: fires a notification at the set time; tapping it starts the measurement */}
+                      <Text style={[s.sheetSection, { marginTop: 16 }]}>自動計測</Text>
+                      {renderAutoTimer(
+                        !!detailTask.auto_timer_enabled,
+                        detailTask.auto_timer_time,
+                        detailTask.auto_timer_mode,
+                        detailTask.auto_timer_minutes,
+                        (v) => patchDetail({ auto_timer_enabled: v ? 1 : 0 }),
+                        () => openTimeEditor('autoTimerEdit', detailTask.auto_timer_time),
+                        () => patchDetail({ auto_timer_time: null }),
+                        (mode) => patchDetail({ auto_timer_mode: mode }),
+                        (mins) => patchDetail({ auto_timer_minutes: mins }),
                       )}
 
                       <View style={{ height: 12 }} />
