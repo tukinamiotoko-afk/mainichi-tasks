@@ -1775,16 +1775,17 @@ export default function HomeScreen({ navigation }: Props) {
                 )}
 
                 {freqType === 'every_n_days' && (
-                  <View style={s.timerDurationRow}>
-                    <TextInput
-                      style={s.timerDurationInput}
-                      value={String(interval)}
-                      onChangeText={(v) => on.setInterval(Math.max(2, parseInt(v.replace(/[^0-9]/g, ''), 10) || 2))}
-                      keyboardType="number-pad"
-                      maxLength={3}
-                    />
-                    <Text style={s.timerDurationLabel}>日おき（下のカレンダーで開始日を選択）</Text>
-                  </View>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.monthDayRow}>
+                    {Array.from({ length: 29 }, (_, i) => i + 2).map((n) => (
+                      <PulseChip
+                        key={n}
+                        style={[s.monthDayChip, interval === n && s.monthDayChipActive]}
+                        onPress={() => on.setInterval(n)}
+                      >
+                        <Text style={[s.monthDayText, interval === n && s.monthDayTextActive]}>{n}</Text>
+                      </PulseChip>
+                    ))}
+                  </ScrollView>
                 )}
 
                 {freqType === 'monthly_day' && (
