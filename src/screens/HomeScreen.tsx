@@ -2107,17 +2107,6 @@ export default function HomeScreen({ navigation }: Props) {
                     returnKeyType="done"
                   />
 
-                  {/* Notification time + notify (second) */}
-                  <Text style={[s.sheetSection, { marginTop: 16 }]}>通知</Text>
-                  {renderSchedule(
-                    newTime,
-                    newNotify,
-                    () => openTimeEditor('add', newTime),
-                    toggleNewNotify,
-                    newNotifyType,
-                    setNewNotifyType,
-                  )}
-
                   {renderIconPriority(newIcon, newPriority, setNewIcon, setNewPriority, addPicker, setAddPicker)}
 
                   {renderFrequency(newFreqType, newDays, newFreqWeeks, newFreqWeekdays, newDay, newFreqInterval, {
@@ -2133,6 +2122,17 @@ export default function HomeScreen({ navigation }: Props) {
                     toggleDate: (ds: string) => setNewFreqDates((cur) => cur.includes(ds) ? cur.filter((x) => x !== ds) : [...cur, ds]),
                     setInterval: setNewFreqInterval,
                   }, addPicker, setAddPicker, newOnceDate, newFreqDates.slice().sort().join(','))}
+
+                  {/* Notification time + notify (second) */}
+                  <Text style={[s.sheetSection, { marginTop: 16 }]}>通知</Text>
+                  {renderSchedule(
+                    newTime,
+                    newNotify,
+                    () => openTimeEditor('add', newTime),
+                    toggleNewNotify,
+                    newNotifyType,
+                    setNewNotifyType,
+                  )}
 
                   {/* Auto timer/stopwatch: fires a notification at the set time; tapping it starts the measurement */}
                   <Text style={[s.sheetSection, { marginTop: 16 }]}>自動計測</Text>
@@ -2195,17 +2195,6 @@ export default function HomeScreen({ navigation }: Props) {
                         returnKeyType="done"
                       />
 
-                      {/* Notification time + notify (second) */}
-                      <Text style={[s.sheetSection, { marginTop: 16 }]}>通知</Text>
-                      {renderSchedule(
-                        detailTask.scheduled_time,
-                        !!detailTask.notify,
-                        () => openTimeEditor('edit', detailTask.scheduled_time),
-                        toggleDetailNotify,
-                        (detailTask.notify_type === 'alarm' ? 'alarm' : 'push'),
-                        (t) => patchDetail({ notify_type: t }),
-                      )}
-
                       {renderIconPriority(
                         detailTask.icon,
                         detailTask.priority,
@@ -2267,6 +2256,17 @@ export default function HomeScreen({ navigation }: Props) {
                         setDetailPicker,
                         detailTask.once_date,
                         detailTask.freq_dates,
+                      )}
+
+                      {/* Notification time + notify (second) */}
+                      <Text style={[s.sheetSection, { marginTop: 16 }]}>通知</Text>
+                      {renderSchedule(
+                        detailTask.scheduled_time,
+                        !!detailTask.notify,
+                        () => openTimeEditor('edit', detailTask.scheduled_time),
+                        toggleDetailNotify,
+                        (detailTask.notify_type === 'alarm' ? 'alarm' : 'push'),
+                        (t) => patchDetail({ notify_type: t }),
                       )}
 
                       {/* Auto timer/stopwatch: fires a notification at the set time; tapping it starts the measurement */}
