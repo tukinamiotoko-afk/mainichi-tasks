@@ -304,10 +304,13 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
     left: 0,
     right: 0,
     borderRadius: 12,
-    backgroundColor: '#1f2937',
+    backgroundColor: '#dc2626',
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 6,
   },
+  swipeDeleteIcon: { fontSize: 17 },
   swipeDeleteText: { color: '#ffffff', fontSize: 14, fontWeight: '800', letterSpacing: 1 },
   taskCard: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 12,
@@ -668,6 +671,7 @@ const TaskRow = React.memo(function TaskRow({
   return (
     <View style={s.swipeWrap} onLayout={(e) => onMeasureHeight(e.nativeEvent.layout.height)}>
       <Animated.View style={[s.swipeDeleteBg, swipeBgStyle]}>
+        <Text style={s.swipeDeleteIcon}>🗑️</Text>
         <Text style={s.swipeDeleteText}>削除</Text>
       </Animated.View>
       <Animated.View
