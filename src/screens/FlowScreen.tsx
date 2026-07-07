@@ -167,7 +167,6 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   guideCard: { width: '100%', maxWidth: 360, backgroundColor: C.card, borderRadius: 20, padding: 22, gap: 14 },
   guideTitle: { color: C.ink, fontSize: 18, fontWeight: '800', textAlign: 'center' },
   guideStepRow: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
-  guideStepIcon: { fontSize: 18 },
   guideStepText: { flex: 1, color: C.muted, fontSize: 13, lineHeight: 19 },
   guideBtn: { marginTop: 4, borderRadius: 12, paddingVertical: 14, alignItems: 'center', backgroundColor: '#7c3aed' },
   guideBtnText: { color: '#ffffff', fontSize: 14, fontWeight: '800' },
@@ -2360,19 +2359,15 @@ export default function FlowScreen({ navigation }: Props) {
           <View style={s.guideCard}>
             <Text style={s.guideTitle}>フローへようこそ</Text>
             <View style={s.guideStepRow}>
-              <Text style={s.guideStepIcon}>📋</Text>
               <Text style={s.guideStepText}>その日に該当するタスクが、カードとして流れ図に並びます。</Text>
             </View>
             <View style={s.guideStepRow}>
-              <Text style={s.guideStepIcon}>✅</Text>
               <Text style={s.guideStepText}>カードをタップすると、そのタスクを完了にできます。</Text>
             </View>
             <View style={s.guideStepRow}>
-              <Text style={s.guideStepIcon}>↕️</Text>
               <Text style={s.guideStepText}>「編集」を押すと、カードをドラッグして並び替えたり、タスクの追加・削除ができます。</Text>
             </View>
             <View style={s.guideStepRow}>
-              <Text style={s.guideStepIcon}>🔀</Text>
               <Text style={s.guideStepText}>「分岐」を使うと、「はい/いいえ」で流れを2つに分けることもできます。</Text>
             </View>
             <TouchableOpacity style={s.guideBtn} onPress={dismissGuide} activeOpacity={0.85}>
