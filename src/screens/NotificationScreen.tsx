@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, StatusBar, Switch } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, StatusBar, Switch, Linking, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useFocusEffect } from '@react-navigation/native';
@@ -60,7 +60,10 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   segChipActive: { backgroundColor: C.primary, borderColor: C.primary },
   segChipText: { color: C.muted, fontSize: 13, fontWeight: '700' },
   segChipTextActive: { color: '#ffffff' },
+  itemArrow: { color: C.muted, fontSize: 20 },
 });
+
+const CONTACT_EMAIL = 'huashanzhu849@gmail.com';
 
 export default function NotificationScreen({ navigation }: Props) {
   const db = useSQLiteContext();
@@ -90,6 +93,15 @@ export default function NotificationScreen({ navigation }: Props) {
   const changeScheduleSize = async (val: ScheduleSize) => {
     setScheduleSize(val);
     await setSetting(db, 'schedule_size', val);
+  };
+
+  const handleContact = async () => {
+    const url = `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('毎日タスク アプリへのお問い合わせ')}`;
+    try {
+      await Linking.openURL(url);
+    } catch {
+      Alert.alert('メールアプリが見つかりません', `${CONTACT_EMAIL} 宛に直接ご連絡ください。`);
+    }
   };
 
   return (
@@ -175,6 +187,19 @@ export default function NotificationScreen({ navigation }: Props) {
               ))}
             </View>
           </View>
+
+          {/* ─── サポート ─── */}
+          <View style={s.sectionDivider} />
+          <Text style={s.sectionLabel}>サポート</Text>
+          <View style={s.divider} />
+
+          <TouchableOpacity style={s.itemRow} onPress={handleContact} activeOpacity={0.7}>
+            <View style={s.itemFlex}>
+              <Text style={s.itemLabel}>お問い合わせ</Text>
+              <Text style={s.itemSub}>ご意見・不具合報告はこちら</Text>
+            </View>
+            <Text style={s.itemArrow}>›</Text>
+          </TouchableOpacity>
 
         </View>
       </ScrollView>
