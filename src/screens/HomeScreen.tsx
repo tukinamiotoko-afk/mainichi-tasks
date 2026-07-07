@@ -440,6 +440,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   weekChipText: { color: C.onDark, fontSize: 12, fontWeight: '700' },
   weekChipTextActive: { color: C.onPrimary },
   monthDayRow: { gap: 6, paddingVertical: 8 },
+  intervalGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingVertical: 8 },
   monthDayChip: { width: 40, height: 40, borderRadius: 10, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
   monthDayChipActive: { backgroundColor: C.primary, borderColor: C.primary },
   monthDayText: { color: C.onDark, fontSize: 13, fontWeight: '700' },
@@ -869,6 +870,7 @@ export default function HomeScreen({ navigation }: Props) {
   const [newFreqWeeks, setNewFreqWeeks] = useState<number[]>([1]);
   const [newFreqWeekdays, setNewFreqWeekdays] = useState<number[]>([1]);
   const [newFreqInterval, setNewFreqInterval] = useState(2);
+  const [newIntervalPickerOpen, setNewIntervalPickerOpen] = useState(false);
   const [newDay, setNewDay] = useState(1);
   const [newOnceDate, setNewOnceDate] = useState<string>(today);
   const [newFreqDates, setNewFreqDates] = useState<string[]>([]);
@@ -884,6 +886,7 @@ export default function HomeScreen({ navigation }: Props) {
   const [detailTask, setDetailTask] = useState<Task | null>(null);
   const [detailTitle, setDetailTitle] = useState('');
   const [detailPicker, setDetailPicker] = useState<MetaPicker>(null);
+  const [detailIntervalPickerOpen, setDetailIntervalPickerOpen] = useState(false);
 
   // Shared time editor (numeric input)
   const [timePickerFor, setTimePickerFor] = useState<'add' | 'edit' | 'autoTimerAdd' | 'autoTimerEdit' | null>(null);
@@ -1676,6 +1679,8 @@ export default function HomeScreen({ navigation }: Props) {
     setOpenPicker: (picker: MetaPicker) => void,
     onceDate: string | null,
     freqDates: string | null,
+    intervalPickerOpen: boolean,
+    setIntervalPickerOpen: (open: boolean) => void,
   ) => {
     const freqText = frequencyLabel({
       freq_type: freqType, freq_days: freqType === 'weekly' ? daysToCsv(days) : daysToCsv(weekdays),
@@ -1775,17 +1780,31 @@ export default function HomeScreen({ navigation }: Props) {
                 )}
 
                 {freqType === 'every_n_days' && (
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.monthDayRow}>
-                    {Array.from({ length: 29 }, (_, i) => i + 2).map((n) => (
-                      <PulseChip
-                        key={n}
-                        style={[s.monthDayChip, interval === n && s.monthDayChipActive]}
-                        onPress={() => on.setInterval(n)}
-                      >
-                        <Text style={[s.monthDayText, interval === n && s.monthDayTextActive]}>{n}</Text>
-                      </PulseChip>
-                    ))}
-                  </ScrollView>
+                  <>
+                    <TouchableOpacity
+                      style={s.metaSelectBtn}
+                      onPress={() => { animateNext(); setIntervalPickerOpen(!intervalPickerOpen); }}
+                      activeOpacity={0.8}
+                    >
+                      <View style={s.metaSelectLeft}>
+                        <Text style={s.metaSelectText}>{interval}日ごと</Text>
+                      </View>
+                      <Text style={s.metaSelectArrow}>{intervalPickerOpen ? '▲' : '▼'}</Text>
+                    </TouchableOpacity>
+                    {intervalPickerOpen && (
+                      <View style={s.intervalGrid}>
+                        {Array.from({ length: 29 }, (_, i) => i + 2).map((n) => (
+                          <PulseChip
+                            key={n}
+                            style={[s.monthDayChip, interval === n && s.monthDayChipActive]}
+                            onPress={() => { on.setInterval(n); setIntervalPickerOpen(false); }}
+                          >
+                            <Text style={[s.monthDayText, interval === n && s.monthDayTextActive]}>{n}</Text>
+                          </PulseChip>
+                        ))}
+                      </View>
+                    )}
+                  </>
                 )}
 
                 {freqType === 'monthly_day' && (
@@ -2158,7 +2177,8 @@ export default function HomeScreen({ navigation }: Props) {
                     setOnceDate: setNewOnceDate,
                     toggleDate: (ds: string) => setNewFreqDates((cur) => cur.includes(ds) ? cur.filter((x) => x !== ds) : [...cur, ds]),
                     setInterval: setNewFreqInterval,
-                  }, addPicker, setAddPicker, newOnceDate, newFreqDates.slice().sort().join(','))}
+                  }, addPicker, setAddPicker, newOnceDate, newFreqDates.slice().sort().join(','),
+                  newIntervalPickerOpen, setNewIntervalPickerOpen)}
 
                   {/* Notification time + notify (second) */}
                   <Text style={[s.sheetSection, { marginTop: 16 }]}>通知</Text>
@@ -2297,6 +2317,8 @@ export default function HomeScreen({ navigation }: Props) {
                         setDetailPicker,
                         detailTask.once_date,
                         detailTask.freq_dates,
+                        detailIntervalPickerOpen,
+                        setDetailIntervalPickerOpen,
                       )}
 
                       {/* Notification time + notify (second) */}
