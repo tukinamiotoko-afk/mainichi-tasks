@@ -2,9 +2,7 @@
 //
 // Android values are real (from the developer's AdMob account). iOS isn't
 // published yet, so it still uses Google's official test IDs — replace
-// once an iOS app is registered in AdMob. REWARDED_AD_UNIT_ID (android)
-// is still a test ID too — a separate "rewarded" ad unit needs to be
-// created in AdMob to get its real ID.
+// once an iOS app is registered in AdMob.
 //
 // ADMOB_APP_ID must also be mirrored into the
 // "react-native-google-mobile-ads" plugin config in app.json
@@ -24,12 +22,10 @@ export const INTERSTITIAL_AD_UNIT_ID = Platform.select({
   default: 'ca-app-pub-6253728869800176/3925779047',
 })!;
 
-// TODO: still a test ID — create a "rewarded" ad unit in AdMob and swap
-// this in (interstitial and rewarded ad units are separate in AdMob).
 export const REWARDED_AD_UNIT_ID = Platform.select({
-  android: 'ca-app-pub-3940256099942544/5224354917',
+  android: 'ca-app-pub-6253728869800176/5127180074',
   ios: 'ca-app-pub-3940256099942544/1712485313',
-  default: 'ca-app-pub-3940256099942544/5224354917',
+  default: 'ca-app-pub-6253728869800176/5127180074',
 })!;
 
 // Show an interstitial after this many tracked actions (task add / complete).
