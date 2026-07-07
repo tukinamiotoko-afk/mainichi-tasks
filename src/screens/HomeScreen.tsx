@@ -20,7 +20,8 @@ import {
 } from '../db/database';
 import {
   TASK_ICONS, PRIORITIES, priorityMeta, WEEKDAYS,
-  FreqType, TaskFreq, FREQ_TYPES, NTH_WEEKS, frequencyLabel, parseDays, parseDateList, nextNthWeekdayDate, isDueToday,
+  FreqType, TaskFreq, FREQ_TYPES, NTH_WEEKS, frequencyLabel, parseDays, parseDateList,
+  nextNthWeekdayDate, nextEveryNDaysDate, isDueToday, monthlyNthWeeks, monthlyNthWeekdays,
   targetFor, isTaskDone,
 } from '../constants/taskMeta';
 import { GRAD_START, GRAD_END } from '../constants/theme';
@@ -70,6 +71,8 @@ type Schedulable = {
   freq_day: number | null;
   once_date?: string | null;
   freq_dates?: string | null;
+  freq_weeks?: string | null;
+  freq_interval?: number | null;
 };
 
 // Minimal shape required to schedule a task's auto-timer trigger.
@@ -89,6 +92,8 @@ type AutoTimerSchedulable = {
   freq_day: number | null;
   once_date?: string | null;
   freq_dates?: string | null;
+  freq_weeks?: string | null;
+  freq_interval?: number | null;
 };
 
 async function ensurePermission(): Promise<boolean> {
@@ -122,8 +127,13 @@ async function scheduleTaskNotifs(task: Schedulable): Promise<string[]> {
     } else if (task.freq_type === 'monthly_day') {
       ids.push(await Notifications.scheduleNotificationAsync({ content, trigger: { day: task.freq_day ?? 1, hour: h, minute: m, repeats: true } as any }));
     } else if (task.freq_type === 'monthly_nth') {
-      const when = nextNthWeekdayDate(task.freq_week ?? 1, task.freq_weekday ?? 0, h, m);
+      const when = nextNthWeekdayDate(monthlyNthWeeks(task), monthlyNthWeekdays(task), h, m);
       ids.push(await Notifications.scheduleNotificationAsync({ content, trigger: { date: when } as any }));
+    } else if (task.freq_type === 'every_n_days') {
+      if (task.once_date) {
+        const when = nextEveryNDaysDate(task.once_date, task.freq_interval ?? 2, h, m);
+        ids.push(await Notifications.scheduleNotificationAsync({ content, trigger: { date: when } as any }));
+      }
     } else if (task.freq_type === 'once') {
       const when = task.once_date ? new Date(`${task.once_date}T${task.scheduled_time}:00`) : new Date();
       if (when.getTime() > Date.now()) {
@@ -184,8 +194,13 @@ async function scheduleAutoTimerNotifs(task: AutoTimerSchedulable): Promise<stri
     } else if (task.freq_type === 'monthly_day') {
       ids.push(await Notifications.scheduleNotificationAsync({ content, trigger: { day: task.freq_day ?? 1, hour: h, minute: m, repeats: true } as any }));
     } else if (task.freq_type === 'monthly_nth') {
-      const when = nextNthWeekdayDate(task.freq_week ?? 1, task.freq_weekday ?? 0, h, m);
+      const when = nextNthWeekdayDate(monthlyNthWeeks(task), monthlyNthWeekdays(task), h, m);
       ids.push(await Notifications.scheduleNotificationAsync({ content, trigger: { date: when } as any }));
+    } else if (task.freq_type === 'every_n_days') {
+      if (task.once_date) {
+        const when = nextEveryNDaysDate(task.once_date, task.freq_interval ?? 2, h, m);
+        ids.push(await Notifications.scheduleNotificationAsync({ content, trigger: { date: when } as any }));
+      }
     } else if (task.freq_type === 'once') {
       const when = task.once_date ? new Date(`${task.once_date}T${task.auto_timer_time}:00`) : new Date();
       if (when.getTime() > Date.now()) {
@@ -522,7 +537,8 @@ function FreqCalendar({ freq, onceDate, onSelect, s }: {
   s: ReturnType<typeof makeStyles>;
 }) {
   const isOnce = freq.freq_type === 'once';
-  const base = isOnce && onceDate ? new Date(`${onceDate}T00:00:00`) : new Date();
+  const hasAnchorDate = isOnce || freq.freq_type === 'every_n_days';
+  const base = hasAnchorDate && onceDate ? new Date(`${onceDate}T00:00:00`) : new Date();
   const [view, setView] = useState({ y: base.getFullYear(), m: base.getMonth() });
   const startDow = new Date(view.y, view.m, 1).getDay();
   const daysInMonth = new Date(view.y, view.m + 1, 0).getDate();
@@ -845,8 +861,9 @@ export default function HomeScreen({ navigation }: Props) {
   const [newNotifyType, setNewNotifyType] = useState<'push' | 'alarm'>('push');
   const [newFreqType, setNewFreqType] = useState<FreqType>('daily');
   const [newDays, setNewDays] = useState<number[]>([]);
-  const [newWeek, setNewWeek] = useState(1);
-  const [newWeekday, setNewWeekday] = useState(1);
+  const [newFreqWeeks, setNewFreqWeeks] = useState<number[]>([1]);
+  const [newFreqWeekdays, setNewFreqWeekdays] = useState<number[]>([1]);
+  const [newFreqInterval, setNewFreqInterval] = useState(2);
   const [newDay, setNewDay] = useState(1);
   const [newOnceDate, setNewOnceDate] = useState<string>(today);
   const [newFreqDates, setNewFreqDates] = useState<string[]>([]);
@@ -905,16 +922,17 @@ export default function HomeScreen({ navigation }: Props) {
     }
   }, []);
 
-  // Keep monthly-nth reminders (which can't natively repeat) armed for the next occurrence.
+  // Keep monthly-nth / every-n-days reminders (which can't natively repeat) armed for the next occurrence.
   useFocusEffect(useCallback(() => {
     (async () => {
       const ts = await getTasks(db);
       for (const t of ts) {
-        if (t.notify && t.scheduled_time && t.freq_type === 'monthly_nth') {
+        const oneShot = t.freq_type === 'monthly_nth' || t.freq_type === 'every_n_days';
+        if (t.notify && t.scheduled_time && oneShot) {
           const notify_id = await rescheduleTask(t);
           await updateTask(db, t.id, { notify_id });
         }
-        if (t.auto_timer_enabled && t.auto_timer_time && t.freq_type === 'monthly_nth') {
+        if (t.auto_timer_enabled && t.auto_timer_time && oneShot) {
           const auto_timer_notify_id = await rescheduleAutoTimer(t);
           await updateTask(db, t.id, { auto_timer_notify_id });
         }
@@ -981,8 +999,9 @@ export default function HomeScreen({ navigation }: Props) {
     setNewNotifyType('push');
     setNewFreqType('daily');
     setNewDays([]);
-    setNewWeek(1);
-    setNewWeekday(1);
+    setNewFreqWeeks([1]);
+    setNewFreqWeekdays([1]);
+    setNewFreqInterval(2);
     setNewDay(1);
     setNewOnceDate(today);
     setNewFreqDates([]);
@@ -1006,11 +1025,13 @@ export default function HomeScreen({ navigation }: Props) {
       notify: newNotify ? 1 : 0,
       notify_type: newNotifyType,
       freq_type: newFreqType,
-      freq_days: newFreqType === 'weekly' ? daysToCsv(newDays) : null,
-      freq_week: newFreqType === 'monthly_nth' ? newWeek : null,
-      freq_weekday: newFreqType === 'monthly_nth' ? newWeekday : null,
+      freq_days: newFreqType === 'weekly' ? daysToCsv(newDays) : newFreqType === 'monthly_nth' ? daysToCsv(newFreqWeekdays) : null,
+      freq_week: null,
+      freq_weekday: null,
+      freq_weeks: newFreqType === 'monthly_nth' ? daysToCsv(newFreqWeeks) : null,
+      freq_interval: newFreqType === 'every_n_days' ? newFreqInterval : null,
       freq_day: newFreqType === 'monthly_day' ? newDay : null,
-      once_date: newFreqType === 'once' ? newOnceDate : null,
+      once_date: (newFreqType === 'once' || newFreqType === 'every_n_days') ? newOnceDate : null,
       freq_dates: newFreqType === 'dates' ? newFreqDates.slice().sort().join(',') : null,
       note: newNote.trim() || null,
       auto_timer_enabled: newAutoTimerEnabled ? 1 : 0,
@@ -1027,6 +1048,7 @@ export default function HomeScreen({ navigation }: Props) {
         freq_type: fields.freq_type!, freq_days: fields.freq_days ?? null,
         freq_week: fields.freq_week ?? null, freq_weekday: fields.freq_weekday ?? null, freq_day: fields.freq_day ?? null,
         once_date: fields.once_date ?? null, freq_dates: fields.freq_dates ?? null,
+        freq_weeks: fields.freq_weeks ?? null, freq_interval: fields.freq_interval ?? null,
       });
       await updateTask(db, taskId, { notify_id });
     }
@@ -1037,6 +1059,7 @@ export default function HomeScreen({ navigation }: Props) {
         freq_type: fields.freq_type!, freq_days: fields.freq_days ?? null,
         freq_week: fields.freq_week ?? null, freq_weekday: fields.freq_weekday ?? null, freq_day: fields.freq_day ?? null,
         once_date: fields.once_date ?? null, freq_dates: fields.freq_dates ?? null,
+        freq_weeks: fields.freq_weeks ?? null, freq_interval: fields.freq_interval ?? null,
       });
       await updateTask(db, taskId, { auto_timer_notify_id });
     }
@@ -1074,8 +1097,8 @@ export default function HomeScreen({ navigation }: Props) {
     if (!detailTask) return;
     const merged = { ...detailTask, ...patch } as Task;
     await updateTask(db, detailTask.id, patch);
-    const scheduleKeys: (keyof TaskFields)[] = ['scheduled_time', 'notify', 'notify_type', 'freq_type', 'freq_days', 'freq_week', 'freq_weekday', 'freq_day', 'once_date'];
-    const autoTimerKeys: (keyof TaskFields)[] = ['auto_timer_enabled', 'auto_timer_time', 'auto_timer_mode', 'auto_timer_minutes', 'freq_type', 'freq_days', 'freq_week', 'freq_weekday', 'freq_day', 'once_date'];
+    const scheduleKeys: (keyof TaskFields)[] = ['scheduled_time', 'notify', 'notify_type', 'freq_type', 'freq_days', 'freq_week', 'freq_weekday', 'freq_day', 'once_date', 'freq_weeks', 'freq_interval'];
+    const autoTimerKeys: (keyof TaskFields)[] = ['auto_timer_enabled', 'auto_timer_time', 'auto_timer_mode', 'auto_timer_minutes', 'freq_type', 'freq_days', 'freq_week', 'freq_weekday', 'freq_day', 'once_date', 'freq_weeks', 'freq_interval'];
     let next = merged;
     if (scheduleKeys.some(k => k in patch)) {
       const notify_id = await rescheduleTask(merged);
@@ -1599,28 +1622,34 @@ export default function HomeScreen({ navigation }: Props) {
   const renderFrequency = (
     freqType: FreqType,
     days: number[],
-    week: number,
-    weekday: number,
+    weeks: number[],
+    weekdays: number[],
     day: number,
+    interval: number,
     on: {
       setType: (t: FreqType) => void;
       toggleDay: (d: number) => void;
-      setWeek: (w: number) => void;
-      setWeekday: (d: number) => void;
+      toggleWeek: (w: number) => void;
+      toggleWeekday: (d: number) => void;
       setDay: (d: number) => void;
       setOnceDate: (d: string) => void;
       toggleDate: (ds: string) => void;
+      setInterval: (n: number) => void;
     },
     openPicker: MetaPicker,
     setOpenPicker: (picker: MetaPicker) => void,
     onceDate: string | null,
     freqDates: string | null,
   ) => {
-    const freqText = frequencyLabel({ freq_type: freqType, freq_days: daysToCsv(days), freq_week: week, freq_weekday: weekday, freq_day: day, once_date: onceDate, freq_dates: freqDates });
+    const freqText = frequencyLabel({
+      freq_type: freqType, freq_days: freqType === 'weekly' ? daysToCsv(days) : daysToCsv(weekdays),
+      freq_week: weeks[0] ?? 1, freq_weekday: weekdays[0] ?? 0, freq_weeks: daysToCsv(weeks),
+      freq_day: day, once_date: onceDate, freq_dates: freqDates, freq_interval: interval,
+    });
     const onSelectDate = (ref: Date, ds: string) => {
       if (freqType === 'dates') {
         on.toggleDate(ds);
-      } else if (freqType === 'once') {
+      } else if (freqType === 'once' || freqType === 'every_n_days') {
         on.setOnceDate(ds);
       } else {
         // 他の頻度でタップ → 「任意」に自動切り替えしてその日を追加
@@ -1677,26 +1706,29 @@ export default function HomeScreen({ navigation }: Props) {
                 {freqType === 'monthly_nth' && (
                   <>
                     <View style={s.weekChoiceRow}>
-                      {NTH_WEEKS.map((w) => (
-                        <PulseChip
-                          key={w.value}
-                          wrapStyle={{ flex: 1 }}
-                          style={[s.weekChip, week === w.value && s.weekChipActive]}
-                          onPress={() => on.setWeek(w.value)}
-                        >
-                          <Text style={[s.weekChipText, week === w.value && s.weekChipTextActive]}>{w.label}</Text>
-                        </PulseChip>
-                      ))}
+                      {NTH_WEEKS.map((w) => {
+                        const active = weeks.includes(w.value);
+                        return (
+                          <PulseChip
+                            key={w.value}
+                            wrapStyle={{ flex: 1 }}
+                            style={[s.weekChip, active && s.weekChipActive]}
+                            onPress={() => on.toggleWeek(w.value)}
+                          >
+                            <Text style={[s.weekChipText, active && s.weekChipTextActive]}>{w.label}</Text>
+                          </PulseChip>
+                        );
+                      })}
                     </View>
                     <View style={s.weekdayRow}>
                       {WEEKDAYS.map((w, i) => {
-                        const active = weekday === i;
+                        const active = weekdays.includes(i);
                         return (
                           <PulseChip
                             key={w}
                             wrapStyle={{ flex: 1 }}
                             style={[s.dayChip, active && s.dayChipActive, i === 0 && s.daySun, i === 6 && s.daySat]}
-                            onPress={() => on.setWeekday(i)}
+                            onPress={() => on.toggleWeekday(i)}
                           >
                             <Text style={[s.dayChipText, active && s.dayChipTextActive]}>{w}</Text>
                           </PulseChip>
@@ -1704,6 +1736,19 @@ export default function HomeScreen({ navigation }: Props) {
                       })}
                     </View>
                   </>
+                )}
+
+                {freqType === 'every_n_days' && (
+                  <View style={s.timerDurationRow}>
+                    <TextInput
+                      style={s.timerDurationInput}
+                      value={String(interval)}
+                      onChangeText={(v) => on.setInterval(Math.max(2, parseInt(v.replace(/[^0-9]/g, ''), 10) || 2))}
+                      keyboardType="number-pad"
+                      maxLength={3}
+                    />
+                    <Text style={s.timerDurationLabel}>日ごと（下のカレンダーで開始日を選択）</Text>
+                  </View>
                 )}
 
                 {freqType === 'monthly_day' && (
@@ -1720,11 +1765,19 @@ export default function HomeScreen({ navigation }: Props) {
                   </ScrollView>
                 )}
 
-                {(freqType === 'once' || freqType === 'dates') && (
-                  <Text style={s.calHint}>{freqType === 'dates' ? 'カレンダーをタップして任意の日を選択（複数可）' : 'カレンダーをタップして日付を選択'}</Text>
+                {(freqType === 'once' || freqType === 'dates' || freqType === 'every_n_days') && (
+                  <Text style={s.calHint}>
+                    {freqType === 'dates' ? 'カレンダーをタップして任意の日を選択（複数可）'
+                      : freqType === 'every_n_days' ? 'カレンダーをタップして開始日を選択'
+                      : 'カレンダーをタップして日付を選択'}
+                  </Text>
                 )}
                 <FreqCalendar
-                  freq={{ freq_type: freqType, freq_days: daysToCsv(days), freq_week: week, freq_weekday: weekday, freq_day: day, once_date: onceDate, freq_dates: freqDates }}
+                  freq={{
+                    freq_type: freqType, freq_days: freqType === 'weekly' ? daysToCsv(days) : daysToCsv(weekdays),
+                    freq_week: weeks[0] ?? 1, freq_weekday: weekdays[0] ?? 0, freq_weeks: daysToCsv(weeks),
+                    freq_day: day, once_date: onceDate, freq_dates: freqDates, freq_interval: interval,
+                  }}
                   onceDate={onceDate}
                   onSelect={onSelectDate}
                   s={s}
@@ -2067,17 +2120,18 @@ export default function HomeScreen({ navigation }: Props) {
 
                   {renderIconPriority(newIcon, newPriority, setNewIcon, setNewPriority, addPicker, setAddPicker)}
 
-                  {renderFrequency(newFreqType, newDays, newWeek, newWeekday, newDay, {
-                    setType: (t) => {
+                  {renderFrequency(newFreqType, newDays, newFreqWeeks, newFreqWeekdays, newDay, newFreqInterval, {
+                    setType: (t: FreqType) => {
                       setNewFreqType(t);
                       if (t === 'weekly' && newDays.length === 0) setNewDays([new Date().getDay()]);
                     },
-                    toggleDay: (d) => setNewDays((ds) => ds.includes(d) ? ds.filter((x) => x !== d) : [...ds, d]),
-                    setWeek: setNewWeek,
-                    setWeekday: setNewWeekday,
+                    toggleDay: (d: number) => setNewDays((ds) => ds.includes(d) ? ds.filter((x) => x !== d) : [...ds, d]),
+                    toggleWeek: (w: number) => setNewFreqWeeks((ws) => ws.includes(w) ? ws.filter((x) => x !== w) : [...ws, w]),
+                    toggleWeekday: (d: number) => setNewFreqWeekdays((ds) => ds.includes(d) ? ds.filter((x) => x !== d) : [...ds, d]),
                     setDay: setNewDay,
                     setOnceDate: setNewOnceDate,
-                    toggleDate: (ds) => setNewFreqDates((cur) => cur.includes(ds) ? cur.filter((x) => x !== ds) : [...cur, ds]),
+                    toggleDate: (ds: string) => setNewFreqDates((cur) => cur.includes(ds) ? cur.filter((x) => x !== ds) : [...cur, ds]),
+                    setInterval: setNewFreqInterval,
                   }, addPicker, setAddPicker, newOnceDate, newFreqDates.slice().sort().join(','))}
 
                   {/* Auto timer/stopwatch: fires a notification at the set time; tapping it starts the measurement */}
@@ -2164,33 +2218,50 @@ export default function HomeScreen({ navigation }: Props) {
                       {renderFrequency(
                         detailTask.freq_type,
                         parseDays(detailTask.freq_days),
-                        detailTask.freq_week ?? 1,
-                        detailTask.freq_weekday ?? 1,
+                        monthlyNthWeeks(detailTask),
+                        monthlyNthWeekdays(detailTask),
                         detailTask.freq_day ?? 1,
+                        detailTask.freq_interval ?? 2,
                         {
-                          setType: (t) => {
+                          setType: (t: FreqType) => {
                             const patch: TaskFields = { freq_type: t };
                             if (t === 'weekly') patch.freq_days = daysToCsv(parseDays(detailTask.freq_days).length ? parseDays(detailTask.freq_days) : [new Date().getDay()]);
-                            if (t === 'monthly_nth') { patch.freq_week = detailTask.freq_week ?? 1; patch.freq_weekday = detailTask.freq_weekday ?? 1; }
+                            if (t === 'monthly_nth') {
+                              patch.freq_weeks = daysToCsv(monthlyNthWeeks(detailTask));
+                              patch.freq_days = daysToCsv(monthlyNthWeekdays(detailTask));
+                            }
                             if (t === 'monthly_day') patch.freq_day = detailTask.freq_day ?? 1;
+                            if (t === 'every_n_days') {
+                              patch.once_date = detailTask.once_date ?? today;
+                              patch.freq_interval = detailTask.freq_interval ?? 2;
+                            }
                             if (t === 'once') patch.once_date = detailTask.once_date ?? today;
                             if (t === 'dates') patch.freq_dates = detailTask.freq_dates ?? '';
                             patchDetail(patch);
                           },
-                          toggleDay: (d) => {
+                          toggleDay: (d: number) => {
                             const cur = parseDays(detailTask.freq_days);
                             const next = cur.includes(d) ? cur.filter((x) => x !== d) : [...cur, d];
                             patchDetail({ freq_days: daysToCsv(next) });
                           },
-                          setWeek: (w) => patchDetail({ freq_week: w }),
-                          setWeekday: (d) => patchDetail({ freq_weekday: d }),
-                          setDay: (d) => patchDetail({ freq_day: d }),
-                          setOnceDate: (d) => patchDetail({ once_date: d }),
-                          toggleDate: (ds) => {
+                          toggleWeek: (w: number) => {
+                            const cur = monthlyNthWeeks(detailTask);
+                            const next = cur.includes(w) ? cur.filter((x) => x !== w) : [...cur, w];
+                            patchDetail({ freq_weeks: daysToCsv(next) });
+                          },
+                          toggleWeekday: (d: number) => {
+                            const cur = monthlyNthWeekdays(detailTask);
+                            const next = cur.includes(d) ? cur.filter((x) => x !== d) : [...cur, d];
+                            patchDetail({ freq_days: daysToCsv(next) });
+                          },
+                          setDay: (d: number) => patchDetail({ freq_day: d }),
+                          setOnceDate: (d: string) => patchDetail({ once_date: d }),
+                          toggleDate: (ds: string) => {
                             const cur = parseDateList(detailTask.freq_dates);
                             const next = cur.includes(ds) ? cur.filter((x) => x !== ds) : [...cur, ds];
                             patchDetail({ freq_dates: next.sort().join(',') });
                           },
+                          setInterval: (n: number) => patchDetail({ freq_interval: n }),
                         },
                         detailPicker,
                         setDetailPicker,

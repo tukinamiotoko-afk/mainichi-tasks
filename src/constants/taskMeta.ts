@@ -51,13 +51,14 @@ export const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
 
 // Recurrence -----------------------------------------------------------------
 
-export type FreqType = 'daily' | 'weekly' | 'monthly_nth' | 'monthly_day' | 'once' | 'dates';
+export type FreqType = 'daily' | 'weekly' | 'monthly_nth' | 'monthly_day' | 'every_n_days' | 'once' | 'dates';
 
 export const FREQ_TYPES: { value: FreqType; label: string }[] = [
   { value: 'daily', label: '毎日' },
   { value: 'weekly', label: '毎週' },
   { value: 'monthly_nth', label: '毎月（曜日）' },
   { value: 'monthly_day', label: '毎月（日付）' },
+  { value: 'every_n_days', label: 'n日ごと' },
   { value: 'once', label: '今日だけ' },
   { value: 'dates', label: '任意' },
 ];
@@ -73,13 +74,27 @@ export const NTH_WEEKS: { value: number; label: string }[] = [
 
 export type TaskFreq = {
   freq_type: FreqType;
-  freq_days: string | null;     // weekly: csv of weekday numbers 0(Sun)-6(Sat)
-  freq_week: number | null;     // monthly_nth: 1-5 (5 = last)
-  freq_weekday: number | null;  // monthly_nth: 0-6
+  freq_days: string | null;     // weekly: csv of weekday numbers 0(Sun)-6(Sat); monthly_nth: csv of weekday numbers
+  freq_week: number | null;     // monthly_nth (legacy single value): 1-5 (5 = last)
+  freq_weekday: number | null;  // monthly_nth (legacy single value): 0-6
   freq_day: number | null;      // monthly_day: 1-31
-  once_date?: string | null;    // once: 'YYYY-MM-DD' the single day it applies
+  once_date?: string | null;    // once: 'YYYY-MM-DD' the single day it applies; every_n_days: the start date
   freq_dates?: string | null;   // dates: csv of 'YYYY-MM-DD' specific days
+  freq_weeks?: string | null;   // monthly_nth: csv of week numbers 1-5 (5 = last)
+  freq_interval?: number | null; // every_n_days: repeat every N days from once_date
 };
+
+// monthly_nth stores its week/weekday selections as csv sets (freq_weeks /
+// freq_days), falling back to the older single freq_week/freq_weekday
+// columns for tasks created before multi-select existed.
+export function monthlyNthWeeks(t: TaskFreq): number[] {
+  const ws = parseDays(t.freq_weeks ?? null);
+  return ws.length ? ws : [t.freq_week ?? 1];
+}
+export function monthlyNthWeekdays(t: TaskFreq): number[] {
+  const ds = parseDays(t.freq_days);
+  return ds.length ? ds : [t.freq_weekday ?? 0];
+}
 
 export function parseDateList(csv: string | null | undefined): string[] {
   return (csv ?? '')
@@ -112,12 +127,14 @@ export function frequencyLabel(t: TaskFreq): string {
       return `毎週 ${days.map((d) => WEEKDAYS[d]).join('・')}`;
     }
     case 'monthly_nth': {
-      const week = NTH_WEEKS.find((w) => w.value === t.freq_week)?.label ?? '第1';
-      const wd = WEEKDAYS[t.freq_weekday ?? 0];
-      return `毎月 ${week}${wd}曜`;
+      const weekLabels = monthlyNthWeeks(t).map((w) => NTH_WEEKS.find((x) => x.value === w)?.label ?? '第1').join('・');
+      const wdLabels = monthlyNthWeekdays(t).map((d) => WEEKDAYS[d]).join('・');
+      return `毎月 ${weekLabels}${wdLabels}曜`;
     }
     case 'monthly_day':
       return `毎月 ${t.freq_day ?? 1}日`;
+    case 'every_n_days':
+      return `${t.freq_interval ?? 2}日ごと`;
     case 'once': {
       if (!t.once_date) return '今日だけ';
       const [, m, d] = t.once_date.split('-');
@@ -153,20 +170,41 @@ export function nthWeekdayOfMonth(year: number, monthIndex: number, week: number
   return new Date(year, monthIndex, day);
 }
 
-// Next future occurrence of an nth-weekday rule at a given time of day.
-export function nextNthWeekdayDate(week: number, weekday: number, hour: number, minute: number): Date {
+// Earliest future occurrence across any of the given week/weekday
+// combinations, at a given time of day.
+export function nextNthWeekdayDate(weeks: number[], weekdays: number[], hour: number, minute: number): Date {
   const now = new Date();
   for (let i = 0; i < 14; i++) {
     const probe = new Date(now.getFullYear(), now.getMonth() + i, 1);
-    const occ = nthWeekdayOfMonth(probe.getFullYear(), probe.getMonth(), week, weekday);
-    if (occ) {
-      occ.setHours(hour, minute, 0, 0);
-      if (occ.getTime() > now.getTime()) return occ;
+    let best: Date | null = null;
+    for (const week of weeks) {
+      for (const weekday of weekdays) {
+        const occ = nthWeekdayOfMonth(probe.getFullYear(), probe.getMonth(), week, weekday);
+        if (!occ) continue;
+        occ.setHours(hour, minute, 0, 0);
+        if (occ.getTime() > now.getTime() && (!best || occ.getTime() < best.getTime())) best = occ;
+      }
     }
+    if (best) return best;
   }
   const fallback = new Date(now.getTime() + 86_400_000);
   fallback.setHours(hour, minute, 0, 0);
   return fallback;
+}
+
+// Next future occurrence of an every-N-days rule anchored at startDate.
+export function nextEveryNDaysDate(startDate: string, interval: number, hour: number, minute: number): Date {
+  const n = Math.max(1, interval);
+  const start = new Date(`${startDate}T00:00:00`);
+  start.setHours(hour, minute, 0, 0);
+  const now = new Date();
+  if (start.getTime() > now.getTime()) return start;
+  const elapsedDays = Math.floor((now.getTime() - start.getTime()) / 86_400_000);
+  const cyclesPassed = Math.floor(elapsedDays / n);
+  let candidate = new Date(start);
+  candidate.setDate(candidate.getDate() + cyclesPassed * n);
+  if (candidate.getTime() <= now.getTime()) candidate.setDate(candidate.getDate() + n);
+  return candidate;
 }
 
 // Whether a task's recurrence rule makes it due on the given date.
@@ -177,8 +215,20 @@ export function isDueToday(t: TaskFreq, ref: Date = new Date()): boolean {
     case 'monthly_day':
       return (t.freq_day ?? 1) === ref.getDate();
     case 'monthly_nth': {
-      const occ = nthWeekdayOfMonth(ref.getFullYear(), ref.getMonth(), t.freq_week ?? 1, t.freq_weekday ?? 0);
-      return !!occ && occ.getDate() === ref.getDate();
+      const weeks = monthlyNthWeeks(t);
+      const weekdays = monthlyNthWeekdays(t);
+      return weeks.some((week) => weekdays.some((weekday) => {
+        const occ = nthWeekdayOfMonth(ref.getFullYear(), ref.getMonth(), week, weekday);
+        return !!occ && occ.getDate() === ref.getDate();
+      }));
+    }
+    case 'every_n_days': {
+      if (!t.once_date) return false;
+      const start = new Date(`${t.once_date}T00:00:00`);
+      const cur = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate());
+      const diffDays = Math.round((cur.getTime() - start.getTime()) / 86_400_000);
+      const n = Math.max(1, t.freq_interval ?? 2);
+      return diffDays >= 0 && diffDays % n === 0;
     }
     case 'once':
       return t.once_date ? t.once_date === ymd(ref) : true;

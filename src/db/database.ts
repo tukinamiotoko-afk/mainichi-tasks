@@ -8,6 +8,7 @@ export type Task = {
   freq_type: FreqType; freq_days: string | null;
   freq_week: number | null; freq_weekday: number | null; freq_day: number | null;
   once_date: string | null; freq_dates: string | null;
+  freq_weeks: string | null; freq_interval: number | null;
   note: string | null;
   auto_timer_enabled: number; auto_timer_time: string | null;
   auto_timer_mode: string; auto_timer_minutes: number; auto_timer_notify_id: string | null;
@@ -53,7 +54,9 @@ export async function migrateDb(db: SQLite.SQLiteDatabase): Promise<void> {
       notify_type TEXT NOT NULL DEFAULT 'push',
       freq_dates TEXT,
       repeat_enabled INTEGER NOT NULL DEFAULT 0,
-      repeat_target INTEGER NOT NULL DEFAULT 1
+      repeat_target INTEGER NOT NULL DEFAULT 1,
+      freq_weeks TEXT,
+      freq_interval INTEGER
     );
     CREATE TABLE IF NOT EXISTS completions (
       task_id INTEGER NOT NULL,
@@ -111,6 +114,8 @@ export async function migrateDb(db: SQLite.SQLiteDatabase): Promise<void> {
   try { await db.execAsync('ALTER TABLE tasks ADD COLUMN repeat_enabled INTEGER NOT NULL DEFAULT 0'); } catch {}
   try { await db.execAsync('ALTER TABLE tasks ADD COLUMN repeat_target INTEGER NOT NULL DEFAULT 1'); } catch {}
   try { await db.execAsync('ALTER TABLE completions ADD COLUMN count INTEGER NOT NULL DEFAULT 1'); } catch {}
+  try { await db.execAsync('ALTER TABLE tasks ADD COLUMN freq_weeks TEXT'); } catch {}
+  try { await db.execAsync('ALTER TABLE tasks ADD COLUMN freq_interval INTEGER'); } catch {}
   try { await db.execAsync("ALTER TABLE flow_branches ADD COLUMN branch_side TEXT NOT NULL DEFAULT 'left'"); } catch {}
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS flow_projects (
@@ -204,13 +209,14 @@ export type TaskFields = {
   auto_timer_enabled?: number; auto_timer_time?: string | null;
   auto_timer_mode?: string; auto_timer_minutes?: number; auto_timer_notify_id?: string | null;
   repeat_enabled?: number; repeat_target?: number;
+  freq_weeks?: string | null; freq_interval?: number | null;
 };
 
 const TASK_COLUMNS: (keyof TaskFields)[] = [
   'title', 'icon', 'priority', 'scheduled_time', 'notify', 'notify_id', 'notify_type',
   'freq_type', 'freq_days', 'freq_week', 'freq_weekday', 'freq_day', 'once_date', 'freq_dates', 'note',
   'auto_timer_enabled', 'auto_timer_time', 'auto_timer_mode', 'auto_timer_minutes', 'auto_timer_notify_id',
-  'repeat_enabled', 'repeat_target',
+  'repeat_enabled', 'repeat_target', 'freq_weeks', 'freq_interval',
 ];
 
 export async function addTask(db: SQLite.SQLiteDatabase, title: string): Promise<number> {
