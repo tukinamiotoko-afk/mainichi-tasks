@@ -15,7 +15,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { RootStackParamList } from '../../App';
 import {
   Task, TaskFields, getToday, getTasks, addTask, updateTask, deleteTask,
-  getCompletionCounts, markComplete, markIncomplete, updateTaskSortOrders,
+  getCompletionCounts, markComplete, markIncomplete, resetCompletion, updateTaskSortOrders,
   getSetting,
 } from '../db/database';
 import {
@@ -945,19 +945,20 @@ export default function HomeScreen({ navigation }: Props) {
     const task = tasksRef.current.find((t) => t.id === id);
     const count = completionCountsRef.current.get(id) ?? 0;
     const target = task ? targetFor(task) : 1;
-    const isRepeat = !!task?.repeat_enabled && target > 1;
     const wasDone = count >= target;
-    if (wasDone && !isRepeat) {
-      await markIncomplete(db, id, selectedDate);
+    if (wasDone) {
+      // Already done (including over-complete repeat tasks past target) —
+      // tapping resets it back to zero rather than piling on further.
+      await resetCompletion(db, id, selectedDate);
     } else {
       await markComplete(db, id, selectedDate);
-      if (!wasDone && count + 1 >= target) triggerCelebration();
+      if (count + 1 >= target) triggerCelebration();
     }
     load();
   }, [db, selectedDate, load]);
 
-  // Long-press undoes one instance at a time — the only way to back out of
-  // a repeat task once it's past its target, since tapping only adds more.
+  // Long-press removes just one instance — for nudging a repeat task's count
+  // down without resetting it all the way to zero.
   const longPressCheck = useCallback(async (id: number) => {
     const count = completionCountsRef.current.get(id) ?? 0;
     if (count <= 0) return;

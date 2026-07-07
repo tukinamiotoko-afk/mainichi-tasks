@@ -298,6 +298,10 @@ export async function markIncomplete(db: SQLite.SQLiteDatabase, taskId: number, 
   await db.runAsync('DELETE FROM completions WHERE task_id = ? AND date = ? AND count <= 0', [taskId, date]);
 }
 
+export async function resetCompletion(db: SQLite.SQLiteDatabase, taskId: number, date: string): Promise<void> {
+  await db.runAsync('DELETE FROM completions WHERE task_id = ? AND date = ?', [taskId, date]);
+}
+
 export async function getCompletionCountInRange(
   db: SQLite.SQLiteDatabase, taskId: number, startDate: string, endDate: string
 ): Promise<number> {
