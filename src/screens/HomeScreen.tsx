@@ -21,6 +21,7 @@ import {
 import {
   TASK_ICONS, PRIORITIES, priorityMeta, WEEKDAYS,
   FreqType, TaskFreq, FREQ_TYPES, NTH_WEEKS, frequencyLabel, parseDays, parseDateList, nextNthWeekdayDate, isDueToday,
+  targetFor, isTaskDone,
 } from '../constants/taskMeta';
 import { GRAD_START, GRAD_END } from '../constants/theme';
 import TabBar from '../components/TabBar';
@@ -33,11 +34,6 @@ const daysToCsv = (days: number[]) => days.slice().sort((a, b) => a - b).join(',
 const DRAG_ROW_HEIGHT = 88;
 const DRAG_GAP = 10;
 const DRAG_SLOT = DRAG_ROW_HEIGHT + DRAG_GAP; // actual slot size including gap
-
-// A task's target completion count for one day — 1 for regular tasks,
-// or its configured repeat target when the repeat feature is turned on.
-const targetFor = (t: Task): number => (t.repeat_enabled ? Math.max(1, t.repeat_target) : 1);
-const isTaskDone = (t: Task, count: number): boolean => count >= targetFor(t);
 
 type FilterStatus = 'all' | 'incomplete' | 'done';
 type FilterFreq = 'all' | 'daily' | 'other';

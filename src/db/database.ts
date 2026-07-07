@@ -313,6 +313,20 @@ export async function getCompletionCountInRange(
   return row?.count ?? 0;
 }
 
+// Sum of instances actually done in the range, each day capped at the
+// task's target (so extra over-target taps don't inflate the total).
+export async function getCompletionInstancesInRange(
+  db: SQLite.SQLiteDatabase, taskId: number, startDate: string, endDate: string
+): Promise<number> {
+  const row = await db.getFirstAsync<{ total: number }>(
+    `SELECT COALESCE(SUM(MIN(c.count, CASE WHEN t.repeat_enabled = 1 THEN t.repeat_target ELSE 1 END)), 0) as total
+     FROM completions c JOIN tasks t ON t.id = c.task_id
+     WHERE c.task_id = ? AND c.date >= ? AND c.date <= ?`,
+    [taskId, startDate, endDate]
+  );
+  return row?.total ?? 0;
+}
+
 export async function getFirstCompletionDate(db: SQLite.SQLiteDatabase, taskId: number): Promise<string | null> {
   const row = await db.getFirstAsync<{ date: string }>(
     `SELECT MIN(c.date) as date FROM completions c JOIN tasks t ON t.id = c.task_id

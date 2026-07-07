@@ -1,5 +1,15 @@
 // Shared metadata + helpers for task icon / priority / frequency (recurrence).
 
+// A task's target completion count for one day — 1 for regular tasks, or
+// its configured repeat target when the repeat feature is turned on.
+export type RepeatFields = { repeat_enabled: number; repeat_target: number };
+export function targetFor(t: RepeatFields): number {
+  return t.repeat_enabled ? Math.max(1, t.repeat_target) : 1;
+}
+export function isTaskDone(t: RepeatFields, count: number): boolean {
+  return count >= targetFor(t);
+}
+
 export const TASK_ICONS = [
   // 身支度・掃除
   '🪥', '🚿', '🧖', '🧹', '🗑️', '🛏️', '🔑',

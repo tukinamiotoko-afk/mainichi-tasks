@@ -9,10 +9,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { RootStackParamList } from '../../App';
 import {
   Task, getToday, subtractDays, daysBetween, getTasks,
-  getCompletionCountInRange, getFirstCompletionDate, getCompletionsForMonth,
+  getCompletionCountInRange, getCompletionInstancesInRange, getFirstCompletionDate, getCompletionsForMonth,
   getSetting, setSetting,
   TimeLog, TimeLogTotal, getTimeLogsForDate, getTimeLogTotalsInRange,
 } from '../db/database';
+import { targetFor } from '../constants/taskMeta';
 import { GRAD_START, GRAD_END } from '../constants/theme';
 import TabBar from '../components/TabBar';
 import { useTheme, ColorSet } from '../contexts/ThemeContext';
@@ -26,7 +27,10 @@ type Period = '7日' | '30日' | '全期間' | '任意';
 type FreqFilter = 'すべて' | '毎日' | 'その他';
 type DropdownKey = 'period' | 'freq';
 type TimerSubMode = 'daily' | 'summary';
-type Rate = { task: Task; completed: number; total: number; rate: number };
+type Rate = {
+  task: Task; completed: number; total: number; rate: number;
+  isRepeat: boolean; instancesDone: number; instancesTarget: number;
+};
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'Stats'> };
 
 function formatDuration(totalSeconds: number): string {
@@ -113,6 +117,9 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   rateRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   rateDays: { color: C.muted, fontSize: 11, fontWeight: '700' },
   rateBadge: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
+  repeatBadge: { backgroundColor: C.primarySoft, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
+  repeatBadgeText: { color: C.primary, fontSize: 10, fontWeight: '800' },
+  repeatTotalText: { color: C.muted, fontSize: 11, fontWeight: '700' },
   ratePct: { color: C.onPrimary, fontSize: 11, fontWeight: '700' },
   barBg: { height: 4, backgroundColor: C.border, borderRadius: 2, overflow: 'hidden' },
   barFill: { height: '100%' },
@@ -227,7 +234,11 @@ export default function StatsScreen({ navigation }: Props) {
       }
       const endDate = period === '任意' ? toDateString(customEnd) : today;
       const completed = await getCompletionCountInRange(db, task.id, startDate, endDate);
-      return { task, completed, total: Math.max(totalDays, 1), rate: completed / Math.max(totalDays, 1) };
+      const total = Math.max(totalDays, 1);
+      const isRepeat = !!task.repeat_enabled && targetFor(task) > 1;
+      const instancesDone = isRepeat ? await getCompletionInstancesInRange(db, task.id, startDate, endDate) : 0;
+      const instancesTarget = isRepeat ? targetFor(task) * total : 0;
+      return { task, completed, total, rate: completed / total, isRepeat, instancesDone, instancesTarget };
     }));
     setRates(computed);
     setRatesLoaded(true);
@@ -512,6 +523,11 @@ export default function StatsScreen({ navigation }: Props) {
                       <Text style={s.rateTitle} numberOfLines={1}>
                         {item.task.icon ? `${item.task.icon} ` : ''}{item.task.title}
                       </Text>
+                      {item.isRepeat && (
+                        <View style={s.repeatBadge}>
+                          <Text style={s.repeatBadgeText}>🔁×{targetFor(item.task)}</Text>
+                        </View>
+                      )}
                       <View style={s.rateRight}>
                         <Text style={s.rateDays}>{item.completed} / {item.total}日</Text>
                         <View style={[s.rateBadge, { backgroundColor: bc }]}>
@@ -522,6 +538,9 @@ export default function StatsScreen({ navigation }: Props) {
                     <View style={s.barBg}>
                       <View style={[s.barFill, { width: `${Math.min(item.rate * 100, 100)}%` as any, backgroundColor: bc }]} />
                     </View>
+                    {item.isRepeat && (
+                      <Text style={s.repeatTotalText}>通算 {item.instancesDone} / {item.instancesTarget}回</Text>
+                    )}
                   </View>
                 );
               }}
