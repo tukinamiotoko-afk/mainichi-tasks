@@ -12,11 +12,12 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Notifications from 'expo-notifications';
 import * as SplashScreen from 'expo-splash-screen';
+import * as StoreReview from 'expo-store-review';
 import { RootStackParamList } from '../../App';
 import {
   Task, TaskFields, getToday, getTasks, addTask, updateTask, deleteTask,
   getCompletionCounts, markComplete, markIncomplete, resetCompletion, updateTaskSortOrders,
-  getSetting,
+  getSetting, setSetting, getTotalCompletionsCount,
 } from '../db/database';
 import {
   TASK_ICONS, PRIORITIES, priorityMeta, WEEKDAYS,
@@ -27,6 +28,8 @@ import {
 import { GRAD_START, GRAD_END } from '../constants/theme';
 import TabBar from '../components/TabBar';
 import { useTheme, ColorSet } from '../contexts/ThemeContext';
+import { usePurchases } from '../contexts/PurchasesContext';
+import { useAds } from '../contexts/AdsContext';
 
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'Home'> };
 
@@ -780,6 +783,8 @@ export default function HomeScreen({ navigation }: Props) {
   const db = useSQLiteContext();
   const insets = useSafeAreaInsets();
   const { C, grad, dark } = useTheme();
+  const { isPremium } = usePurchases();
+  const { recordAction } = useAds();
   const s = useMemo(() => makeStyles(C), [C]);
   const screen = Dimensions.get('window');
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -964,6 +969,34 @@ export default function HomeScreen({ navigation }: Props) {
     ]).start(() => setShowThumb(false));
   };
 
+  // Gate a premium-only toggle: runs onEnable only if subscribed, otherwise
+  // prompts the upgrade screen instead of turning the feature on.
+  const requirePremium = useCallback((onEnable: () => void) => {
+    if (isPremium) { onEnable(); return; }
+    Alert.alert(
+      'プレミアム機能です',
+      'この機能はプレミアム限定です。アップグレードしますか？',
+      [
+        { text: 'キャンセル', style: 'cancel' },
+        { text: 'プレミアムを見る', onPress: () => navigation.navigate('Upgrade') },
+      ]
+    );
+  }, [isPremium, navigation]);
+
+  // Ask for a store review at most once, and only once the user has some
+  // real completion history — a much better moment than right at launch.
+  const REVIEW_PROMPT_THRESHOLD = 10;
+  const maybeRequestReview = useCallback(async () => {
+    const shown = await getSetting(db, 'reviewPromptShown');
+    if (shown) return;
+    const total = await getTotalCompletionsCount(db);
+    if (total < REVIEW_PROMPT_THRESHOLD) return;
+    const available = await StoreReview.isAvailableAsync();
+    if (!available) return;
+    await setSetting(db, 'reviewPromptShown', '1');
+    StoreReview.requestReview();
+  }, [db]);
+
   const toggle = useCallback(async (id: number) => {
     const task = tasksRef.current.find((t) => t.id === id);
     const count = completionCountsRef.current.get(id) ?? 0;
@@ -976,9 +1009,11 @@ export default function HomeScreen({ navigation }: Props) {
     } else {
       await markComplete(db, id, selectedDate);
       if (count + 1 >= target) triggerCelebration();
+      recordAction();
+      maybeRequestReview();
     }
     load();
-  }, [db, selectedDate, load]);
+  }, [db, selectedDate, load, recordAction, maybeRequestReview]);
 
   // Long-press removes just one instance — for nudging a repeat task's count
   // down without resetting it all the way to zero.
@@ -1066,6 +1101,7 @@ export default function HomeScreen({ navigation }: Props) {
     resetAddDraft();
     setShowAdd(false);
     load();
+    recordAction();
   };
 
   const closeAddSheet = () => {
@@ -2141,7 +2177,7 @@ export default function HomeScreen({ navigation }: Props) {
                     newAutoTimerTime,
                     newAutoTimerMode,
                     newAutoTimerMinutes,
-                    setNewAutoTimerEnabled,
+                    (v) => (v ? requirePremium(() => setNewAutoTimerEnabled(true)) : setNewAutoTimerEnabled(false)),
                     () => openTimeEditor('autoTimerAdd', newAutoTimerTime),
                     () => setNewAutoTimerTime(null),
                     setNewAutoTimerMode,
@@ -2149,7 +2185,11 @@ export default function HomeScreen({ navigation }: Props) {
                   )}
 
                   <Text style={[s.sheetSection, { marginTop: 16 }]}>複数回</Text>
-                  {renderRepeat(newRepeatEnabled, newRepeatTarget, setNewRepeatEnabled, setNewRepeatTarget)}
+                  {renderRepeat(
+                    newRepeatEnabled, newRepeatTarget,
+                    (v) => (v ? requirePremium(() => setNewRepeatEnabled(true)) : setNewRepeatEnabled(false)),
+                    setNewRepeatTarget,
+                  )}
 
                   <View style={{ height: 12 }} />
                 </ScrollView>
@@ -2276,7 +2316,7 @@ export default function HomeScreen({ navigation }: Props) {
                         detailTask.auto_timer_time,
                         detailTask.auto_timer_mode,
                         detailTask.auto_timer_minutes,
-                        (v) => patchDetail({ auto_timer_enabled: v ? 1 : 0 }),
+                        (v) => (v ? requirePremium(() => patchDetail({ auto_timer_enabled: 1 })) : patchDetail({ auto_timer_enabled: 0 })),
                         () => openTimeEditor('autoTimerEdit', detailTask.auto_timer_time),
                         () => patchDetail({ auto_timer_time: null }),
                         (mode) => patchDetail({ auto_timer_mode: mode }),
@@ -2287,10 +2327,12 @@ export default function HomeScreen({ navigation }: Props) {
                       {renderRepeat(
                         !!detailTask.repeat_enabled,
                         detailTask.repeat_target,
-                        (v) => patchDetail({
-                          repeat_enabled: v ? 1 : 0,
-                          ...(v && detailTask.repeat_target < 2 ? { repeat_target: 2 } : {}),
-                        }),
+                        (v) => (v
+                          ? requirePremium(() => patchDetail({
+                              repeat_enabled: 1,
+                              ...(detailTask.repeat_target < 2 ? { repeat_target: 2 } : {}),
+                            }))
+                          : patchDetail({ repeat_enabled: 0 })),
                         (n) => patchDetail({ repeat_target: n }),
                       )}
 

@@ -11,6 +11,7 @@ import { GRAD, GRAD_START, GRAD_END } from '../constants/theme';
 import TabBar from '../components/TabBar';
 import { useTheme, ColorSet } from '../contexts/ThemeContext';
 import { useTimerActions, useTimerState, useTimerClock, timerSeconds, displayTimerSeconds } from '../contexts/TimerContext';
+import { useAds } from '../contexts/AdsContext';
 
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'Timer'> };
 
@@ -93,7 +94,8 @@ export default function TimerScreen({ navigation }: Props) {
 
   const [tasks, setTasks] = useState<Task[]>([]);
   const { timers, mode } = useTimerState();
-  const { addTimer: addTimerAction, removeTimer, startTimer, pauseTimer, saveTimer, updateTargetSeconds, setMode } = useTimerActions();
+  const { addTimer: addTimerAction, removeTimer, startTimer, pauseTimer, saveTimer, updateTargetSeconds, setMode, grantTimerBonus } = useTimerActions();
+  const { showRewardedAd } = useAds();
   const now = useTimerClock();
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerSortKey, setPickerSortKey] = useState<'manual' | 'priority' | 'name'>('manual');
@@ -137,6 +139,30 @@ export default function TimerScreen({ navigation }: Props) {
 
   const addTimer = async (task: Task) => {
     const target = await addTimerAction(task);
+    if (target === null) {
+      setPickerOpen(false);
+      Alert.alert(
+        '本日の回数上限です',
+        '無料版では1日に計測を開始できる回数に上限があります。広告を見ると+1回、プレミアムなら無制限です。',
+        [
+          { text: 'キャンセル', style: 'cancel' },
+          {
+            text: '広告を見て+1回',
+            onPress: async () => {
+              const earned = await showRewardedAd();
+              if (earned) {
+                await grantTimerBonus();
+                addTimer(task);
+              } else {
+                Alert.alert('広告を最後まで見られませんでした');
+              }
+            },
+          },
+          { text: 'プレミアムを見る', onPress: () => navigation.navigate('Upgrade') },
+        ]
+      );
+      return;
+    }
     setMinuteInputs((prev) => ({ ...prev, [task.id]: String(Math.round(target / 60)) }));
     setPickerOpen(false);
   };

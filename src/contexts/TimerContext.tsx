@@ -3,7 +3,10 @@ import { useSQLiteContext } from 'expo-sqlite';
 import * as Notifications from 'expo-notifications';
 import {
   Task, addTimeLog, getToday, markComplete, getTimerSettingForTask, saveTimerSettingForTask, getTaskById,
+  getTimerDailyUsage, incrementTimerStarts, addTimerBonus,
 } from '../db/database';
+import { FREE_TIMER_STARTS_PER_DAY } from '../constants/billing';
+import { usePurchases } from './PurchasesContext';
 
 export type TimerMode = 'stopwatch' | 'timer';
 export type TimerItem = {
@@ -27,7 +30,8 @@ export function displayTimerSeconds(item: TimerItem, now: number, mode: TimerMod
 type AddTimerOptions = { targetSeconds?: number; autoStart?: boolean; mode?: TimerMode };
 
 type TimerActions = {
-  addTimer: (task: Task, opts?: AddTimerOptions) => Promise<number>;
+  // null return means the free daily limit was hit — no timer was added.
+  addTimer: (task: Task, opts?: AddTimerOptions) => Promise<number | null>;
   removeTimer: (taskId: number) => void;
   startTimer: (taskId: number) => void;
   pauseTimer: (taskId: number) => void;
@@ -35,6 +39,7 @@ type TimerActions = {
   updateTargetSeconds: (taskId: number, seconds: number) => Promise<void>;
   setMode: (mode: TimerMode) => void;
   isTiming: (taskId: number) => boolean;
+  grantTimerBonus: () => Promise<void>;
 };
 
 type TimerState = { timers: TimerItem[]; mode: TimerMode };
@@ -46,6 +51,7 @@ const TimerClockContext = createContext<number>(Date.now());
 export function TimerProvider({ children }: { children: ReactNode }) {
   const db = useSQLiteContext();
   const today = getToday();
+  const { isPremium } = usePurchases();
   const [timers, setTimers] = useState<TimerItem[]>([]);
   const [mode, setModeState] = useState<TimerMode>('stopwatch');
   const [now, setNow] = useState(Date.now());
@@ -60,7 +66,16 @@ export function TimerProvider({ children }: { children: ReactNode }) {
 
   const setMode = useCallback((m: TimerMode) => setModeState(m), []);
 
-  const addTimer = useCallback(async (task: Task, opts?: AddTimerOptions): Promise<number> => {
+  const grantTimerBonus = useCallback(async () => {
+    await addTimerBonus(db, today);
+  }, [db, today]);
+
+  const addTimer = useCallback(async (task: Task, opts?: AddTimerOptions): Promise<number | null> => {
+    const alreadyAdded = timersRef.current.some((item) => item.task.id === task.id);
+    if (!alreadyAdded && !isPremium) {
+      const usage = await getTimerDailyUsage(db, today);
+      if (usage.starts >= FREE_TIMER_STARTS_PER_DAY + usage.bonus) return null;
+    }
     let target = opts?.targetSeconds;
     if (target === undefined) {
       const saved = await getTimerSettingForTask(db, task.id);
@@ -68,7 +83,8 @@ export function TimerProvider({ children }: { children: ReactNode }) {
     } else {
       await saveTimerSettingForTask(db, task.id, target);
     }
-    if (timersRef.current.some((item) => item.task.id === task.id)) return target;
+    if (alreadyAdded) return target;
+    if (!isPremium) await incrementTimerStarts(db, today);
     if (opts?.mode) setModeState(opts.mode);
     const startedAtMs = opts?.autoStart ? Date.now() : null;
     const startedAtIso = startedAtMs ? new Date(startedAtMs).toISOString() : null;
@@ -77,7 +93,7 @@ export function TimerProvider({ children }: { children: ReactNode }) {
       return [...current, { task, baseSeconds: 0, startedAtMs, startedAtIso, targetSeconds: target! }];
     });
     return target;
-  }, [db]);
+  }, [db, today, isPremium]);
 
   const removeTimer = useCallback((taskId: number) => {
     setTimers((current) => current.filter((item) => item.task.id !== taskId));
@@ -156,8 +172,8 @@ export function TimerProvider({ children }: { children: ReactNode }) {
   }, [mode, now, timers, saveTimer]);
 
   const actions = useMemo<TimerActions>(() => ({
-    addTimer, removeTimer, startTimer, pauseTimer, saveTimer, updateTargetSeconds, setMode, isTiming,
-  }), [addTimer, removeTimer, startTimer, pauseTimer, saveTimer, updateTargetSeconds, setMode, isTiming]);
+    addTimer, removeTimer, startTimer, pauseTimer, saveTimer, updateTargetSeconds, setMode, isTiming, grantTimerBonus,
+  }), [addTimer, removeTimer, startTimer, pauseTimer, saveTimer, updateTargetSeconds, setMode, isTiming, grantTimerBonus]);
   const state = useMemo<TimerState>(() => ({ timers, mode }), [timers, mode]);
 
   return (

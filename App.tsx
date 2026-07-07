@@ -12,9 +12,12 @@ import NotificationScreen from './src/screens/NotificationScreen';
 import TimerScreen from './src/screens/TimerScreen';
 import ScheduleScreen from './src/screens/ScheduleScreen';
 import FlowScreen from './src/screens/FlowScreen';
+import UpgradeScreen from './src/screens/UpgradeScreen';
 import { migrateDb } from './src/db/database';
 import { ThemeProvider } from './src/contexts/ThemeContext';
 import { TimerProvider } from './src/contexts/TimerContext';
+import { PurchasesProvider } from './src/contexts/PurchasesContext';
+import { AdsProvider } from './src/contexts/AdsContext';
 
 // Kept visible until HomeScreen finishes its first task load, so the app
 // never shows a blank frame while waiting on the initial SQLite read.
@@ -38,6 +41,7 @@ export type RootStackParamList = {
   Timer: undefined;
   Schedule: undefined;
   Flow: undefined;
+  Upgrade: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -53,6 +57,7 @@ function AppNavigation() {
         <Stack.Screen name="Timer" component={TimerScreen} />
         <Stack.Screen name="Schedule" component={ScheduleScreen} />
         <Stack.Screen name="Flow" component={FlowScreen} />
+        <Stack.Screen name="Upgrade" component={UpgradeScreen} options={{ animation: 'slide_from_bottom' }} />
       </Stack.Navigator>
     </NavigationContainer>
   );
@@ -77,9 +82,13 @@ export default function App() {
   return (
     <SQLiteProvider databaseName="daily_tasks.db" onInit={migrateDb}>
       <ThemeProvider>
-        <TimerProvider>
-          <AppNavigation />
-        </TimerProvider>
+        <PurchasesProvider>
+          <AdsProvider>
+            <TimerProvider>
+              <AppNavigation />
+            </TimerProvider>
+          </AdsProvider>
+        </PurchasesProvider>
       </ThemeProvider>
     </SQLiteProvider>
   );

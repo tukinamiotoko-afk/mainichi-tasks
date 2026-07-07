@@ -8,8 +8,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { RootStackParamList } from '../../App';
 import { getSetting, setSetting } from '../db/database';
 import { GRAD_START, GRAD_END } from '../constants/theme';
+import { FREE_ACCENT_KEYS } from '../constants/billing';
 import TabBar from '../components/TabBar';
 import { useTheme, ColorSet, ACCENT_LIST, AccentKey } from '../contexts/ThemeContext';
+import { usePurchases } from '../contexts/PurchasesContext';
 
 type ScheduleSize = 'small' | 'normal' | 'large';
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'Notifications'> };
@@ -54,6 +56,9 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   accentChipActive: { borderColor: C.ink },
   accentCheck: { color: '#ffffff', fontSize: 16, fontWeight: '900' },
   accentName: { color: C.muted, fontSize: 12, marginTop: 2 },
+  accentLock: { position: 'absolute', top: -2, right: -2, fontSize: 12 },
+  premiumRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14 },
+  premiumBadge: { color: C.primary, fontSize: 12, fontWeight: '800' },
 
   segRow: { flexDirection: 'row', gap: 8 },
   segChip: { flex: 1, borderWidth: 1.5, borderColor: C.border, borderRadius: 20, paddingVertical: 10, alignItems: 'center' },
@@ -70,6 +75,7 @@ export default function NotificationScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const { C, dark, setDark, accent, setAccent, grad } = useTheme();
   const s = useMemo(() => makeStyles(C), [C]);
+  const { isPremium } = usePurchases();
 
   const [tagRight, setTagRight] = useState(false);
   const [scheduleSize, setScheduleSize] = useState<ScheduleSize>('normal');
@@ -115,7 +121,19 @@ export default function NotificationScreen({ navigation }: Props) {
       <ScrollView style={s.list} contentContainerStyle={s.listContent}>
         <View style={s.card}>
 
+          {/* ─── プレミアム ─── */}
+          <Text style={s.sectionLabel}>プレミアム</Text>
+          <View style={s.divider} />
+          <TouchableOpacity style={s.premiumRow} onPress={() => navigation.navigate('Upgrade')} activeOpacity={0.7}>
+            <View style={s.itemFlex}>
+              <Text style={s.itemLabel}>{isPremium ? 'プレミアム加入中' : 'プレミアムにアップグレード'}</Text>
+              <Text style={s.itemSub}>{isPremium ? 'ご利用ありがとうございます' : '広告なし・全機能が使えます'}</Text>
+            </View>
+            {!isPremium && <Text style={s.premiumBadge}>詳細 ›</Text>}
+          </TouchableOpacity>
+
           {/* ─── 外観 ─── */}
+          <View style={s.sectionDivider} />
           <Text style={s.sectionLabel}>外観</Text>
           <View style={s.divider} />
 
@@ -136,16 +154,20 @@ export default function NotificationScreen({ navigation }: Props) {
           <View style={s.itemBlock}>
             <Text style={s.itemLabel}>テーマカラー</Text>
             <View style={s.accentRow}>
-              {ACCENT_LIST.map(({ key, label, swatch }) => (
-                <TouchableOpacity
-                  key={key}
-                  style={[s.accentChip, { backgroundColor: swatch }, accent === key && s.accentChipActive]}
-                  onPress={() => setAccent(key as AccentKey)}
-                  activeOpacity={0.8}
-                >
-                  {accent === key && <Text style={s.accentCheck}>✓</Text>}
-                </TouchableOpacity>
-              ))}
+              {ACCENT_LIST.map(({ key, label, swatch }) => {
+                const locked = !isPremium && !(FREE_ACCENT_KEYS as readonly string[]).includes(key);
+                return (
+                  <TouchableOpacity
+                    key={key}
+                    style={[s.accentChip, { backgroundColor: swatch }, accent === key && s.accentChipActive]}
+                    onPress={() => (locked ? navigation.navigate('Upgrade') : setAccent(key as AccentKey))}
+                    activeOpacity={0.8}
+                  >
+                    {accent === key && <Text style={s.accentCheck}>✓</Text>}
+                    {locked && <Text style={s.accentLock}>🔒</Text>}
+                  </TouchableOpacity>
+                );
+              })}
             </View>
             <Text style={s.accentName}>{ACCENT_LIST.find((a) => a.key === accent)?.label ?? ''}</Text>
           </View>

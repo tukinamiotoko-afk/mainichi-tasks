@@ -88,6 +88,11 @@ export async function migrateDb(db: SQLite.SQLiteDatabase): Promise<void> {
       key TEXT PRIMARY KEY,
       value TEXT
     );
+    CREATE TABLE IF NOT EXISTS timer_daily_usage (
+      date TEXT PRIMARY KEY,
+      starts INTEGER NOT NULL DEFAULT 0,
+      bonus INTEGER NOT NULL DEFAULT 0
+    );
   `);
   try { await db.execAsync('ALTER TABLE completions ADD COLUMN completed_at TEXT'); } catch {}
   try { await db.execAsync('ALTER TABLE notification_settings ADD COLUMN task_id INTEGER'); } catch {}
@@ -172,6 +177,38 @@ export async function getSetting(db: SQLite.SQLiteDatabase, key: string): Promis
 
 export async function setSetting(db: SQLite.SQLiteDatabase, key: string, value: string): Promise<void> {
   await db.runAsync('INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)', [key, value]);
+}
+
+export type TimerDailyUsage = { starts: number; bonus: number };
+
+export async function getTimerDailyUsage(db: SQLite.SQLiteDatabase, date: string): Promise<TimerDailyUsage> {
+  const row = await db.getFirstAsync<TimerDailyUsage>(
+    'SELECT starts, bonus FROM timer_daily_usage WHERE date = ?', [date]
+  );
+  return row ?? { starts: 0, bonus: 0 };
+}
+
+export async function incrementTimerStarts(db: SQLite.SQLiteDatabase, date: string): Promise<void> {
+  await db.runAsync(
+    `INSERT INTO timer_daily_usage (date, starts, bonus) VALUES (?, 1, 0)
+     ON CONFLICT(date) DO UPDATE SET starts = starts + 1`,
+    [date]
+  );
+}
+
+export async function addTimerBonus(db: SQLite.SQLiteDatabase, date: string): Promise<void> {
+  await db.runAsync(
+    `INSERT INTO timer_daily_usage (date, starts, bonus) VALUES (?, 0, 1)
+     ON CONFLICT(date) DO UPDATE SET bonus = bonus + 1`,
+    [date]
+  );
+}
+
+// Total completions ever recorded — used only as a rough engagement signal
+// to decide when it's a reasonable moment to ask for a store review.
+export async function getTotalCompletionsCount(db: SQLite.SQLiteDatabase): Promise<number> {
+  const row = await db.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM completions');
+  return row?.count ?? 0;
 }
 
 export function getToday(): string {

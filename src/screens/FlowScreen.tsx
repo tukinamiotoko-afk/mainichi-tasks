@@ -18,8 +18,10 @@ import {
 } from '../db/database';
 import { isDueToday, WEEKDAYS } from '../constants/taskMeta';
 import { GRAD_START, GRAD_END } from '../constants/theme';
+import { FREE_FLOW_CHART_LIMIT } from '../constants/billing';
 import TabBar from '../components/TabBar';
 import { useTheme, ColorSet } from '../contexts/ThemeContext';
+import { usePurchases } from '../contexts/PurchasesContext';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -396,6 +398,7 @@ export default function FlowScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const { width: viewportWidth } = useWindowDimensions();
   const { C, grad } = useTheme();
+  const { isPremium } = usePurchases();
   const s = useMemo(() => makeStyles(C), [C]);
   const today = getToday();
 
@@ -557,6 +560,18 @@ export default function FlowScreen({ navigation }: Props) {
   }, [db, load]);
 
   const createFlowChart = useCallback(async (fromTaskList: boolean) => {
+    if (!isPremium && flowCharts.length >= FREE_FLOW_CHART_LIMIT) {
+      setFlowListOpen(false);
+      Alert.alert(
+        'フローチャートの上限です',
+        `無料版ではフローチャートは${FREE_FLOW_CHART_LIMIT}個までです。プレミアムで無制限に作成できます。`,
+        [
+          { text: 'キャンセル', style: 'cancel' },
+          { text: 'プレミアムを見る', onPress: () => navigation.navigate('Upgrade') },
+        ]
+      );
+      return;
+    }
     const title = newChartName.trim() || `フロー${flowCharts.length + 1}`;
     const id = await addFlowChart(db, title);
     if (fromTaskList && dueTasks.length > 0) {
@@ -570,7 +585,7 @@ export default function FlowScreen({ navigation }: Props) {
     setNewChartName('');
     setFlowListOpen(false);
     await load();
-  }, [db, newChartName, flowCharts.length, dueTasks, load]);
+  }, [db, newChartName, flowCharts.length, dueTasks, load, isPremium, navigation]);
 
   const startRenameChart = (c: FlowChart) => {
     setRenamingChartId(c.id);
