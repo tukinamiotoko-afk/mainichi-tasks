@@ -894,6 +894,9 @@ export default function HomeScreen({ navigation }: Props) {
   const [minuteInput, setMinuteInput] = useState('00');
 
   const splashHiddenRef = useRef(false);
+  // Bumped whenever the list is (re)loaded, so rows replay their entrance
+  // animation on screen focus / date change instead of just on first mount.
+  const [listAnimKey, setListAnimKey] = useState(0);
 
   const load = useCallback(async () => {
     try {
@@ -906,6 +909,7 @@ export default function HomeScreen({ navigation }: Props) {
       setCompletionCounts(counts);
       setTagRight(layout === 'tag_right');
       setTasksLoaded(true);
+      setListAnimKey((k) => k + 1);
     } finally {
       if (!splashHiddenRef.current) {
         splashHiddenRef.current = true;
@@ -1985,27 +1989,29 @@ export default function HomeScreen({ navigation }: Props) {
             </View>
           ) : null
         }
-        renderItem={({ item }) => (
-          <TaskRow
-            item={item}
-            count={completionCounts.get(item.id) ?? 0}
-            isDone={isTaskDone(item, completionCounts.get(item.id) ?? 0)}
-            isDragging={activeDragId === item.id}
-            isSwiping={swipingId === item.id}
-            reorderEnabled={reorderEnabled}
-            tagRight={tagRight}
-            s={s}
-            panHandlers={getPanResponder(item.id).panHandlers}
-            shiftAnim={getShiftAnim(item.id)}
-            dragY={dragY}
-            dragScale={dragScale}
-            swipeAnim={swipeAnim}
-            onToggle={toggle}
-            onLongPressCheck={longPressCheck}
-            onOpenDetail={openDetail}
-            onStartDrag={startDrag}
-            onMeasureHeight={handleRowLayout}
-          />
+        renderItem={({ item, index }) => (
+          <RiseIn key={listAnimKey} index={index}>
+            <TaskRow
+              item={item}
+              count={completionCounts.get(item.id) ?? 0}
+              isDone={isTaskDone(item, completionCounts.get(item.id) ?? 0)}
+              isDragging={activeDragId === item.id}
+              isSwiping={swipingId === item.id}
+              reorderEnabled={reorderEnabled}
+              tagRight={tagRight}
+              s={s}
+              panHandlers={getPanResponder(item.id).panHandlers}
+              shiftAnim={getShiftAnim(item.id)}
+              dragY={dragY}
+              dragScale={dragScale}
+              swipeAnim={swipeAnim}
+              onToggle={toggle}
+              onLongPressCheck={longPressCheck}
+              onOpenDetail={openDetail}
+              onStartDrag={startDrag}
+              onMeasureHeight={handleRowLayout}
+            />
+          </RiseIn>
         )}
         ListFooterComponent={<View style={{ height: 80 }} />}
       />
