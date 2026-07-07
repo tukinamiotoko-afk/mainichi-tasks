@@ -1747,7 +1747,7 @@ export default function HomeScreen({ navigation }: Props) {
                       keyboardType="number-pad"
                       maxLength={3}
                     />
-                    <Text style={s.timerDurationLabel}>日ごと（下のカレンダーで開始日を選択）</Text>
+                    <Text style={s.timerDurationLabel}>日おき（下のカレンダーで開始日を選択）</Text>
                   </View>
                 )}
 
