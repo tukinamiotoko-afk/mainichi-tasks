@@ -11,6 +11,7 @@ export type Task = {
   note: string | null;
   auto_timer_enabled: number; auto_timer_time: string | null;
   auto_timer_mode: string; auto_timer_minutes: number; auto_timer_notify_id: string | null;
+  repeat_enabled: number; repeat_target: number;
 };
 export type NotificationSetting = { id: number; time: string; notification_type: string; identifier: string | null; task_id: number | null };
 export type CompletionDetail = { task_id: number; title: string; icon: string | null; date: string; completed_at: string | null };
@@ -50,11 +51,14 @@ export async function migrateDb(db: SQLite.SQLiteDatabase): Promise<void> {
       freq_day INTEGER,
       once_date TEXT,
       notify_type TEXT NOT NULL DEFAULT 'push',
-      freq_dates TEXT
+      freq_dates TEXT,
+      repeat_enabled INTEGER NOT NULL DEFAULT 0,
+      repeat_target INTEGER NOT NULL DEFAULT 1
     );
     CREATE TABLE IF NOT EXISTS completions (
       task_id INTEGER NOT NULL,
       date TEXT NOT NULL,
+      count INTEGER NOT NULL DEFAULT 1,
       completed_at TEXT,
       PRIMARY KEY (task_id, date)
     );
@@ -104,6 +108,9 @@ export async function migrateDb(db: SQLite.SQLiteDatabase): Promise<void> {
   try { await db.execAsync("ALTER TABLE tasks ADD COLUMN auto_timer_mode TEXT NOT NULL DEFAULT 'stopwatch'"); } catch {}
   try { await db.execAsync('ALTER TABLE tasks ADD COLUMN auto_timer_minutes INTEGER NOT NULL DEFAULT 25'); } catch {}
   try { await db.execAsync('ALTER TABLE tasks ADD COLUMN auto_timer_notify_id TEXT'); } catch {}
+  try { await db.execAsync('ALTER TABLE tasks ADD COLUMN repeat_enabled INTEGER NOT NULL DEFAULT 0'); } catch {}
+  try { await db.execAsync('ALTER TABLE tasks ADD COLUMN repeat_target INTEGER NOT NULL DEFAULT 1'); } catch {}
+  try { await db.execAsync('ALTER TABLE completions ADD COLUMN count INTEGER NOT NULL DEFAULT 1'); } catch {}
   try { await db.execAsync("ALTER TABLE flow_branches ADD COLUMN branch_side TEXT NOT NULL DEFAULT 'left'"); } catch {}
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS flow_projects (
@@ -196,12 +203,14 @@ export type TaskFields = {
   note?: string | null;
   auto_timer_enabled?: number; auto_timer_time?: string | null;
   auto_timer_mode?: string; auto_timer_minutes?: number; auto_timer_notify_id?: string | null;
+  repeat_enabled?: number; repeat_target?: number;
 };
 
 const TASK_COLUMNS: (keyof TaskFields)[] = [
   'title', 'icon', 'priority', 'scheduled_time', 'notify', 'notify_id', 'notify_type',
   'freq_type', 'freq_days', 'freq_week', 'freq_weekday', 'freq_day', 'once_date', 'freq_dates', 'note',
   'auto_timer_enabled', 'auto_timer_time', 'auto_timer_mode', 'auto_timer_minutes', 'auto_timer_notify_id',
+  'repeat_enabled', 'repeat_target',
 ];
 
 export async function addTask(db: SQLite.SQLiteDatabase, title: string): Promise<number> {
@@ -255,28 +264,46 @@ export async function deleteTask(db: SQLite.SQLiteDatabase, id: number): Promise
   return ids;
 }
 
+// A task/day counts as fully done once its completion count reaches the
+// task's target (repeat tasks) or 1 (regular, non-repeat tasks).
+const DONE_CONDITION = 'c.count >= (CASE WHEN t.repeat_enabled = 1 THEN t.repeat_target ELSE 1 END)';
+
 export async function getCompletedTaskIds(db: SQLite.SQLiteDatabase, date: string): Promise<number[]> {
-  const rows = await db.getAllAsync<{ task_id: number }>('SELECT task_id FROM completions WHERE date = ?', [date]);
+  const rows = await db.getAllAsync<{ task_id: number }>(
+    `SELECT c.task_id as task_id FROM completions c JOIN tasks t ON t.id = c.task_id
+     WHERE c.date = ? AND ${DONE_CONDITION}`,
+    [date]
+  );
   return rows.map((r) => r.task_id);
+}
+
+export async function getCompletionCounts(db: SQLite.SQLiteDatabase, date: string): Promise<Map<number, number>> {
+  const rows = await db.getAllAsync<{ task_id: number; count: number }>(
+    'SELECT task_id, count FROM completions WHERE date = ?', [date]
+  );
+  return new Map(rows.map((r) => [r.task_id, r.count]));
 }
 
 export async function markComplete(db: SQLite.SQLiteDatabase, taskId: number, date: string): Promise<void> {
   const now = new Date().toISOString();
   await db.runAsync(
-    'INSERT OR REPLACE INTO completions (task_id, date, completed_at) VALUES (?, ?, ?)',
+    `INSERT INTO completions (task_id, date, count, completed_at) VALUES (?, ?, 1, ?)
+     ON CONFLICT(task_id, date) DO UPDATE SET count = count + 1, completed_at = excluded.completed_at`,
     [taskId, date, now]
   );
 }
 
 export async function markIncomplete(db: SQLite.SQLiteDatabase, taskId: number, date: string): Promise<void> {
-  await db.runAsync('DELETE FROM completions WHERE task_id = ? AND date = ?', [taskId, date]);
+  await db.runAsync('UPDATE completions SET count = count - 1 WHERE task_id = ? AND date = ?', [taskId, date]);
+  await db.runAsync('DELETE FROM completions WHERE task_id = ? AND date = ? AND count <= 0', [taskId, date]);
 }
 
 export async function getCompletionCountInRange(
   db: SQLite.SQLiteDatabase, taskId: number, startDate: string, endDate: string
 ): Promise<number> {
   const row = await db.getFirstAsync<{ count: number }>(
-    'SELECT COUNT(*) as count FROM completions WHERE task_id = ? AND date >= ? AND date <= ?',
+    `SELECT COUNT(*) as count FROM completions c JOIN tasks t ON t.id = c.task_id
+     WHERE c.task_id = ? AND c.date >= ? AND c.date <= ? AND ${DONE_CONDITION}`,
     [taskId, startDate, endDate]
   );
   return row?.count ?? 0;
@@ -284,7 +311,9 @@ export async function getCompletionCountInRange(
 
 export async function getFirstCompletionDate(db: SQLite.SQLiteDatabase, taskId: number): Promise<string | null> {
   const row = await db.getFirstAsync<{ date: string }>(
-    'SELECT MIN(date) as date FROM completions WHERE task_id = ?', [taskId]
+    `SELECT MIN(c.date) as date FROM completions c JOIN tasks t ON t.id = c.task_id
+     WHERE c.task_id = ? AND ${DONE_CONDITION}`,
+    [taskId]
   );
   return row?.date ?? null;
 }
@@ -297,7 +326,7 @@ export async function getCompletionsForMonth(
   return db.getAllAsync<CompletionDetail>(
     `SELECT c.task_id, t.title, t.icon, c.date, c.completed_at
      FROM completions c JOIN tasks t ON c.task_id = t.id
-     WHERE c.date >= ? AND c.date <= ?
+     WHERE c.date >= ? AND c.date <= ? AND ${DONE_CONDITION}
      ORDER BY c.date, c.completed_at`,
     [start, end]
   );

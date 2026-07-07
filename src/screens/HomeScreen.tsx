@@ -15,7 +15,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { RootStackParamList } from '../../App';
 import {
   Task, TaskFields, getToday, getTasks, addTask, updateTask, deleteTask,
-  getCompletedTaskIds, markComplete, markIncomplete, updateTaskSortOrders,
+  getCompletionCounts, markComplete, markIncomplete, updateTaskSortOrders,
   getSetting,
 } from '../db/database';
 import {
@@ -33,6 +33,11 @@ const daysToCsv = (days: number[]) => days.slice().sort((a, b) => a - b).join(',
 const DRAG_ROW_HEIGHT = 88;
 const DRAG_GAP = 10;
 const DRAG_SLOT = DRAG_ROW_HEIGHT + DRAG_GAP; // actual slot size including gap
+
+// A task's target completion count for one day — 1 for regular tasks,
+// or its configured repeat target when the repeat feature is turned on.
+const targetFor = (t: Task): number => (t.repeat_enabled ? Math.max(1, t.repeat_target) : 1);
+const isTaskDone = (t: Task, count: number): boolean => count >= targetFor(t);
 
 type FilterStatus = 'all' | 'incomplete' | 'done';
 type FilterFreq = 'all' | 'daily' | 'other';
@@ -313,6 +318,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   checkBox: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
   checkBoxDone: { backgroundColor: C.primary, borderColor: C.primary },
   checkMark: { color: C.onPrimary, fontSize: 11, fontWeight: '700' },
+  checkCount: { color: C.stone, fontSize: 10, fontWeight: '800' },
   taskBody: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
   taskTextWrap: { flex: 1, gap: 4 },
   taskTitle: { color: C.onDark, fontSize: 14, fontWeight: '500', lineHeight: 20 },
@@ -463,7 +469,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
 
   thumbOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
   thumbEmoji: { fontSize: 72 },
-  celebrateText: { color: '#ffffff', fontSize: 22, fontWeight: '800', letterSpacing: 0.5, textShadowColor: 'rgba(0,0,0,0.85)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 8 },
+  celebrateText: { fontSize: 22, fontWeight: '800', letterSpacing: 0.5, textShadowColor: 'rgba(0,0,0,0.85)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 8 },
 });
 
 // Frequency type chip row. Each chip bounces on tap, and the "任意" chip also
@@ -575,6 +581,7 @@ type TaskRowStyles = ReturnType<typeof makeStyles>;
 
 type TaskRowProps = {
   item: Task;
+  count: number;
   isDone: boolean;
   isDragging: boolean;
   isSwiping: boolean;
@@ -587,6 +594,7 @@ type TaskRowProps = {
   dragScale: Animated.Value;
   swipeAnim: Animated.Value;
   onToggle: (id: number) => void;
+  onLongPressCheck: (id: number) => void;
   onOpenDetail: (task: Task) => void;
   onStartDrag: (id: number) => void;
   onMeasureHeight: (h: number) => void;
@@ -606,9 +614,9 @@ function taskContentEqual(a: Task, b: Task): boolean {
 }
 
 const TaskRow = React.memo(function TaskRow({
-  item, isDone, isDragging, isSwiping, reorderEnabled, tagRight, s,
+  item, count, isDone, isDragging, isSwiping, reorderEnabled, tagRight, s,
   panHandlers, shiftAnim, dragY, dragScale, swipeAnim,
-  onToggle, onOpenDetail, onStartDrag, onMeasureHeight,
+  onToggle, onLongPressCheck, onOpenDetail, onStartDrag, onMeasureHeight,
 }: TaskRowProps) {
   const swipeStyle = isSwiping
     ? {
@@ -674,6 +682,8 @@ const TaskRow = React.memo(function TaskRow({
         {...panHandlers}
       >
         {(() => {
+          const target = targetFor(item);
+          const isRepeat = !!item.repeat_enabled && target > 1;
           const tagEl = (
             <TouchableOpacity style={s.tagBtn} onPress={() => onOpenDetail(item)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Text style={[s.tagIcon, !item.icon && s.tagIconEmpty]}>{item.icon ?? ''}</Text>
@@ -683,9 +693,15 @@ const TaskRow = React.memo(function TaskRow({
             <TouchableOpacity
               style={[s.checkBox, isDone && s.checkBoxDone]}
               onPress={() => onToggle(item.id)}
+              onLongPress={isRepeat ? () => onLongPressCheck(item.id) : undefined}
+              delayLongPress={350}
               hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
             >
-              {isDone && <Text style={s.checkMark}>✓</Text>}
+              {isDone ? (
+                <Text style={s.checkMark}>✓</Text>
+              ) : isRepeat && count > 0 ? (
+                <Text style={s.checkCount}>{count}</Text>
+              ) : null}
             </TouchableOpacity>
           );
           return (
@@ -705,7 +721,11 @@ const TaskRow = React.memo(function TaskRow({
                     <Text style={s.freqTag}>{frequencyLabel(item)}</Text>
                   </View>
                 </View>
-                {isDone && <View style={s.doneBadge}><Text style={s.doneBadgeText}>完了</Text></View>}
+                {isRepeat ? (
+                  count > 0 && <View style={s.doneBadge}><Text style={s.doneBadgeText}>{Math.min(count, target)}/{target}完了</Text></View>
+                ) : (
+                  isDone && <View style={s.doneBadge}><Text style={s.doneBadgeText}>完了</Text></View>
+                )}
               </TouchableOpacity>
               {tagRight ? tagEl : checkEl}
             </>
@@ -716,6 +736,7 @@ const TaskRow = React.memo(function TaskRow({
   );
 }, (prev, next) => (
   taskContentEqual(prev.item, next.item) &&
+  prev.count === next.count &&
   prev.isDone === next.isDone &&
   prev.isDragging === next.isDragging &&
   prev.isSwiping === next.isSwiping &&
@@ -728,6 +749,7 @@ const TaskRow = React.memo(function TaskRow({
   prev.dragScale === next.dragScale &&
   prev.swipeAnim === next.swipeAnim &&
   prev.onToggle === next.onToggle &&
+  prev.onLongPressCheck === next.onLongPressCheck &&
   prev.onOpenDetail === next.onOpenDetail &&
   prev.onStartDrag === next.onStartDrag &&
   prev.onMeasureHeight === next.onMeasureHeight
@@ -736,15 +758,15 @@ const TaskRow = React.memo(function TaskRow({
 export default function HomeScreen({ navigation }: Props) {
   const db = useSQLiteContext();
   const insets = useSafeAreaInsets();
-  const { C, grad } = useTheme();
+  const { C, grad, dark } = useTheme();
   const s = useMemo(() => makeStyles(C), [C]);
   const screen = Dimensions.get('window');
   const [tasks, setTasks] = useState<Task[]>([]);
   const [tasksLoaded, setTasksLoaded] = useState(false);
   const [tagRight, setTagRight] = useState(false);
   const tasksRef = useRef<Task[]>([]);
-  const [completedIds, setCompletedIds] = useState<Set<number>>(new Set());
-  const completedIdsRef = useRef<Set<number>>(completedIds);
+  const [completionCounts, setCompletionCounts] = useState<Map<number, number>>(new Map());
+  const completionCountsRef = useRef<Map<number, number>>(completionCounts);
   const displayedTasksRef = useRef<Task[]>([]);
   const [showThumb, setShowThumb] = useState(false);
   const thumbAnim = useRef(new Animated.Value(0)).current;
@@ -828,6 +850,8 @@ export default function HomeScreen({ navigation }: Props) {
   const [newAutoTimerTime, setNewAutoTimerTime] = useState<string | null>(null);
   const [newAutoTimerMode, setNewAutoTimerMode] = useState<'stopwatch' | 'timer'>('stopwatch');
   const [newAutoTimerMinutes, setNewAutoTimerMinutes] = useState(25);
+  const [newRepeatEnabled, setNewRepeatEnabled] = useState(false);
+  const [newRepeatTarget, setNewRepeatTarget] = useState(2);
 
   // Task detail sheet
   const [detailTask, setDetailTask] = useState<Task | null>(null);
@@ -843,13 +867,13 @@ export default function HomeScreen({ navigation }: Props) {
 
   const load = useCallback(async () => {
     try {
-      const [ts, ids, layout] = await Promise.all([
+      const [ts, counts, layout] = await Promise.all([
         getTasks(db),
-        getCompletedTaskIds(db, selectedDate),
+        getCompletionCounts(db, selectedDate),
         getSetting(db, 'card_layout'),
       ]);
       setTasks(ts);
-      setCompletedIds(new Set(ids));
+      setCompletionCounts(counts);
       setTagRight(layout === 'tag_right');
       setTasksLoaded(true);
     } finally {
@@ -867,8 +891,8 @@ export default function HomeScreen({ navigation }: Props) {
   }, [tasks]);
 
   useEffect(() => {
-    completedIdsRef.current = completedIds;
-  }, [completedIds]);
+    completionCountsRef.current = completionCounts;
+  }, [completionCounts]);
 
   useEffect(() => {
     if (Platform.OS === 'android') {
@@ -918,12 +942,26 @@ export default function HomeScreen({ navigation }: Props) {
   };
 
   const toggle = useCallback(async (id: number) => {
-    if (completedIdsRef.current.has(id)) {
+    const task = tasksRef.current.find((t) => t.id === id);
+    const count = completionCountsRef.current.get(id) ?? 0;
+    const target = task ? targetFor(task) : 1;
+    const isRepeat = !!task?.repeat_enabled && target > 1;
+    const wasDone = count >= target;
+    if (wasDone && !isRepeat) {
       await markIncomplete(db, id, selectedDate);
     } else {
       await markComplete(db, id, selectedDate);
-      triggerCelebration();
+      if (!wasDone && count + 1 >= target) triggerCelebration();
     }
+    load();
+  }, [db, selectedDate, load]);
+
+  // Long-press undoes one instance at a time — the only way to back out of
+  // a repeat task once it's past its target, since tapping only adds more.
+  const longPressCheck = useCallback(async (id: number) => {
+    const count = completionCountsRef.current.get(id) ?? 0;
+    if (count <= 0) return;
+    await markIncomplete(db, id, selectedDate);
     load();
   }, [db, selectedDate, load]);
 
@@ -947,6 +985,8 @@ export default function HomeScreen({ navigation }: Props) {
     setNewAutoTimerTime(null);
     setNewAutoTimerMode('stopwatch');
     setNewAutoTimerMinutes(25);
+    setNewRepeatEnabled(false);
+    setNewRepeatTarget(2);
   };
 
   const handleAdd = async () => {
@@ -971,6 +1011,8 @@ export default function HomeScreen({ navigation }: Props) {
       auto_timer_time: newAutoTimerTime,
       auto_timer_mode: newAutoTimerMode,
       auto_timer_minutes: newAutoTimerMinutes,
+      repeat_enabled: newRepeatEnabled ? 1 : 0,
+      repeat_target: newRepeatTarget,
     };
     await updateTask(db, taskId, fields);
     if (newNotify && newTime) {
@@ -1093,7 +1135,7 @@ export default function HomeScreen({ navigation }: Props) {
     await patchDetail({ notify: value ? 1 : 0 });
   };
 
-  const done = useMemo(() => tasks.filter((t) => completedIds.has(t.id)).length, [tasks, completedIds]);
+  const done = useMemo(() => tasks.filter((t) => isTaskDone(t, completionCounts.get(t.id) ?? 0)).length, [tasks, completionCounts]);
   const total = tasks.length;
   const progress = total > 0 ? done / total : 0;
   // Gauge gradient color by completion ratio.
@@ -1120,8 +1162,8 @@ export default function HomeScreen({ navigation }: Props) {
       }
       return true;
     });
-    if (filterStatus === 'incomplete') list = list.filter((t) => !completedIds.has(t.id));
-    else if (filterStatus === 'done') list = list.filter((t) => completedIds.has(t.id));
+    if (filterStatus === 'incomplete') list = list.filter((t) => !isTaskDone(t, completionCounts.get(t.id) ?? 0));
+    else if (filterStatus === 'done') list = list.filter((t) => isTaskDone(t, completionCounts.get(t.id) ?? 0));
     if (filterFreq === 'daily') list = list.filter((t) => t.freq_type === 'daily');
     else if (filterFreq === 'other') list = list.filter((t) => t.freq_type !== 'daily');
     if (filterDue === 'today') list = list.filter((t) => isDueToday(t, selDateObj));
@@ -1137,7 +1179,7 @@ export default function HomeScreen({ navigation }: Props) {
       list = [...list].sort((a, b) => a.title.localeCompare(b.title, 'ja'));
     }
     return list;
-  }, [sortedTasks, selectedDate, filterStatus, filterFreq, filterDue, sortKey, completedIds, selDateObj]);
+  }, [sortedTasks, selectedDate, filterStatus, filterFreq, filterDue, sortKey, completionCounts, selDateObj]);
   displayedTasksRef.current = displayedTasks;
 
   const persistTaskOrder = async () => {
@@ -1506,6 +1548,48 @@ export default function HomeScreen({ navigation }: Props) {
     </View>
   );
 
+  // Lets a task be checked off multiple times a day. Tapping the checkbox
+  // always adds one; long-pressing it removes one — the only way back once
+  // the count is past the target.
+  const renderRepeat = (
+    enabled: boolean,
+    targetCount: number,
+    onToggleEnabled: (v: boolean) => void,
+    onSetTarget: (n: number) => void,
+  ) => (
+    <View style={s.scheduleCard}>
+      <View style={s.scheduleTopRow}>
+        <View style={s.metaSelectLeft}>
+          <Text style={s.metaSelectText}>複数回タスクにする</Text>
+        </View>
+        <View style={s.scheduleToggleTop}>
+          <Switch
+            value={enabled}
+            onValueChange={onToggleEnabled}
+            trackColor={{ true: C.primary, false: C.border }}
+            thumbColor="#ffffff"
+          />
+        </View>
+      </View>
+      {enabled && (
+        <>
+          <View style={s.timerDurationRow}>
+            <Text style={s.timerDurationLabel}>1日の目標回数：</Text>
+            <TextInput
+              style={s.timerDurationInput}
+              value={String(targetCount)}
+              onChangeText={(v) => onSetTarget(Math.max(2, parseInt(v.replace(/[^0-9]/g, ''), 10) || 2))}
+              keyboardType="number-pad"
+              maxLength={2}
+            />
+            <Text style={s.timerDurationLabel}>回</Text>
+          </View>
+          <Text style={s.scheduleHint}>タップで1回分チェック、長押しで1回分取り消せます</Text>
+        </>
+      )}
+    </View>
+  );
+
   const renderFrequency = (
     freqType: FreqType,
     days: number[],
@@ -1789,7 +1873,8 @@ export default function HomeScreen({ navigation }: Props) {
         renderItem={({ item }) => (
           <TaskRow
             item={item}
-            isDone={completedIds.has(item.id)}
+            count={completionCounts.get(item.id) ?? 0}
+            isDone={isTaskDone(item, completionCounts.get(item.id) ?? 0)}
             isDragging={activeDragId === item.id}
             isSwiping={swipingId === item.id}
             reorderEnabled={reorderEnabled}
@@ -1801,6 +1886,7 @@ export default function HomeScreen({ navigation }: Props) {
             dragScale={dragScale}
             swipeAnim={swipeAnim}
             onToggle={toggle}
+            onLongPressCheck={longPressCheck}
             onOpenDetail={openDetail}
             onStartDrag={startDrag}
             onMeasureHeight={handleRowLayout}
@@ -1913,7 +1999,12 @@ export default function HomeScreen({ navigation }: Props) {
                 ],
               },
             ]}>👍</Animated.Text>
-            <Text style={s.celebrateText}>達成しました！</Text>
+            <Text style={[
+              s.celebrateText,
+              dark
+                ? { color: '#ffffff', textShadowColor: 'rgba(0,0,0,0.85)' }
+                : { color: '#1f2937', textShadowColor: 'rgba(255,255,255,0.9)' },
+            ]}>達成しました！</Text>
           </Animated.View>
         </View>
       )}
@@ -1996,6 +2087,9 @@ export default function HomeScreen({ navigation }: Props) {
                     setNewAutoTimerMode,
                     setNewAutoTimerMinutes,
                   )}
+
+                  <Text style={[s.sheetSection, { marginTop: 16 }]}>複数回</Text>
+                  {renderRepeat(newRepeatEnabled, newRepeatTarget, setNewRepeatEnabled, setNewRepeatTarget)}
 
                   <View style={{ height: 12 }} />
                 </ScrollView>
@@ -2110,6 +2204,17 @@ export default function HomeScreen({ navigation }: Props) {
                         () => patchDetail({ auto_timer_time: null }),
                         (mode) => patchDetail({ auto_timer_mode: mode }),
                         (mins) => patchDetail({ auto_timer_minutes: mins }),
+                      )}
+
+                      <Text style={[s.sheetSection, { marginTop: 16 }]}>複数回</Text>
+                      {renderRepeat(
+                        !!detailTask.repeat_enabled,
+                        detailTask.repeat_target,
+                        (v) => patchDetail({
+                          repeat_enabled: v ? 1 : 0,
+                          ...(v && detailTask.repeat_target < 2 ? { repeat_target: 2 } : {}),
+                        }),
+                        (n) => patchDetail({ repeat_target: n }),
                       )}
 
                       <TouchableOpacity style={s.detailDeleteBtn} onPress={() => handleDelete(detailTask)}>
