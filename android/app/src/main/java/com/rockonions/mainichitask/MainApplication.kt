@@ -1,4 +1,4 @@
-package com.tukinamiotokoafk.mainichitasks
+package com.rockonions.mainichitask
 
 import android.app.Application
 import android.content.res.Configuration
