@@ -9,7 +9,7 @@
       "supportsTablet": false
     },
     "android": {
-      "package": "com.tukinamiotokoafk.mainichitasks",
+      "package": "com.rockonions.mainichitask",
       "adaptiveIcon": {
         "backgroundColor": "#2563eb"
       }

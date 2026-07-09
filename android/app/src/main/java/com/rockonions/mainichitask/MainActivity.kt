@@ -1,4 +1,4 @@
-package com.tukinamiotokoafk.mainichitasks
+package com.rockonions.mainichitask
 
 import android.os.Build
 import android.os.Bundle
