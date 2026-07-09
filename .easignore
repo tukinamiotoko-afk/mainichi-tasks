@@ -9,3 +9,10 @@ yarn-error.log*
 .DS_Store
 dist/
 android/local.properties
+android/build/
+android/*/build/
+android/.gradle/
+android/.idea/
+android/.cxx/
+android/**/*.iml
+android/**/*.hprof
