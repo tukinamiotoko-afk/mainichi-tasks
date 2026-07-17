@@ -1,14 +1,12 @@
 // RevenueCat configuration.
 //
-// TODO: replace with real values once a RevenueCat project + Play Console
-// subscription products exist. Until then, purchases will fail gracefully
-// (see PurchasesContext) and every premium feature stays locked.
+// TODO: replace the iOS key once an iOS app is registered in RevenueCat.
 import { Platform } from 'react-native';
 
 export const REVENUECAT_API_KEY = Platform.select({
-  android: 'REVENUECAT_ANDROID_API_KEY_PLACEHOLDER',
+  android: 'goog_aGJyaRxpuftPZThFYvJOVgUlPjo',
   ios: 'REVENUECAT_IOS_API_KEY_PLACEHOLDER',
-  default: 'REVENUECAT_ANDROID_API_KEY_PLACEHOLDER',
+  default: 'goog_aGJyaRxpuftPZThFYvJOVgUlPjo',
 })!;
 
 // The RevenueCat entitlement identifier that gates every premium feature.
