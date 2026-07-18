@@ -194,8 +194,16 @@ export function TimerProvider({ children }: { children: ReactNode }) {
 
   const isTiming = useCallback((itemKey: string) => timersRef.current.some((t) => t.key === itemKey), []);
 
-  // tapping an auto-timer notification starts the matching task's timer/stopwatch
-  const handleAutoTimerResponse = useCallback(async (data: any) => {
+  // tapping an auto-timer notification, or pressing its Android action button,
+  // starts the matching task's timer/stopwatch
+  const handleAutoTimerResponse = useCallback(async (response: Notifications.NotificationResponse | null) => {
+    if (!response) return;
+    const action = response.actionIdentifier;
+    if (
+      action !== Notifications.DEFAULT_ACTION_IDENTIFIER &&
+      action !== 'start-auto-timer'
+    ) return;
+    const data = response.notification.request.content.data;
     if (!data || data.kind !== 'auto-timer' || typeof data.taskId !== 'number') return;
     const task = await getTaskById(db, data.taskId);
     if (!task) return;
@@ -206,10 +214,10 @@ export function TimerProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     Notifications.getLastNotificationResponseAsync().then((response) => {
-      if (response) handleAutoTimerResponse(response.notification.request.content.data);
+      if (response) handleAutoTimerResponse(response);
     });
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {
-      handleAutoTimerResponse(response.notification.request.content.data);
+      handleAutoTimerResponse(response);
     });
     return () => sub.remove();
   }, [handleAutoTimerResponse]);

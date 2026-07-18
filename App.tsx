@@ -76,6 +76,16 @@ export default function App() {
         importance: Notifications.AndroidImportance.DEFAULT,
         sound: null,
       });
+      Notifications.setNotificationCategoryAsync(
+        'autoTimerActions',
+        [
+          {
+            identifier: 'start-auto-timer',
+            buttonTitle: '開始',
+            options: { opensAppToForeground: true },
+          },
+        ]
+      );
     }
   }, []);
 
