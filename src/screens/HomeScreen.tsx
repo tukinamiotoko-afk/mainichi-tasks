@@ -345,7 +345,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   taskTitleDone: { color: C.muted, textDecorationLine: 'line-through' },
   taskMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
   taskSide: { alignItems: 'flex-end', justifyContent: 'center', gap: 6, minHeight: 24 },
-  taskStatusRow: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 18 },
+  taskStatusRow: { flexDirection: 'row', alignItems: 'center', minHeight: 18 },
   taskStatusIcon: {
     minWidth: 18,
     height: 18,
@@ -700,7 +700,6 @@ const TaskRow = React.memo(function TaskRow({
     ? { transform: [{ translateY: shiftAnim }] }
     : null;
   const priority = priorityMeta(item.priority);
-  const notifyIcon = item.notify ? (item.notify_type === 'alarm' ? '⏰' : '🔔') : null;
   const autoMeasureIcon = item.auto_timer_enabled ? '⏱' : null;
 
   return (
@@ -766,18 +765,11 @@ const TaskRow = React.memo(function TaskRow({
                     </View>
                   </View>
                   <View style={s.taskSide}>
-                    {(notifyIcon || autoMeasureIcon) && (
+                    {autoMeasureIcon && (
                       <View style={s.taskStatusRow}>
-                        {notifyIcon && (
-                          <View style={s.taskStatusIcon}>
-                            <Text style={s.taskStatusIconText}>{notifyIcon}</Text>
-                          </View>
-                        )}
-                        {autoMeasureIcon && (
-                          <View style={s.taskStatusIcon}>
-                            <Text style={s.taskStatusIconText}>{autoMeasureIcon}</Text>
-                          </View>
-                        )}
+                        <View style={s.taskStatusIcon}>
+                          <Text style={s.taskStatusIconText}>{autoMeasureIcon}</Text>
+                        </View>
                       </View>
                     )}
                     {isRepeat ? (
@@ -931,6 +923,7 @@ export default function HomeScreen({ navigation }: Props) {
   const [minuteInput, setMinuteInput] = useState('00');
 
   const splashHiddenRef = useRef(false);
+  const notificationRefreshDoneRef = useRef(false);
   // Bumped whenever the list is (re)loaded, so rows replay their entrance
   // animation on screen focus / date change instead of just on first mount.
   const [listAnimKey, setListAnimKey] = useState(0);
@@ -955,6 +948,20 @@ export default function HomeScreen({ navigation }: Props) {
     }
   }, [db, selectedDate]);
 
+  const refreshAllTaskNotifications = useCallback(async () => {
+    const allTasks = await getTasks(db);
+    for (const t of allTasks) {
+      if (t.notify && t.scheduled_time) {
+        const notify_id = await rescheduleTask(t);
+        await updateTask(db, t.id, { notify_id });
+      }
+      if (t.auto_timer_enabled && t.auto_timer_time) {
+        const auto_timer_notify_id = await rescheduleAutoTimer(t);
+        await updateTask(db, t.id, { auto_timer_notify_id });
+      }
+    }
+  }, [db]);
+
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   useEffect(() => {
@@ -977,15 +984,29 @@ export default function HomeScreen({ navigation }: Props) {
     (async () => {
       const notifyGuideDone = await getSetting(db, 'notifyGuideDone');
       if (!notifyGuideDone) {
-        await ensurePermission();
+        const granted = await ensurePermission();
         await setSetting(db, 'notifyGuideDone', '1');
+        if (granted) {
+          await refreshAllTaskNotifications();
+          notificationRefreshDoneRef.current = true;
+        }
       }
       if (Platform.OS === 'android') {
         const batteryGuideDone = await getSetting(db, 'batterySaverGuideDone');
         if (!batteryGuideDone) setShowBatteryGuide(true);
       }
     })();
-  }, [db, tasksLoaded]);
+  }, [db, tasksLoaded, refreshAllTaskNotifications]);
+
+  useEffect(() => {
+    if (!tasksLoaded || notificationRefreshDoneRef.current) return;
+    (async () => {
+      const perms = await Notifications.getPermissionsAsync();
+      if (perms.status !== 'granted') return;
+      await refreshAllTaskNotifications();
+      notificationRefreshDoneRef.current = true;
+    })();
+  }, [tasksLoaded, refreshAllTaskNotifications]);
 
   // Keep monthly-nth / every-n-days reminders (which can't natively repeat) armed for the next occurrence.
   useFocusEffect(useCallback(() => {
@@ -1253,11 +1274,19 @@ export default function HomeScreen({ navigation }: Props) {
   const toggleNewNotify = async (value: boolean) => {
     if (value && !(await ensurePermission())) return;
     setNewNotify(value);
+    if (value) {
+      await refreshAllTaskNotifications();
+      notificationRefreshDoneRef.current = true;
+    }
   };
 
   const toggleDetailNotify = async (value: boolean) => {
     if (value && !(await ensurePermission())) return;
     await patchDetail({ notify: value ? 1 : 0 });
+    if (value) {
+      await refreshAllTaskNotifications();
+      notificationRefreshDoneRef.current = true;
+    }
   };
 
   const closeBatteryGuide = useCallback(async () => {

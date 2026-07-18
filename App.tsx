@@ -73,7 +73,7 @@ export default function App() {
       });
       Notifications.setNotificationChannelAsync('silent', {
         name: 'サイレント通知',
-        importance: Notifications.AndroidImportance.LOW,
+        importance: Notifications.AndroidImportance.DEFAULT,
         sound: null,
       });
     }
