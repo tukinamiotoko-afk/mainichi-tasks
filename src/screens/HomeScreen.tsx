@@ -464,7 +464,11 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 12,
     paddingHorizontal: 14, paddingVertical: 14, gap: 12,
   },
-  taskCardDone: { opacity: 0.6 },
+  taskCardDone: {
+    backgroundColor: '#e5e7eb',
+    borderColor: '#cbd5e1',
+    opacity: 1,
+  },
   checkBox: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
   checkBoxDone: { backgroundColor: C.primary, borderColor: C.primary },
   checkMark: { color: C.onPrimary, fontSize: 11, fontWeight: '700' },
