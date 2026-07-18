@@ -26,6 +26,9 @@ const debugAds = (...args: unknown[]) => {
   }
 };
 const REWARDED_TIMEOUT_MS = 15_000;
+const callIfFn = (fn: unknown) => {
+  if (typeof fn === 'function') fn();
+};
 
 export function AdsProvider({ children }: { children: ReactNode }) {
   const { isPremium } = usePurchases();
@@ -116,7 +119,7 @@ export function AdsProvider({ children }: { children: ReactNode }) {
           timeoutId = null;
         }
         debugAds('rewarded finish', result, 'earned=', earned);
-        unsubLoaded(); unsubEarned(); unsubClosed(); unsubError();
+        callIfFn(unsubLoaded); callIfFn(unsubEarned); callIfFn(unsubClosed); callIfFn(unsubError);
         resolve(result);
       };
       const unsubLoaded = ad.addAdEventListener(AdEventType.LOADED, () => {
@@ -141,6 +144,7 @@ export function AdsProvider({ children }: { children: ReactNode }) {
         debugAds('rewarded error', error);
         finish(false);
       });
+      debugAds('rewarded listeners', typeof unsubLoaded, typeof unsubEarned, typeof unsubClosed, typeof unsubError);
       ad.load();
     });
   }, []);
