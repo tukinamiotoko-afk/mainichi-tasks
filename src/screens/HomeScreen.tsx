@@ -61,6 +61,19 @@ const SORT_OPTS: { k: SortKey; l: string }[] = [
   { k: 'manual', l: '手動' }, { k: 'priority', l: '優先度' }, { k: 'time', l: '時刻' }, { k: 'name', l: '名前' },
 ];
 const SWIPE_DELETE_THRESHOLD = 92;
+const FLOAT_SHADOW_OFFSET = 4;
+const FLOAT_SHADOW_WRAP = {
+  position: 'relative' as const,
+  paddingBottom: FLOAT_SHADOW_OFFSET,
+};
+const FLOAT_SHADOW_BASE = {
+  position: 'absolute' as const,
+  left: 0,
+  right: 0,
+  top: FLOAT_SHADOW_OFFSET,
+  bottom: 0,
+  backgroundColor: 'rgba(15,23,42,0.16)',
+};
 
 // Minimal shape required to schedule a task's reminder.
 type Schedulable = {
@@ -300,7 +313,7 @@ async function rescheduleAutoTimer(task: AutoTimerSchedulable): Promise<string |
 }
 
 // Each row rises into place on mount, staggered by index, without dimming.
-function RiseIn({ index, style, children }: { index: number; style?: any; children: React.ReactNode }) {
+function RiseIn({ index, style, shadowStyle, children }: { index: number; style?: any; shadowStyle?: any; children: React.ReactNode }) {
   const anim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     Animated.timing(anim, {
@@ -311,7 +324,14 @@ function RiseIn({ index, style, children }: { index: number; style?: any; childr
     }).start();
   }, [anim, index]);
   return (
-    <Animated.View style={[style, { transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }] }]}>
+    <Animated.View
+      style={[
+        shadowStyle && FLOAT_SHADOW_WRAP,
+        style,
+        { transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }] },
+      ]}
+    >
+      {shadowStyle && <View pointerEvents="none" style={[FLOAT_SHADOW_BASE, shadowStyle]} />}
       {children}
     </Animated.View>
   );
@@ -329,10 +349,17 @@ function bounce(v: Animated.Value) {
 
 // A chip that bounces when tapped. `wrapStyle` lets the animated wrapper carry
 // layout props (e.g. flex) so the chip keeps its sizing inside flex rows.
-function PulseChip({ onPress, style, wrapStyle, children }: { onPress: () => void; style?: any; wrapStyle?: any; children: React.ReactNode }) {
+function PulseChip({ onPress, style, wrapStyle, shadowStyle, children }: { onPress: () => void; style?: any; wrapStyle?: any; shadowStyle?: any; children: React.ReactNode }) {
   const scale = useRef(new Animated.Value(1)).current;
   return (
-    <Animated.View style={[wrapStyle, { transform: [{ scale }] }]}>
+    <Animated.View
+      style={[
+        shadowStyle && FLOAT_SHADOW_WRAP,
+        wrapStyle,
+        { transform: [{ scale }] },
+      ]}
+    >
+      {shadowStyle && <View pointerEvents="none" style={[FLOAT_SHADOW_BASE, shadowStyle]} />}
       <TouchableOpacity style={style} onPress={() => { bounce(scale); onPress(); }} activeOpacity={0.8}>
         {children}
       </TouchableOpacity>
@@ -517,6 +544,8 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
     elevation: 2,
   },
   iconGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingVertical: 6 },
+  iconChipWrap: { width: 44, height: 44 },
+  iconChipShadow: { borderRadius: 12 },
   iconChip: { width: 44, height: 44, borderRadius: 12, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
   iconChipActive: { backgroundColor: C.iconChipActiveBg, borderColor: C.primary },
   iconEmoji: { fontSize: 22 },
@@ -524,6 +553,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
 
   // Priority / generic chips
   typeRow: { flexDirection: 'row', gap: 8 },
+  typeChipShadow: { borderRadius: 20 },
   typeChip: {
     flex: 1,
     borderWidth: 1,
@@ -538,6 +568,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   // Frequency
   freqPanel: { gap: 8, marginTop: 8 },
   freqTypeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  freqTypeChipShadow: { borderRadius: 20 },
   freqTypeChip: {
     borderWidth: 1,
     borderColor: C.border,
@@ -549,6 +580,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   freqTypeText: { color: C.muted, fontSize: 12, fontWeight: '700' },
   freqTypeTextActive: { color: C.onPrimary },
   weekdayRow: { flexDirection: 'row', gap: 6, marginTop: 8 },
+  dayChipShadow: { borderRadius: 10 },
   dayChip: {
     flex: 1,
     height: 38,
@@ -564,6 +596,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   daySun: { },
   daySat: { },
   weekChoiceRow: { flexDirection: 'row', gap: 6, marginTop: 8 },
+  weekChipShadow: { borderRadius: 10 },
   weekChip: {
     flex: 1,
     borderRadius: 10,
@@ -577,6 +610,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   weekChipTextActive: { color: C.onPrimary },
   monthDayRow: { gap: 6, paddingVertical: 8 },
   intervalGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingVertical: 8 },
+  monthDayChipShadow: { borderRadius: 10 },
   monthDayChip: {
     width: 40,
     height: 40,
@@ -658,7 +692,7 @@ function FreqTypeChips({ freqType, onSetType, s }: {
       {FREQ_TYPES.map((ft, i) => {
         const isActive = freqType === ft.value;
         return (
-          <RiseIn key={ft.value} index={i}>
+          <RiseIn key={ft.value} index={i} shadowStyle={s.freqTypeChipShadow}>
             <Animated.View style={{ transform: [{ scale: getScale(ft.value) }] }}>
               <TouchableOpacity
                 style={[s.freqTypeChip, isActive && s.freqTypeChipActive]}
@@ -2016,6 +2050,7 @@ export default function HomeScreen({ navigation }: Props) {
                         <PulseChip
                           key={w}
                           wrapStyle={{ flex: 1 }}
+                          shadowStyle={s.dayChipShadow}
                           style={[s.dayChip, active && s.dayChipActive, i === 0 && s.daySun, i === 6 && s.daySat]}
                           onPress={() => on.toggleDay(i)}
                         >
@@ -2035,6 +2070,7 @@ export default function HomeScreen({ navigation }: Props) {
                           <PulseChip
                             key={w.value}
                             wrapStyle={{ flex: 1 }}
+                            shadowStyle={s.weekChipShadow}
                             style={[s.weekChip, active && s.weekChipActive]}
                             onPress={() => on.toggleWeek(w.value)}
                           >
@@ -2050,6 +2086,7 @@ export default function HomeScreen({ navigation }: Props) {
                           <PulseChip
                             key={w}
                             wrapStyle={{ flex: 1 }}
+                            shadowStyle={s.dayChipShadow}
                             style={[s.dayChip, active && s.dayChipActive, i === 0 && s.daySun, i === 6 && s.daySat]}
                             onPress={() => on.toggleWeekday(i)}
                           >
@@ -2078,6 +2115,7 @@ export default function HomeScreen({ navigation }: Props) {
                         {Array.from({ length: 29 }, (_, i) => i + 2).map((n) => (
                           <PulseChip
                             key={n}
+                            shadowStyle={s.monthDayChipShadow}
                             style={[s.monthDayChip, interval === n && s.monthDayChipActive]}
                             onPress={() => { on.setInterval(n); setIntervalPickerOpen(false); }}
                           >
@@ -2094,6 +2132,7 @@ export default function HomeScreen({ navigation }: Props) {
                     {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
                       <PulseChip
                         key={d}
+                        shadowStyle={s.monthDayChipShadow}
                         style={[s.monthDayChip, day === d && s.monthDayChipActive]}
                         onPress={() => on.setDay(d)}
                       >
@@ -2152,13 +2191,13 @@ export default function HomeScreen({ navigation }: Props) {
       </TouchableOpacity>
       {openPicker === 'icon' && (
         <View style={s.iconGrid}>
-          <RiseIn index={0}>
+          <RiseIn index={0} style={s.iconChipWrap} shadowStyle={s.iconChipShadow}>
             <TouchableOpacity style={[s.iconChip, icon === null && s.iconChipActive]} onPress={() => { onIcon(null); setOpenPicker(null); }}>
               <Text style={s.iconNone}>なし</Text>
             </TouchableOpacity>
           </RiseIn>
           {TASK_ICONS.map((ic, i) => (
-            <RiseIn key={ic} index={i + 1}>
+            <RiseIn key={ic} index={i + 1} style={s.iconChipWrap} shadowStyle={s.iconChipShadow}>
               <TouchableOpacity style={[s.iconChip, icon === ic && s.iconChipActive]} onPress={() => { onIcon(ic); setOpenPicker(null); }}>
                 <Text style={s.iconEmoji}>{ic}</Text>
               </TouchableOpacity>
@@ -2182,7 +2221,7 @@ export default function HomeScreen({ navigation }: Props) {
       {openPicker === 'priority' && (
         <View style={s.typeRow}>
           {PRIORITIES.map((p, i) => (
-            <RiseIn key={p.value} index={i} style={{ flex: 1 }}>
+            <RiseIn key={p.value} index={i} style={{ flex: 1 }} shadowStyle={s.typeChipShadow}>
               <TouchableOpacity
                 style={[s.typeChip, priority === p.value && { backgroundColor: p.color, borderColor: p.color }]}
                 onPress={() => { onPriority(p.value); setOpenPicker(null); }}
