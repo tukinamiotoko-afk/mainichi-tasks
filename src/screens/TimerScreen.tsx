@@ -26,8 +26,8 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   modeTextActive: { color: C.onPrimary },
   modeSub: { color: C.muted, fontSize: 11, fontWeight: '800', textAlign: 'center' },
   minuteRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  minuteLabel: { color: C.muted, fontSize: 12, fontWeight: '700' },
-  minuteInput: { color: C.primary, fontSize: 14, fontWeight: '900', minWidth: 24, textAlign: 'center', padding: 0 },
+  minuteLabel: { color: C.muted, fontSize: 12, fontWeight: '700', textAlign: 'center' },
+  minuteInput: { color: C.primary, fontSize: 42, fontWeight: '900', minWidth: 140, textAlign: 'center', padding: 0 },
   addBtnWrap: { flex: 1 },
   addBtn: { borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
   addBtnText: { color: C.onPrimary, fontSize: 14, fontWeight: '900' },
@@ -43,12 +43,12 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   removeText: { color: C.muted, fontSize: 18, fontWeight: '900' },
   timerTime: { color: C.onDark, fontSize: 42, fontWeight: '900', textAlign: 'center', letterSpacing: 1 },
   timerControls: { flexDirection: 'row', gap: 8 },
-  controlBtn: { flex: 1, borderRadius: 10, paddingVertical: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: '#ffffff', borderWidth: 1, borderColor: C.border, minHeight: 52 },
+  controlBtn: { flex: 1, borderRadius: 10, paddingVertical: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#ffffff', borderWidth: 1, borderColor: C.border, minHeight: 46 },
   controlBtnDisabled: { opacity: 0.45 },
   startText: { color: '#16a34a', fontSize: 24, fontWeight: '900' },
   pauseText: { color: '#f59e0b', fontSize: 22, fontWeight: '900', letterSpacing: 0 },
   saveText: { color: '#dc2626', fontSize: 20, fontWeight: '900' },
-  emptyBox: { backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 12, padding: 20, alignItems: 'center', gap: 6 },
+  emptyBox: { paddingVertical: 20, alignItems: 'center', gap: 6 },
   emptyTitle: { color: C.stone, fontSize: 15, fontWeight: '900' },
   emptyBody: { color: C.muted, fontSize: 12, fontWeight: '700', textAlign: 'center' },
   modalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' },
@@ -106,6 +106,7 @@ export default function TimerScreen({ navigation }: Props) {
     setPickerIconFilter(null);
   };
   const [minuteInputs, setMinuteInputs] = useState<Record<number, string>>({});
+  const [editingTimerId, setEditingTimerId] = useState<number | null>(null);
 
   const runningCount = timers.filter((item) => item.startedAtMs).length;
 
@@ -174,6 +175,14 @@ export default function TimerScreen({ navigation }: Props) {
     removeTimer(taskId);
   };
 
+  const commitTimerMinutes = async (taskId: number) => {
+    const mins = parseInt(minuteInputs[taskId] ?? '0', 10);
+    const secs = Math.max(0, isNaN(mins) ? 0 : mins) * 60;
+    setMinuteInputs((prev) => ({ ...prev, [taskId]: String(Math.round(secs / 60)) }));
+    await updateTargetSeconds(taskId, secs);
+    setEditingTimerId((current) => (current === taskId ? null : current));
+  };
+
   return (
     <View style={s.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor={C.body} />
@@ -228,26 +237,34 @@ export default function TimerScreen({ navigation }: Props) {
                   <Text style={[s.modeText, item.mode === 'timer' && s.modeTextActive]}>タイマー</Text>
                 </TouchableOpacity>
               </View>
-              {item.mode === 'timer' && (
+              {item.mode === 'timer' && editingTimerId === item.task.id && (
                 <View style={s.minuteRow}>
                   <TextInput
                     style={s.minuteInput}
                     value={minuteInputs[item.task.id] ?? String(Math.round(item.targetSeconds / 60))}
                     onChangeText={(v) => setMinuteInputs((prev) => ({ ...prev, [item.task.id]: v.replace(/[^0-9]/g, '') }))}
-                    onBlur={async () => {
-                      const mins = parseInt(minuteInputs[item.task.id] ?? '0', 10);
-                      const secs = Math.max(0, isNaN(mins) ? 0 : mins) * 60;
-                      setMinuteInputs((prev) => ({ ...prev, [item.task.id]: String(Math.round(secs / 60)) }));
-                      await updateTargetSeconds(item.task.id, secs);
-                    }}
+                    onBlur={async () => { await commitTimerMinutes(item.task.id); }}
+                    onSubmitEditing={async () => { await commitTimerMinutes(item.task.id); }}
                     keyboardType="number-pad"
                     returnKeyType="done"
                     editable={!running}
+                    autoFocus
                   />
                   <Text style={s.minuteLabel}>分</Text>
                 </View>
               )}
-              <Text style={s.timerTime}>{formatDuration(shownSeconds, true)}</Text>
+              {item.mode === 'timer' && editingTimerId === item.task.id ? null : (
+                <TouchableOpacity
+                  activeOpacity={item.mode === 'timer' && !running ? 0.8 : 1}
+                  onPress={() => {
+                    if (item.mode !== 'timer' || running) return;
+                    setMinuteInputs((prev) => ({ ...prev, [item.task.id]: String(Math.round(item.targetSeconds / 60)) }));
+                    setEditingTimerId(item.task.id);
+                  }}
+                >
+                  <Text style={s.timerTime}>{formatDuration(shownSeconds, true)}</Text>
+                </TouchableOpacity>
+              )}
               <View style={s.timerControls}>
                 <TouchableOpacity onPress={() => startTimer(item.task.id)} disabled={running} activeOpacity={0.86} style={[s.controlBtn, running && s.controlBtnDisabled]}>
                   <Text style={s.startText}>▶</Text>

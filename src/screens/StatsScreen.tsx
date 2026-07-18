@@ -400,37 +400,48 @@ export default function StatsScreen({ navigation }: Props) {
           </>
         ) : (
           <>
-            <View style={s.chipRow}>
-              {([{ k: 'daily' as const, l: '日別' }, { k: 'summary' as const, l: '集計' }]).map((o) => (
-                <TouchableOpacity key={o.k} style={[s.chip, timerSubMode === o.k && s.chipActive]} onPress={() => setTimerSubMode(o.k)}>
-                  <Text style={[s.chipText, timerSubMode === o.k && s.chipTextActive]}>{o.l}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
             {timerSubMode === 'daily' ? (
-              <View style={s.monthNav}>
-                <TouchableOpacity onPress={() => setTimerDate(subtractDays(timerDate, 1))} style={s.navBtn}>
-                  <Text style={s.navBtnText}>‹</Text>
-                </TouchableOpacity>
-                <Text style={s.monthLabel}>{timerDate}{timerDate === today ? '（今日）' : ''}</Text>
-                <TouchableOpacity onPress={() => setTimerDate(subtractDays(timerDate, -1))} style={s.navBtn}>
-                  <Text style={s.navBtnText}>›</Text>
-                </TouchableOpacity>
-              </View>
+              <>
+                <View style={s.monthNav}>
+                  <TouchableOpacity onPress={() => setTimerDate(subtractDays(timerDate, 1))} style={s.navBtn}>
+                    <Text style={s.navBtnText}>‹</Text>
+                  </TouchableOpacity>
+                  <Text style={s.monthLabel}>{timerDate}{timerDate === today ? '（今日）' : ''}</Text>
+                  <TouchableOpacity onPress={() => setTimerDate(subtractDays(timerDate, -1))} style={s.navBtn}>
+                    <Text style={s.navBtnText}>›</Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={s.chipRow}>
+                  {([{ k: 'daily' as const, l: '日別' }, { k: 'summary' as const, l: '集計' }]).map((o) => (
+                    <TouchableOpacity key={o.k} style={[s.chip, timerSubMode === o.k && s.chipActive]} onPress={() => setTimerSubMode(o.k)}>
+                      <Text style={[s.chipText, timerSubMode === o.k && s.chipTextActive]}>{o.l}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </>
             ) : (
-              <View style={s.selectorRow}>
-                <TouchableOpacity
-                  style={[s.selectorBtn, openDropdown === 'period' && s.selectorBtnOpen]}
-                  onPress={() => toggleDropdown('period')}
-                  activeOpacity={0.8}
-                >
-                  <View style={s.selectorLeft}>
-                    <Text style={s.selectorLabel}>期間</Text>
-                    <Text style={s.selectorValue} numberOfLines={1}>{periodDisplay}</Text>
-                  </View>
-                  <Text style={s.selectorArrow}>{openDropdown === 'period' ? '▲' : '▼'}</Text>
-                </TouchableOpacity>
-              </View>
+              <>
+                <View style={s.chipRow}>
+                  {([{ k: 'daily' as const, l: '日別' }, { k: 'summary' as const, l: '集計' }]).map((o) => (
+                    <TouchableOpacity key={o.k} style={[s.chip, timerSubMode === o.k && s.chipActive]} onPress={() => setTimerSubMode(o.k)}>
+                      <Text style={[s.chipText, timerSubMode === o.k && s.chipTextActive]}>{o.l}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <View style={s.selectorRow}>
+                  <TouchableOpacity
+                    style={[s.selectorBtn, openDropdown === 'period' && s.selectorBtnOpen]}
+                    onPress={() => toggleDropdown('period')}
+                    activeOpacity={0.8}
+                  >
+                    <View style={s.selectorLeft}>
+                      <Text style={s.selectorLabel}>期間</Text>
+                      <Text style={s.selectorValue} numberOfLines={1}>{periodDisplay}</Text>
+                    </View>
+                    <Text style={s.selectorArrow}>{openDropdown === 'period' ? '▲' : '▼'}</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
             )}
           </>
         )}

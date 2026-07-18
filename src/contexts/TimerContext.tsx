@@ -2,7 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import { useSQLiteContext } from 'expo-sqlite';
 import * as Notifications from 'expo-notifications';
 import {
-  Task, addTimeLog, getToday, markComplete, getTimerSettingForTask, saveTimerSettingForTask, getTaskById,
+  Task, addTimeLog, getToday, markComplete, getTimerSettingForTask, saveTimerSettingForTask, getTaskById, getTasks, getSetting, setSetting,
   getTimerDailyUsage, incrementTimerStarts, addTimerBonus,
 } from '../db/database';
 import { FREE_TIMER_STARTS_PER_DAY } from '../constants/billing';
@@ -48,6 +48,7 @@ type TimerState = { timers: TimerItem[] };
 const TimerActionsContext = createContext<TimerActions | null>(null);
 const TimerStateContext = createContext<TimerState | null>(null);
 const TimerClockContext = createContext<number>(Date.now());
+const TIMER_PINNED_IDS_KEY = 'timerPinnedTaskIds';
 
 export function TimerProvider({ children }: { children: ReactNode }) {
   const db = useSQLiteContext();
@@ -63,6 +64,37 @@ export function TimerProvider({ children }: { children: ReactNode }) {
     const id = setInterval(() => setNow(Date.now()), 500);
     return () => clearInterval(id);
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const raw = await getSetting(db, TIMER_PINNED_IDS_KEY);
+      const ids = (raw ?? '').split(',').map((v) => Number(v)).filter((v) => Number.isInteger(v) && v > 0);
+      if (ids.length === 0) return;
+      const allTasks = await getTasks(db);
+      const taskMap = new Map(allTasks.map((task) => [task.id, task]));
+      const restored = await Promise.all(ids.map(async (taskId) => {
+        const task = taskMap.get(taskId);
+        if (!task) return null;
+        const saved = await getTimerSettingForTask(db, taskId);
+        return {
+          task,
+          baseSeconds: 0,
+          startedAtMs: null,
+          startedAtIso: null,
+          targetSeconds: saved?.target_seconds ?? 0,
+          mode: 'stopwatch' as TimerMode,
+        };
+      }));
+      if (!cancelled) setTimers((current) => current.length > 0 ? current : restored.filter(Boolean) as TimerItem[]);
+    })();
+    return () => { cancelled = true; };
+  }, [db]);
+
+  const persistPinnedTimers = useCallback(async (items: TimerItem[]) => {
+    const value = items.map((item) => String(item.task.id)).join(',');
+    await setSetting(db, TIMER_PINNED_IDS_KEY, value);
+  }, [db]);
 
   const setMode = useCallback((taskId: number, m: TimerMode) => {
     setTimers((current) => current.map((item) => (item.task.id === taskId ? { ...item, mode: m } : item)));
@@ -92,14 +124,20 @@ export function TimerProvider({ children }: { children: ReactNode }) {
     const startedAtIso = startedAtMs ? new Date(startedAtMs).toISOString() : null;
     setTimers((current) => {
       if (current.some((item) => item.task.id === task.id)) return current;
-      return [...current, { task, baseSeconds: 0, startedAtMs, startedAtIso, targetSeconds: target!, mode: itemMode }];
+      const next = [...current, { task, baseSeconds: 0, startedAtMs, startedAtIso, targetSeconds: target!, mode: itemMode }];
+      persistPinnedTimers(next).catch(() => {});
+      return next;
     });
     return target;
-  }, [db, today, isPremium]);
+  }, [db, today, isPremium, persistPinnedTimers]);
 
   const removeTimer = useCallback((taskId: number) => {
-    setTimers((current) => current.filter((item) => item.task.id !== taskId));
-  }, []);
+    setTimers((current) => {
+      const next = current.filter((item) => item.task.id !== taskId);
+      persistPinnedTimers(next).catch(() => {});
+      return next;
+    });
+  }, [persistPinnedTimers]);
 
   const startTimer = useCallback((taskId: number) => {
     const startedAtMs = Date.now();
