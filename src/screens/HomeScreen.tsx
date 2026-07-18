@@ -884,6 +884,7 @@ export default function HomeScreen({ navigation }: Props) {
   const [newAutoTimerMinutes, setNewAutoTimerMinutes] = useState(25);
   const [newRepeatEnabled, setNewRepeatEnabled] = useState(false);
   const [newRepeatTarget, setNewRepeatTarget] = useState(2);
+  const [showExactAlarmGuide, setShowExactAlarmGuide] = useState(false);
   const [showBatteryGuide, setShowBatteryGuide] = useState(false);
   const onboardingShownRef = useRef(false);
 
@@ -900,6 +901,7 @@ export default function HomeScreen({ navigation }: Props) {
 
   const splashHiddenRef = useRef(false);
   const notificationRefreshDoneRef = useRef(false);
+  const exactAlarmRefreshPendingRef = useRef(false);
   // Bumped whenever the list is (re)loaded, so rows replay their entrance
   // animation on screen focus / date change instead of just on first mount.
   const [listAnimKey, setListAnimKey] = useState(0);
@@ -968,6 +970,11 @@ export default function HomeScreen({ navigation }: Props) {
         }
       }
       if (Platform.OS === 'android') {
+        const exactAlarmGuideDone = await getSetting(db, 'exactAlarmGuideDone');
+        if (!exactAlarmGuideDone) {
+          setShowExactAlarmGuide(true);
+          return;
+        }
         const batteryGuideDone = await getSetting(db, 'batterySaverGuideDone');
         if (!batteryGuideDone) setShowBatteryGuide(true);
       }
@@ -987,6 +994,10 @@ export default function HomeScreen({ navigation }: Props) {
   // Keep monthly-nth / every-n-days reminders (which can't natively repeat) armed for the next occurrence.
   useFocusEffect(useCallback(() => {
     (async () => {
+      if (exactAlarmRefreshPendingRef.current) {
+        await refreshAllTaskNotifications();
+        exactAlarmRefreshPendingRef.current = false;
+      }
       const ts = await getTasks(db);
       for (const t of ts) {
         const oneShot = t.freq_type === 'monthly_nth' || t.freq_type === 'every_n_days';
@@ -1000,7 +1011,7 @@ export default function HomeScreen({ navigation }: Props) {
         }
       }
     })();
-  }, [db]));
+  }, [db, refreshAllTaskNotifications]));
 
   const triggerCelebration = () => {
     setShowThumb(true);
@@ -1269,6 +1280,32 @@ export default function HomeScreen({ navigation }: Props) {
     setShowBatteryGuide(false);
     await setSetting(db, 'batterySaverGuideDone', '1');
   }, [db]);
+
+  const closeExactAlarmGuide = useCallback(async () => {
+    setShowExactAlarmGuide(false);
+    await setSetting(db, 'exactAlarmGuideDone', '1');
+    if (Platform.OS === 'android') {
+      const batteryGuideDone = await getSetting(db, 'batterySaverGuideDone');
+      if (!batteryGuideDone) setShowBatteryGuide(true);
+    }
+  }, [db]);
+
+  const openExactAlarmSettings = useCallback(async () => {
+    exactAlarmRefreshPendingRef.current = true;
+    try {
+      await IntentLauncher.startActivityAsync('android.settings.REQUEST_SCHEDULE_EXACT_ALARM', {
+        data: `package:${ANDROID_PACKAGE_NAME}`,
+      });
+    } catch {
+      try {
+        await IntentLauncher.startActivityAsync(IntentLauncher.ActivityAction.APPLICATION_DETAILS_SETTINGS, {
+          data: `package:${ANDROID_PACKAGE_NAME}`,
+        });
+      } catch {}
+    } finally {
+      await closeExactAlarmGuide();
+    }
+  }, [closeExactAlarmGuide]);
 
   const openBatterySaverSettings = useCallback(async () => {
     try {
@@ -2526,6 +2563,25 @@ export default function HomeScreen({ navigation }: Props) {
               <TouchableOpacity style={s.timeConfirmBtnWrap} onPress={confirmTime} activeOpacity={0.85}>
                 <LinearGradient colors={grad.brand} start={GRAD_START} end={GRAD_END} style={s.timeConfirmBtn}>
                   <Text style={s.timeConfirmText}>決定</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showExactAlarmGuide} transparent animationType="fade" onRequestClose={closeExactAlarmGuide}>
+        <View style={s.timeModalBg}>
+          <View style={[s.timeModalCard, { gap: 14 }]}>
+            <Text style={s.timeModalTitle}>アラームとリマインダーを許可してください</Text>
+            <Text style={s.emptyBody}>時刻どおりに通知を出すために、毎日タスクのアラームとリマインダーを許可してください。</Text>
+            <View style={s.timeBtnRow}>
+              <TouchableOpacity style={s.timeCancelBtn} onPress={closeExactAlarmGuide}>
+                <Text style={s.timeCancelText}>あとで</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.timeConfirmBtnWrap} onPress={openExactAlarmSettings} activeOpacity={0.85}>
+                <LinearGradient colors={grad.brand} start={GRAD_START} end={GRAD_END} style={s.timeConfirmBtn}>
+                  <Text style={s.timeConfirmText}>設定を開く</Text>
                 </LinearGradient>
               </TouchableOpacity>
             </View>
