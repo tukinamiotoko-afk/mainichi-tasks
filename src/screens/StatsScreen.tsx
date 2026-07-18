@@ -122,6 +122,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   },
   chipAltStackOpen: { backgroundColor: 'rgba(255,255,255,0.3)' },
   chipAltTopBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  chipAltBranch: { width: 14, height: 1, backgroundColor: 'rgba(255,255,255,0.65)' },
 
   customBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.card, paddingHorizontal: 16, paddingVertical: 10, gap: 6, borderBottomWidth: 1, borderBottomColor: C.border },
   customLabel: { color: C.stone, fontSize: 11, fontWeight: '700' },
@@ -483,6 +484,7 @@ export default function StatsScreen({ navigation }: Props) {
                           if (timerModePickerOpen) toggleTimerModePicker();
                         }}
                       >
+                        <View style={s.chipAltBranch} />
                         <Text style={s.chipAltText}>↳ {o.l}</Text>
                       </TouchableOpacity>
                     ))}
