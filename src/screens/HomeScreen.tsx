@@ -443,14 +443,8 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   fChipTextActive: { color: C.onPrimary },
   filterHint: { color: C.muted, fontSize: 10, fontWeight: '600', marginTop: 4 },
 
-  swipeWrap: {
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 2, height: 4 },
-    shadowOpacity: 0.16,
-    shadowRadius: 8,
-    elevation: 5,
-  },
+  swipeWrap: { borderRadius: 12 },
+  taskCardShadow: { borderRadius: 12 },
   swipeDeleteBg: {
     position: 'absolute',
     top: 0,
@@ -2342,7 +2336,7 @@ export default function HomeScreen({ navigation }: Props) {
           ) : null
         }
         renderItem={({ item, index }) => (
-          <RiseIn key={listAnimKey} index={index}>
+          <RiseIn key={listAnimKey} index={index} shadowStyle={s.taskCardShadow}>
             <TaskRow
               item={item}
               count={completionCounts.get(item.id) ?? 0}
