@@ -120,10 +120,6 @@ export function TimerProvider({ children }: { children: ReactNode }) {
     const itemMode: TimerMode = opts?.mode ?? 'stopwatch';
     const itemKey = timerItemKey(task.id, itemMode);
     const alreadyAdded = timersRef.current.some((item) => item.key === itemKey);
-    if (!alreadyAdded && !isPremium) {
-      const usage = await getTimerDailyUsage(db, today);
-      if (usage.starts >= FREE_TIMER_STARTS_PER_DAY + usage.bonus) return null;
-    }
     let target = opts?.targetSeconds;
     if (target === undefined) {
       const saved = await getTimerSettingForTask(db, task.id);
@@ -132,7 +128,6 @@ export function TimerProvider({ children }: { children: ReactNode }) {
       await saveTimerSettingForTask(db, task.id, target);
     }
     if (alreadyAdded) return target;
-    if (!isPremium) await incrementTimerStarts(db, today);
     const startedAtMs = opts?.autoStart ? Date.now() : null;
     const startedAtIso = startedAtMs ? new Date(startedAtMs).toISOString() : null;
     setTimers((current) => {
@@ -142,7 +137,7 @@ export function TimerProvider({ children }: { children: ReactNode }) {
       return next;
     });
     return target;
-  }, [db, today, isPremium, persistPinnedTimers]);
+  }, [db, persistPinnedTimers]);
 
   const removeTimer = useCallback((itemKey: string) => {
     setTimers((current) => {
