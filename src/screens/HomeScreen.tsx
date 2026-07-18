@@ -1,3 +1,4 @@
+// @refresh reset
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, Modal,
