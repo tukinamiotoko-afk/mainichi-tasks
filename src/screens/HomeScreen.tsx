@@ -408,7 +408,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   taskBody: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
   taskTextWrap: { flex: 1, gap: 4 },
   taskTitle: { color: C.onDark, fontSize: 14, fontWeight: '500', lineHeight: 20 },
-  taskTitleDone: { color: C.muted, textDecorationLine: 'line-through' },
+  taskTitleDone: { color: C.muted },
   taskMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
   priorityBadge: { borderRadius: 4, paddingHorizontal: 6, paddingVertical: 1 },
   priorityBadgeText: { color: C.onPrimary, fontSize: 9, fontWeight: '800' },
