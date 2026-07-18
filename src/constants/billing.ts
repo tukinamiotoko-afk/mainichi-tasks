@@ -21,5 +21,5 @@ export const YEARLY_PRICE_LABEL = '年額 ¥2,000';
 
 // Free-tier limits — everything above these requires PREMIUM_ENTITLEMENT_ID.
 export const FREE_FLOW_CHART_LIMIT = 1;
-export const FREE_TIMER_STARTS_PER_DAY = 2;
+export const FREE_TIMER_STARTS_PER_DAY = 3;
 export const FREE_ACCENT_KEYS = ['blue'] as const;

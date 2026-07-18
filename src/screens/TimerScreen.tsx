@@ -174,9 +174,9 @@ export default function TimerScreen({ navigation }: Props) {
     const target = await addTimerAction(task, { mode: currentTab });
     if (target === null) {
       setPickerOpen(false);
-      Alert.alert(
-        '本日の回数上限です',
-        '無料版では1日に計測を開始できる回数に上限があります。広告を見ると+1回、プレミアムなら無制限です。',
+        Alert.alert(
+          '本日の回数上限です',
+          '無料版では計測の開始は1日3回までです。広告を見ると+1回、プレミアムなら無制限です。',
         [
           { text: 'キャンセル', style: 'cancel' },
           {
@@ -372,9 +372,9 @@ export default function TimerScreen({ navigation }: Props) {
                       onPress={async () => {
                         const started = await startTimer(item.key);
                         if (started) return;
-                        Alert.alert(
-                          '本日の回数上限です',
-                          '無料版では1日に計測を開始できる回数に上限があります。広告を見ると+1回、プレミアムなら無制限です。',
+                      Alert.alert(
+                        '本日の回数上限です',
+                        '無料版では計測の開始は1日3回までです。広告を見ると+1回、プレミアムなら無制限です。',
                           [
                             { text: 'キャンセル', style: 'cancel' },
                             {
