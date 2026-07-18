@@ -1133,7 +1133,11 @@ export default function HomeScreen({ navigation }: Props) {
       ]);
       setTasks(ts);
       setCompletionCounts(counts);
-      setTagRight(layout === 'tag_right');
+      const nextTagRight = layout === 'tag_right';
+      setTagRight(nextTagRight);
+      const nextFab = clampFab(nextTagRight ? 8 : Math.max(screen.width - 72, 20), Math.max(screen.height - insets.bottom - 132, 120));
+      fabPosition.current = nextFab;
+      fabAnim.setValue(nextFab);
       setTasksLoaded(true);
       setListAnimKey((k) => k + 1);
     } finally {

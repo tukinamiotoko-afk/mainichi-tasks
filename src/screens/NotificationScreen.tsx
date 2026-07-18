@@ -184,7 +184,7 @@ export default function NotificationScreen({ navigation }: Props) {
           <View style={s.itemRow}>
             <View style={s.itemFlex}>
               <Text style={s.itemLabel}>タグ・完了ボタンの位置</Text>
-              <Text style={s.itemSub}>{tagRight ? 'タグ：右　チェック：左' : 'タグ：左　チェック：右'}</Text>
+              <Text style={s.itemSub}>{tagRight ? 'タグ：右　チェック：左　追加：左' : 'タグ：左　チェック：右　追加：右'}</Text>
             </View>
             <Switch
               value={tagRight}

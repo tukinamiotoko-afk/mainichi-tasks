@@ -8,7 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import ReanimatedAnimated, { runOnJS, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { RootStackParamList } from '../../App';
-import { Task, TimeLog, deleteTimeLog, getTasks, getTimeLogsForTask } from '../db/database';
+import { Task, TimeLog, deleteTimeLog, getSetting, getTasks, getTimeLogsForTask } from '../db/database';
 import { GRAD_START, GRAD_END } from '../constants/theme';
 import TabBar from '../components/TabBar';
 import { useTheme, ColorSet } from '../contexts/ThemeContext';
@@ -269,9 +269,20 @@ export default function TimerScreen({ navigation }: Props) {
     setTasks(loadedTasks);
   }, [db]);
 
+  const applyFabSide = useCallback(async () => {
+    const layout = await getSetting(db, 'card_layout');
+    const x = layout === 'tag_right' ? 8 : fabStartX;
+    const y = fabStartY;
+    fabX.value = x;
+    fabY.value = y;
+    fabGestureStartX.value = x;
+    fabGestureStartY.value = y;
+  }, [db, fabGestureStartX, fabGestureStartY, fabStartX, fabStartY, fabX, fabY]);
+
   useFocusEffect(useCallback(() => {
     load();
-  }, [load]));
+    applyFabSide();
+  }, [applyFabSide, load]));
 
   const availableTasks = tasks.filter((task) => !timers.some((item) => item.task.id === task.id && item.mode === currentTab));
   const iconGroups = useMemo(() => {
