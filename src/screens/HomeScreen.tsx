@@ -37,6 +37,7 @@ type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'Home'>
 const pad = (n: number) => String(n).padStart(2, '0');
 const daysToCsv = (days: number[]) => days.slice().sort((a, b) => a - b).join(',');
 const ANDROID_PACKAGE_NAME = 'com.rockonions.mainichitask';
+const APP_DISPLAY_NAME = '毎日タスク';
 const DRAG_ROW_HEIGHT = 88;
 const DRAG_GAP = 10;
 const DRAG_SLOT = DRAG_ROW_HEIGHT + DRAG_GAP; // actual slot size including gap
@@ -1266,18 +1267,29 @@ export default function HomeScreen({ navigation }: Props) {
 
   const openBatterySaverSettings = useCallback(async () => {
     try {
-        await IntentLauncher.startActivityAsync(IntentLauncher.ActivityAction.APPLICATION_DETAILS_SETTINGS, {
-          data: `package:${ANDROID_PACKAGE_NAME}`,
-        });
+      await IntentLauncher.startActivityAsync('android.intent.action.MAIN', {
+        packageName: 'com.miui.powerkeeper',
+        className: 'com.miui.powerkeeper.ui.HiddenAppsConfigActivity',
+        extra: {
+          package_name: ANDROID_PACKAGE_NAME,
+          package_label: APP_DISPLAY_NAME,
+        },
+      });
     } catch {
       try {
-        await IntentLauncher.startActivityAsync('android.settings.VIEW_ADVANCED_POWER_USAGE_DETAIL', {
+        await IntentLauncher.startActivityAsync(IntentLauncher.ActivityAction.APPLICATION_DETAILS_SETTINGS, {
           data: `package:${ANDROID_PACKAGE_NAME}`,
         });
       } catch {
         try {
-          await Linking.openSettings();
-        } catch {}
+          await IntentLauncher.startActivityAsync('android.settings.VIEW_ADVANCED_POWER_USAGE_DETAIL', {
+            data: `package:${ANDROID_PACKAGE_NAME}`,
+          });
+        } catch {
+          try {
+            await Linking.openSettings();
+          } catch {}
+        }
       }
     } finally {
       await closeBatteryGuide();
