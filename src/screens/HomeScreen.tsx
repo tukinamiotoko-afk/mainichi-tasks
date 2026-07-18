@@ -1266,10 +1266,17 @@ export default function HomeScreen({ navigation }: Props) {
 
   const openBatterySaverSettings = useCallback(async () => {
     try {
+      await IntentLauncher.startActivityAsync('android.settings.action.APP_USAGE_SETTINGS', {
+        extra: {
+          'android.intent.extra.PACKAGE_NAME': ANDROID_PACKAGE_NAME,
+        },
+      });
+    } catch {
+      try {
       await IntentLauncher.startActivityAsync('android.settings.VIEW_ADVANCED_POWER_USAGE_DETAIL', {
         data: `package:${ANDROID_PACKAGE_NAME}`,
       });
-    } catch {
+      } catch {
       try {
         await IntentLauncher.startActivityAsync(IntentLauncher.ActivityAction.APPLICATION_DETAILS_SETTINGS, {
           data: `package:${ANDROID_PACKAGE_NAME}`,
@@ -1278,6 +1285,7 @@ export default function HomeScreen({ navigation }: Props) {
         try {
           await Linking.openSettings();
         } catch {}
+      }
       }
     } finally {
       await closeBatteryGuide();
