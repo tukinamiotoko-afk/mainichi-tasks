@@ -14,7 +14,10 @@ import { useTheme, ColorSet, ACCENT_LIST, AccentKey } from '../contexts/ThemeCon
 import { usePurchases } from '../contexts/PurchasesContext';
 
 type ScheduleSize = 'small' | 'normal' | 'large';
+type FabMode = 'manual' | 'left_bottom' | 'right_bottom';
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'Notifications'> };
+const HOME_FAB_MODE_KEY = 'homeFabMode';
+const TIMER_FAB_MODE_KEY = 'timerFabMode';
 
 const makeStyles = (C: ColorSet) => StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: C.body },
@@ -79,14 +82,20 @@ export default function NotificationScreen({ navigation }: Props) {
 
   const [tagRight, setTagRight] = useState(false);
   const [scheduleSize, setScheduleSize] = useState<ScheduleSize>('normal');
+  const [homeFabMode, setHomeFabMode] = useState<FabMode>('manual');
+  const [timerFabMode, setTimerFabMode] = useState<FabMode>('manual');
 
   const load = useCallback(async () => {
-    const [layout, size] = await Promise.all([
+    const [layout, size, homeFab, timerFab] = await Promise.all([
       getSetting(db, 'card_layout'),
       getSetting(db, 'schedule_size'),
+      getSetting(db, HOME_FAB_MODE_KEY),
+      getSetting(db, TIMER_FAB_MODE_KEY),
     ]);
     setTagRight(layout === 'tag_right');
     if (size === 'small' || size === 'large' || size === 'normal') setScheduleSize(size);
+    if (homeFab === 'manual' || homeFab === 'left_bottom' || homeFab === 'right_bottom') setHomeFabMode(homeFab);
+    if (timerFab === 'manual' || timerFab === 'left_bottom' || timerFab === 'right_bottom') setTimerFabMode(timerFab);
   }, [db]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -99,6 +108,16 @@ export default function NotificationScreen({ navigation }: Props) {
   const changeScheduleSize = async (val: ScheduleSize) => {
     setScheduleSize(val);
     await setSetting(db, 'schedule_size', val);
+  };
+
+  const changeHomeFabMode = async (val: FabMode) => {
+    setHomeFabMode(val);
+    await setSetting(db, HOME_FAB_MODE_KEY, val);
+  };
+
+  const changeTimerFabMode = async (val: FabMode) => {
+    setTimerFabMode(val);
+    await setSetting(db, TIMER_FAB_MODE_KEY, val);
   };
 
   const handleContact = async () => {
@@ -188,6 +207,40 @@ export default function NotificationScreen({ navigation }: Props) {
               trackColor={{ false: C.border, true: C.primary }}
               thumbColor="#ffffff"
             />
+          </View>
+          <View style={s.divider} />
+
+          <View style={s.itemBlock}>
+            <Text style={s.itemLabel}>タスク一覧の追加ボタン位置</Text>
+            <Text style={s.itemSub}>手動なら動かした位置を覚えます</Text>
+            <View style={s.segRow}>
+              {([['manual', '手動'], ['left_bottom', '左下'], ['right_bottom', '右下']] as [FabMode, string][]).map(([v, label]) => (
+                <TouchableOpacity
+                  key={v}
+                  style={[s.segChip, homeFabMode === v && s.segChipActive]}
+                  onPress={() => changeHomeFabMode(v)}
+                >
+                  <Text style={[s.segChipText, homeFabMode === v && s.segChipTextActive]}>{label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+          <View style={s.divider} />
+
+          <View style={s.itemBlock}>
+            <Text style={s.itemLabel}>計測の追加ボタン位置</Text>
+            <Text style={s.itemSub}>手動なら動かした位置を覚えます</Text>
+            <View style={s.segRow}>
+              {([['manual', '手動'], ['left_bottom', '左下'], ['right_bottom', '右下']] as [FabMode, string][]).map(([v, label]) => (
+                <TouchableOpacity
+                  key={v}
+                  style={[s.segChip, timerFabMode === v && s.segChipActive]}
+                  onPress={() => changeTimerFabMode(v)}
+                >
+                  <Text style={[s.segChipText, timerFabMode === v && s.segChipTextActive]}>{label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
 
           {/* ─── タイムスケジュール ─── */}

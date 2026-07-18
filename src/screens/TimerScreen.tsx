@@ -17,6 +17,8 @@ import { useAds } from '../contexts/AdsContext';
 
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'Timer'> };
 const TIMER_FAB_POSITION_KEY = 'timerFabPosition';
+const TIMER_FAB_MODE_KEY = 'timerFabMode';
+type FabMode = 'manual' | 'left_bottom' | 'right_bottom';
 
 function splitSeconds(totalSeconds: number): { minutes: string; seconds: string } {
   const safe = Math.max(0, Math.round(totalSeconds));
@@ -219,6 +221,7 @@ export default function TimerScreen({ navigation }: Props) {
   const [minuteInputs, setMinuteInputs] = useState<Record<string, string>>({});
   const [secondInputs, setSecondInputs] = useState<Record<string, string>>({});
   const [editingTimerId, setEditingTimerId] = useState<string | null>(null);
+  const [timerFabMode, setTimerFabMode] = useState<FabMode>('manual');
   const fabStartX = Math.max(screen.width - 72, 20);
   const fabStartY = Math.max(screen.height - insets.bottom - 132, 120);
   const fabMaxX = screen.width - 60;
@@ -236,6 +239,18 @@ export default function TimerScreen({ navigation }: Props) {
 
   const restoreFabPosition = useCallback(async () => {
     try {
+      const modeRaw = await getSetting(db, TIMER_FAB_MODE_KEY);
+      const mode: FabMode = modeRaw === 'left_bottom' || modeRaw === 'right_bottom' ? modeRaw : 'manual';
+      setTimerFabMode(mode);
+      if (mode !== 'manual') {
+        const x = mode === 'left_bottom' ? 8 : fabStartX;
+        const y = fabStartY;
+        fabX.value = x;
+        fabY.value = y;
+        fabGestureStartX.value = x;
+        fabGestureStartY.value = y;
+        return;
+      }
       const saved = await getSetting(db, TIMER_FAB_POSITION_KEY);
       if (!saved) return;
       const parsed = JSON.parse(saved) as { x?: number; y?: number };
@@ -258,6 +273,7 @@ export default function TimerScreen({ navigation }: Props) {
   }));
   const panGesture = useMemo(() => Gesture.Pan()
     .minDistance(0)
+    .enabled(timerFabMode === 'manual')
     .onStart(() => {
       fabGestureStartX.value = fabX.value;
       fabGestureStartY.value = fabY.value;
@@ -272,7 +288,7 @@ export default function TimerScreen({ navigation }: Props) {
       fabX.value = nextX;
       fabY.value = nextY;
       runOnJS(persistFabPosition)(nextX, nextY);
-    }), [fabGestureStartX, fabGestureStartY, fabMaxX, fabMaxY, fabX, fabY]);
+    }), [fabGestureStartX, fabGestureStartY, fabMaxX, fabMaxY, fabX, fabY, persistFabPosition, timerFabMode]);
   const tapGesture = useMemo(() => Gesture.Tap()
     .maxDistance(8)
     .onEnd((_event, success) => {

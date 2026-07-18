@@ -35,6 +35,8 @@ import { useAds } from '../contexts/AdsContext';
 
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'Home'> };
 const HOME_FAB_POSITION_KEY = 'homeFabPosition';
+const HOME_FAB_MODE_KEY = 'homeFabMode';
+type FabMode = 'manual' | 'left_bottom' | 'right_bottom';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const daysToCsv = (days: number[]) => days.slice().sort((a, b) => a - b).join(',');
@@ -1052,6 +1054,9 @@ export default function HomeScreen({ navigation }: Props) {
   const panelAnim = useRef(new Animated.Value(0)).current;
   const lastPanelRef = useRef<'filter' | 'sort'>('filter');
   if (activePanel) lastPanelRef.current = activePanel;
+  const [homeFabMode, setHomeFabMode] = useState<FabMode>('manual');
+  const homeFabModeRef = useRef<FabMode>('manual');
+  homeFabModeRef.current = homeFabMode;
   const today = getToday();
   const [selectedDate, setSelectedDate] = useState(today);
   const dateChangeAnim = useRef(new Animated.Value(1)).current;
@@ -1147,6 +1152,15 @@ export default function HomeScreen({ navigation }: Props) {
 
   const restoreHomeFabPosition = useCallback(async () => {
     try {
+      const modeRaw = await getSetting(db, HOME_FAB_MODE_KEY);
+      const mode: FabMode = modeRaw === 'left_bottom' || modeRaw === 'right_bottom' ? modeRaw : 'manual';
+      setHomeFabMode(mode);
+      if (mode !== 'manual') {
+        const preset = clampFab(mode === 'left_bottom' ? 8 : Math.max(screen.width - 72, 20), Math.max(screen.height - insets.bottom - 132, 120));
+        fabPosition.current = preset;
+        fabAnim.setValue(preset);
+        return;
+      }
       const saved = await getSetting(db, HOME_FAB_POSITION_KEY);
       if (!saved) return;
       const parsed = JSON.parse(saved) as { x?: number; y?: number };
@@ -1870,7 +1884,7 @@ export default function HomeScreen({ navigation }: Props) {
   });
   const fabPanResponder = useRef(PanResponder.create({
     onStartShouldSetPanResponder: () => false,
-    onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dx) > 4 || Math.abs(gesture.dy) > 4,
+    onMoveShouldSetPanResponder: (_, gesture) => homeFabModeRef.current === 'manual' && (Math.abs(gesture.dx) > 4 || Math.abs(gesture.dy) > 4),
     onPanResponderGrant: () => { fabStartPosition.current = fabPosition.current; },
     onPanResponderMove: (_, gesture) => {
       const next = clampFab(fabStartPosition.current.x + gesture.dx, fabStartPosition.current.y + gesture.dy);
@@ -1880,7 +1894,7 @@ export default function HomeScreen({ navigation }: Props) {
       const next = clampFab(fabStartPosition.current.x + gesture.dx, fabStartPosition.current.y + gesture.dy);
       fabPosition.current = next;
       fabAnim.setValue(next);
-      setSetting(db, HOME_FAB_POSITION_KEY, JSON.stringify(next)).catch(() => {});
+      if (homeFabModeRef.current === 'manual') setSetting(db, HOME_FAB_POSITION_KEY, JSON.stringify(next)).catch(() => {});
     },
     onPanResponderTerminate: () => { fabAnim.setValue(fabPosition.current); },
   })).current;
