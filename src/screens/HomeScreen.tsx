@@ -1021,6 +1021,8 @@ export default function HomeScreen({ navigation }: Props) {
   const thumbAnim = useRef(new Animated.Value(0)).current;
   const thumbOpacity = useRef(new Animated.Value(0)).current;
   const bloomAnim = useRef(new Animated.Value(0)).current;
+  const progressAnim = useRef(new Animated.Value(0)).current;
+  const skipNextProgressAnimRef = useRef(true);
   const fabPosition = useRef({ x: Math.max(screen.width - 72, 20), y: Math.max(screen.height - insets.bottom - 132, 120) });
   const fabStartPosition = useRef(fabPosition.current);
   const fabAnim = useRef(new Animated.ValueXY(fabPosition.current)).current;
@@ -1169,6 +1171,7 @@ export default function HomeScreen({ navigation }: Props) {
 
   useFocusEffect(useCallback(() => {
     setFabReady(false);
+    skipNextProgressAnimRef.current = true;
     const cachedLayout = getSettingCached('card_layout');
     if (cachedLayout === 'tag_left' || cachedLayout === 'tag_right') {
       const nextTagRight = cachedLayout === 'tag_right';
@@ -1879,6 +1882,20 @@ export default function HomeScreen({ navigation }: Props) {
   })).current;
 
   useEffect(() => {
+    if (skipNextProgressAnimRef.current || !tasksLoaded) {
+      progressAnim.setValue(progress);
+      skipNextProgressAnimRef.current = false;
+      return;
+    }
+    Animated.timing(progressAnim, {
+      toValue: progress,
+      duration: 260,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [progress, progressAnim, tasksLoaded]);
+
+  useEffect(() => {
     Animated.timing(panelAnim, { toValue: activePanel ? 1 : 0, duration: 200, useNativeDriver: true }).start();
   }, [activePanel, panelAnim]);
 
@@ -2308,7 +2325,7 @@ export default function HomeScreen({ navigation }: Props) {
         <View style={s.progressRow}>
           <View style={s.progressBg}>
             <Animated.View
-              style={[s.progressFill, { width: `${Math.max(0, Math.min(1, progress)) * 100}%` }]}
+              style={[s.progressFill, { width: progressAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }]}
             >
               <LinearGradient colors={gaugeColors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.progressGrad} />
             </Animated.View>
