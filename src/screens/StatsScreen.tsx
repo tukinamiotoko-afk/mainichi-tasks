@@ -458,7 +458,7 @@ export default function StatsScreen({ navigation }: Props) {
                     onPress={toggleTimerModePicker}
                     activeOpacity={0.85}
                   >
-                    <Text style={[s.chipAltText, timerModeFilter === 'timer' && s.chipAltTextActive]}>
+                    <Text style={[s.chipAltText, s.chipAltTextActive]}>
                       {timerModeFilter === 'timer' ? 'タイマー' : 'ストップウォッチ'} {timerModePickerOpen ? '▲' : '▼'}
                     </Text>
                   </TouchableOpacity>
