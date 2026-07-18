@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, StatusBar, Alert, ScrollView, Modal, Dimensions, TextInput, Animated, Easing } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, StatusBar, Alert, ScrollView, Modal, Dimensions, TextInput, Animated, Easing, PanResponder } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useFocusEffect } from '@react-navigation/native';
@@ -38,9 +38,6 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   minuteInput: { color: C.primary, fontSize: 42, fontWeight: '900', minWidth: 84, textAlign: 'center', padding: 0 },
   secondInput: { color: C.primary, fontSize: 42, fontWeight: '900', minWidth: 84, textAlign: 'center', padding: 0 },
   timeInputBlock: { alignItems: 'center', gap: 2 },
-  addBtnWrap: { flex: 1 },
-  addBtn: { borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
-  addBtnText: { color: C.onPrimary, fontSize: 14, fontWeight: '900' },
   sectionTitle: { color: C.stone, fontSize: 12, fontWeight: '900', marginTop: 4 },
   timerCard: {
     backgroundColor: C.card,
@@ -167,6 +164,9 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   pickerIconChip: { width: 40, height: 40, borderRadius: 12, borderWidth: 1.5, borderColor: C.border, backgroundColor: C.body, alignItems: 'center', justifyContent: 'center', marginRight: 8 },
   pickerIconChipActive: { borderColor: C.primary, backgroundColor: C.primarySoft },
   pickerIconChipText: { fontSize: 18 },
+  fabWrap: { position: 'absolute', zIndex: 20 },
+  fab: { width: 52, height: 52, borderRadius: 26, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.25, shadowRadius: 6 },
+  fabText: { color: C.onPrimary, fontSize: 26, fontWeight: '400', lineHeight: 30 },
 });
 
 function formatDuration(totalSeconds: number, alwaysHours = false): string {
@@ -188,6 +188,7 @@ export default function TimerScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const { C, grad } = useTheme();
   const s = useMemo(() => makeStyles(C), [C]);
+  const screen = Dimensions.get('window');
   const sheetHeight = Math.max(360, Math.round(Dimensions.get('window').height * 0.82));
 
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -215,11 +216,35 @@ export default function TimerScreen({ navigation }: Props) {
   const [minuteInputs, setMinuteInputs] = useState<Record<string, string>>({});
   const [secondInputs, setSecondInputs] = useState<Record<string, string>>({});
   const [editingTimerId, setEditingTimerId] = useState<string | null>(null);
+  const fabPosition = useRef({ x: Math.max(screen.width - 72, 20), y: Math.max(screen.height - insets.bottom - 132, 120) });
+  const fabStartPosition = useRef(fabPosition.current);
+  const fabAnim = useRef(new Animated.ValueXY(fabPosition.current)).current;
 
   const getExpandAnim = (itemKey: string) => {
     if (!expandAnims.current[itemKey]) expandAnims.current[itemKey] = new Animated.Value(0);
     return expandAnims.current[itemKey];
   };
+
+  const clampFab = (x: number, y: number) => ({
+    x: Math.max(8, Math.min(x, screen.width - 60)),
+    y: Math.max(100, Math.min(y, screen.height - insets.bottom - 124)),
+  });
+
+  const fabPanResponder = useRef(PanResponder.create({
+    onStartShouldSetPanResponder: () => false,
+    onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dx) > 4 || Math.abs(gesture.dy) > 4,
+    onPanResponderGrant: () => { fabStartPosition.current = fabPosition.current; },
+    onPanResponderMove: (_, gesture) => {
+      const next = clampFab(fabStartPosition.current.x + gesture.dx, fabStartPosition.current.y + gesture.dy);
+      fabAnim.setValue(next);
+    },
+    onPanResponderRelease: (_, gesture) => {
+      const next = clampFab(fabStartPosition.current.x + gesture.dx, fabStartPosition.current.y + gesture.dy);
+      fabPosition.current = next;
+      fabAnim.setValue(next);
+    },
+    onPanResponderTerminate: () => { fabAnim.setValue(fabPosition.current); },
+  })).current;
 
   const runningCount = timers.filter((item) => item.startedAtMs).length;
   const visibleTimers = useMemo(() => timers.filter((item) => item.mode === currentTab), [timers, currentTab]);
@@ -351,17 +376,11 @@ export default function TimerScreen({ navigation }: Props) {
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity style={s.addBtnWrap} onPress={() => setPickerOpen(true)} activeOpacity={0.86}>
-          <LinearGradient colors={grad.brand} start={GRAD_START} end={GRAD_END} style={s.addBtn}>
-            <Text style={s.addBtnText}>＋ {currentTab === 'timer' ? 'タイマー' : 'ストップウォッチ'}を追加</Text>
-          </LinearGradient>
-        </TouchableOpacity>
-
         <Text style={s.sectionTitle}>{currentTab === 'timer' ? 'タイマー' : 'ストップウォッチ'}カード</Text>
         {visibleTimers.length === 0 ? (
           <View style={s.emptyBox}>
             <Text style={s.emptyTitle}>まだ何もありません</Text>
-            <Text style={s.emptyBody}>追加ボタンから、{currentTab === 'timer' ? 'タイマー' : 'ストップウォッチ'}を入れてください</Text>
+            <Text style={s.emptyBody}>右下の＋ボタンから、{currentTab === 'timer' ? 'タイマー' : 'ストップウォッチ'}を入れてください</Text>
           </View>
         ) : visibleTimers.map((item) => {
           const seconds = timerSeconds(item, now);
@@ -620,6 +639,14 @@ export default function TimerScreen({ navigation }: Props) {
           </View>
         </View>
       </Modal>
+
+      <Animated.View style={[s.fabWrap, fabAnim.getLayout()]} {...fabPanResponder.panHandlers}>
+        <TouchableOpacity activeOpacity={0.85} onPress={() => setPickerOpen(true)}>
+          <LinearGradient colors={grad.brand} start={GRAD_START} end={GRAD_END} style={s.fab}>
+            <Text style={s.fabText}>＋</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      </Animated.View>
 
       <TabBar current="Timer" navigation={navigation} />
     </View>
