@@ -477,6 +477,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   taskTextWrap: { flex: 1, gap: 4 },
   taskTitle: { color: C.onDark, fontSize: 14, fontWeight: '500', lineHeight: 20 },
   taskTitleDone: { color: C.muted },
+  taskMetaDone: { color: '#94a3b8' },
   taskMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
   priorityBadge: { borderRadius: 4, paddingHorizontal: 6, paddingVertical: 1 },
   priorityBadgeText: { color: C.onPrimary, fontSize: 9, fontWeight: '800' },
@@ -950,8 +951,8 @@ const TaskRow = React.memo(function TaskRow({
                   <View style={s.taskTextWrap}>
                     <Text style={[s.taskTitle, isDone && s.taskTitleDone]} numberOfLines={2}>{item.title}</Text>
                     <View style={s.taskMetaRow}>
-                      {item.scheduled_time && <Text style={s.scheduleTag}>{item.notify ? '🔔 ' : ''}{item.scheduled_time}</Text>}
-                      <Text style={s.freqTag}>{frequencyLabel(item)}</Text>
+                      {item.scheduled_time && <Text style={[s.scheduleTag, isDone && s.taskMetaDone]}>{item.notify ? '🔔 ' : ''}{item.scheduled_time}</Text>}
+                      <Text style={[s.freqTag, isDone && s.taskMetaDone]}>{frequencyLabel(item)}</Text>
                     </View>
                   </View>
                   {isRepeat ? (
