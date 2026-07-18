@@ -27,6 +27,11 @@ export function AdsProvider({ children }: { children: ReactNode }) {
   const interstitialRef = useRef<InterstitialAd | null>(null);
   const interstitialLoadedRef = useRef(false);
 
+  // AdMob returns an error (e.g. no fill) fairly often, especially for a
+  // freshly-created ad unit — retry after a delay instead of giving up
+  // and leaving the interstitial permanently unloaded for the session.
+  const RETRY_DELAY_MS = 60_000;
+
   const loadInterstitial = useCallback(() => {
     if (!supported) return;
     const ad = InterstitialAd.createForAdRequest(INTERSTITIAL_AD_UNIT_ID);
@@ -35,7 +40,14 @@ export function AdsProvider({ children }: { children: ReactNode }) {
     const unsubClosed = ad.addAdEventListener(AdEventType.CLOSED, () => {
       unsubLoaded();
       unsubClosed();
+      unsubError();
       loadInterstitial();
+    });
+    const unsubError = ad.addAdEventListener(AdEventType.ERROR, () => {
+      unsubLoaded();
+      unsubClosed();
+      unsubError();
+      setTimeout(loadInterstitial, RETRY_DELAY_MS);
     });
     ad.load();
     interstitialRef.current = ad;
