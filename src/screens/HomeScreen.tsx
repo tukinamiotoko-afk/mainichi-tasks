@@ -1286,11 +1286,8 @@ export default function HomeScreen({ navigation }: Props) {
 
   const openBatterySaverSettings = useCallback(async () => {
     try {
-      await Linking.sendIntent('android.settings.BATTERY_SAVER_SETTINGS');
+      await Linking.openSettings();
     } catch {
-      try {
-        await Linking.openSettings();
-      } catch {}
     } finally {
       await closeBatteryGuide();
     }
