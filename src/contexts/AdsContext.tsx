@@ -122,7 +122,7 @@ export function AdsProvider({ children }: { children: ReactNode }) {
         callIfFn(unsubLoaded); callIfFn(unsubEarned); callIfFn(unsubClosed); callIfFn(unsubError);
         resolve(result);
       };
-      const unsubLoaded = ad.addAdEventListener(AdEventType.LOADED, () => {
+      const unsubLoaded = ad.addAdEventListener(RewardedAdEventType.LOADED, () => {
         debugAds('rewarded loaded');
         try {
           debugAds('show rewarded');
