@@ -68,8 +68,8 @@ const FLOAT_SHADOW_BASE = {
   left: 0,
   right: 0,
   bottom: 0,
-  backgroundColor: 'rgba(15,23,42,0.32)',
-  transform: [{ translateX: 3 }, { translateY: 5 }],
+  backgroundColor: 'rgba(15,23,42,0.48)',
+  transform: [{ translateX: 4 }, { translateY: 6 }],
 };
 
 // Minimal shape required to schedule a task's reminder.
@@ -336,7 +336,7 @@ function RiseIn({ index, style, shadowStyle, children }: { index: number; style?
             {
               opacity: anim.interpolate({
                 inputRange: [0, 0.85, 1],
-                outputRange: [0.2, 0.08, 0],
+                outputRange: [0.38, 0.16, 0],
                 extrapolate: 'clamp',
               }),
             },
@@ -380,7 +380,7 @@ function PulseChip({ onPress, style, wrapStyle, shadowStyle, children }: { onPre
             {
               opacity: scale.interpolate({
                 inputRange: [0.92, 1, 1.18],
-                outputRange: [0.14, 0, 0.18],
+                outputRange: [0.28, 0, 0.34],
                 extrapolate: 'clamp',
               }),
             },
