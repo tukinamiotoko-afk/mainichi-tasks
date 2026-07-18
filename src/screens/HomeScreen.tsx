@@ -421,12 +421,8 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 16,
     zIndex: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 22,
-    elevation: 18,
   },
+  panelShadow: { borderRadius: 12 },
   listHeader: { marginBottom: 4 },
   sectionBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 10, paddingBottom: 4 },
   sectionRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
@@ -2373,6 +2369,20 @@ export default function HomeScreen({ navigation }: Props) {
           transform: [{ translateY: panelAnim.interpolate({ inputRange: [0, 1], outputRange: [-16, 0] }) }],
         }]}
       >
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            FLOAT_SHADOW_BASE,
+            s.panelShadow,
+            {
+              opacity: panelAnim.interpolate({
+                inputRange: [0, 0.85, 1],
+                outputRange: [0.38, 0.16, 0],
+                extrapolate: 'clamp',
+              }),
+            },
+          ]}
+        />
         {lastPanelRef.current === 'filter' ? (
           <View style={s.filterPanel}>
             <Text style={s.filterLabel}>状態</Text>
