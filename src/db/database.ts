@@ -16,7 +16,7 @@ export type Task = {
 };
 export type NotificationSetting = { id: number; time: string; notification_type: string; identifier: string | null; task_id: number | null };
 export type CompletionDetail = { task_id: number; title: string; icon: string | null; date: string; completed_at: string | null };
-export type TimeLog = { id: number; task_id: number; title: string; date: string; duration_seconds: number; started_at: string; ended_at: string };
+export type TimeLog = { id: number; task_id: number; title: string; date: string; duration_seconds: number; started_at: string; ended_at: string; mode: 'stopwatch' | 'timer' };
 export type TimerSetting = { task_id: number; target_seconds: number };
 export type FlowProject = { id: number; title: string; sort_order: number };
 export type FlowStep = { id: number; project_id: number; title: string; sort_order: number };
@@ -78,7 +78,8 @@ export async function migrateDb(db: SQLite.SQLiteDatabase): Promise<void> {
       date TEXT NOT NULL,
       duration_seconds INTEGER NOT NULL,
       started_at TEXT NOT NULL,
-      ended_at TEXT NOT NULL
+      ended_at TEXT NOT NULL,
+      mode TEXT NOT NULL DEFAULT 'stopwatch'
     );
     CREATE TABLE IF NOT EXISTS timer_settings (
       task_id INTEGER PRIMARY KEY,
@@ -122,6 +123,7 @@ export async function migrateDb(db: SQLite.SQLiteDatabase): Promise<void> {
   try { await db.execAsync('ALTER TABLE tasks ADD COLUMN freq_weeks TEXT'); } catch {}
   try { await db.execAsync('ALTER TABLE tasks ADD COLUMN freq_interval INTEGER'); } catch {}
   try { await db.execAsync("ALTER TABLE flow_branches ADD COLUMN branch_side TEXT NOT NULL DEFAULT 'left'"); } catch {}
+  try { await db.execAsync("ALTER TABLE time_logs ADD COLUMN mode TEXT NOT NULL DEFAULT 'stopwatch'"); } catch {}
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS flow_projects (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -427,19 +429,20 @@ export async function deleteNotificationSetting(
 }
 
 export async function addTimeLog(
-  db: SQLite.SQLiteDatabase, taskId: number, durationSeconds: number, startedAt: string, endedAt: string
+  db: SQLite.SQLiteDatabase, taskId: number, durationSeconds: number, startedAt: string, endedAt: string,
+  mode: 'stopwatch' | 'timer' = 'stopwatch'
 ): Promise<void> {
   const ended = new Date(endedAt);
   const date = `${ended.getFullYear()}-${String(ended.getMonth() + 1).padStart(2, '0')}-${String(ended.getDate()).padStart(2, '0')}`;
   await db.runAsync(
-    'INSERT INTO time_logs (task_id, date, duration_seconds, started_at, ended_at) VALUES (?, ?, ?, ?, ?)',
-    [taskId, date, Math.max(1, Math.round(durationSeconds)), startedAt, endedAt]
+    'INSERT INTO time_logs (task_id, date, duration_seconds, started_at, ended_at, mode) VALUES (?, ?, ?, ?, ?, ?)',
+    [taskId, date, Math.max(1, Math.round(durationSeconds)), startedAt, endedAt, mode]
   );
 }
 
 export async function getTimeLogsForDate(db: SQLite.SQLiteDatabase, date: string): Promise<TimeLog[]> {
   return db.getAllAsync<TimeLog>(
-    `SELECT l.id, l.task_id, t.title, l.date, l.duration_seconds, l.started_at, l.ended_at
+    `SELECT l.id, l.task_id, t.title, l.date, l.duration_seconds, l.started_at, l.ended_at, l.mode
      FROM time_logs l JOIN tasks t ON l.task_id = t.id
      WHERE l.date = ?
      ORDER BY l.ended_at DESC`,

@@ -128,7 +128,7 @@ export function TimerProvider({ children }: { children: ReactNode }) {
     savingRef.current.add(taskId);
     const endedAt = new Date(endedAtMs).toISOString();
     const startedAt = timer.startedAtIso ?? new Date(endedAtMs - duration * 1000).toISOString();
-    await addTimeLog(db, taskId, duration, startedAt, endedAt);
+    await addTimeLog(db, taskId, duration, startedAt, endedAt, timer.mode);
     await markComplete(db, taskId, today);
     setTimers((current) => current.map((item) => (
       item.task.id === taskId ? { ...item, baseSeconds: 0, startedAtMs: null, startedAtIso: null } : item

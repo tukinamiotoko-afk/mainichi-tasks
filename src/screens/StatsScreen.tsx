@@ -119,6 +119,8 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   rateBadge: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
   repeatBadge: { backgroundColor: C.primarySoft, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
   repeatBadgeText: { color: C.primary, fontSize: 10, fontWeight: '800' },
+  modeBadge: { backgroundColor: C.scheduleCardBg, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
+  modeBadgeText: { color: C.muted, fontSize: 10, fontWeight: '800' },
   repeatTotalText: { color: C.muted, fontSize: 11, fontWeight: '700' },
   ratePct: { color: C.onPrimary, fontSize: 11, fontWeight: '700' },
   barBg: { height: 4, backgroundColor: C.border, borderRadius: 2, overflow: 'hidden' },
@@ -596,7 +598,12 @@ export default function StatsScreen({ navigation }: Props) {
                   <Text style={s.rateTitle} numberOfLines={1}>{item.title}</Text>
                   <Text style={s.timerDuration}>{formatDuration(item.duration_seconds)}</Text>
                 </View>
-                <Text style={s.timerClock}>{formatClock(item.started_at)} 〜 {formatClock(item.ended_at)}</Text>
+                <View style={s.rateHeader}>
+                  <Text style={s.timerClock}>{formatClock(item.started_at)} 〜 {formatClock(item.ended_at)}</Text>
+                  <View style={s.modeBadge}>
+                    <Text style={s.modeBadgeText}>{item.mode === 'timer' ? 'タイマー' : 'ストップウォッチ'}</Text>
+                  </View>
+                </View>
               </View>
             )}
           />
