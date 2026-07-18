@@ -1820,7 +1820,7 @@ export default function HomeScreen({ navigation }: Props) {
               <Text style={[s.notifyTypeText, mode === 'timer' && s.notifyTypeTextActive]}>⏱ タイマー</Text>
             </TouchableOpacity>
           </View>
-          <Text style={s.scheduleHint}>指定時刻に通知が届き、タップするとその場で計測が始まります</Text>
+          <Text style={[s.scheduleHint, { color: C.onDark }]}>指定時刻に通知が届き、タップするとその場で計測が始まります</Text>
         </>
       )}
     </View>
