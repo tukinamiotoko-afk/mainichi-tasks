@@ -252,7 +252,6 @@ async function scheduleAutoTimerNotifs(task: AutoTimerSchedulable): Promise<stri
     title: '', body,
     sound: true,
     android: { channelId },
-    ...(Platform.OS === 'android' ? { categoryIdentifier: 'autoTimerActions' } : null),
     data: { kind: 'auto-timer', taskId: task.id, mode: task.auto_timer_mode, minutes: task.auto_timer_minutes },
   } as any;
   const ids: string[] = [];

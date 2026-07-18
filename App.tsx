@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { Platform } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SQLiteProvider } from 'expo-sqlite';
 import { StatusBar } from 'expo-status-bar';
@@ -44,11 +44,12 @@ export type RootStackParamList = {
   Upgrade: undefined;
 };
 
+export const navigationRef = createNavigationContainerRef<RootStackParamList>();
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 function AppNavigation() {
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       <StatusBar style="light" />
       <Stack.Navigator screenOptions={{ headerShown: false, animation: 'none' }}>
         <Stack.Screen name="Home" component={HomeScreen} />
@@ -76,16 +77,6 @@ export default function App() {
         importance: Notifications.AndroidImportance.DEFAULT,
         sound: null,
       });
-      Notifications.setNotificationCategoryAsync(
-        'autoTimerActions',
-        [
-          {
-            identifier: 'start-auto-timer',
-            buttonTitle: '開始',
-            options: { opensAppToForeground: true },
-          },
-        ]
-      );
     }
   }, []);
 

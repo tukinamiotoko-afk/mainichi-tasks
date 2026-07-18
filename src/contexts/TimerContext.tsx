@@ -7,6 +7,7 @@ import {
 } from '../db/database';
 import { FREE_TIMER_STARTS_PER_DAY } from '../constants/billing';
 import { usePurchases } from './PurchasesContext';
+import { navigationRef } from '../../App';
 
 export type TimerMode = 'stopwatch' | 'timer';
 export type TimerItem = {
@@ -194,15 +195,11 @@ export function TimerProvider({ children }: { children: ReactNode }) {
 
   const isTiming = useCallback((itemKey: string) => timersRef.current.some((t) => t.key === itemKey), []);
 
-  // tapping an auto-timer notification, or pressing its Android action button,
-  // starts the matching task's timer/stopwatch
+  // tapping an auto-timer notification starts the matching task's
+  // timer/stopwatch and opens the Timer screen
   const handleAutoTimerResponse = useCallback(async (response: Notifications.NotificationResponse | null) => {
     if (!response) return;
-    const action = response.actionIdentifier;
-    if (
-      action !== Notifications.DEFAULT_ACTION_IDENTIFIER &&
-      action !== 'start-auto-timer'
-    ) return;
+    if (response.actionIdentifier !== Notifications.DEFAULT_ACTION_IDENTIFIER) return;
     const data = response.notification.request.content.data;
     if (!data || data.kind !== 'auto-timer' || typeof data.taskId !== 'number') return;
     const task = await getTaskById(db, data.taskId);
@@ -210,6 +207,7 @@ export function TimerProvider({ children }: { children: ReactNode }) {
     const timerMode: TimerMode = data.mode === 'timer' ? 'timer' : 'stopwatch';
     const targetSeconds = timerMode === 'timer' ? Math.max(60, (Number(data.minutes) || 25) * 60) : undefined;
     await addTimer(task, { autoStart: true, mode: timerMode, targetSeconds });
+    if (navigationRef.isReady()) navigationRef.navigate('Timer');
   }, [db, addTimer]);
 
   useEffect(() => {
