@@ -122,7 +122,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   },
   chipAltStackOpen: { backgroundColor: 'rgba(255,255,255,0.3)' },
   chipAltTopBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  chipAltBranch: { width: 14, height: 1, backgroundColor: 'rgba(255,255,255,0.65)' },
+  chipAltDivider: { height: 1, backgroundColor: 'rgba(255,255,255,0.35)', marginTop: 8 },
 
   customBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.card, paddingHorizontal: 16, paddingVertical: 10, gap: 6, borderBottomWidth: 1, borderBottomColor: C.border },
   customLabel: { color: C.stone, fontSize: 11, fontWeight: '700' },
@@ -449,7 +449,7 @@ export default function StatsScreen({ navigation }: Props) {
                     s.chipAltStack,
                     timerModePickerOpen && s.chipAltStackOpen,
                     {
-                      maxHeight: timerModeExpand.interpolate({ inputRange: [0, 1], outputRange: [34, 126] }),
+                      maxHeight: timerModeExpand.interpolate({ inputRange: [0, 1], outputRange: [34, 96] }),
                     },
                   ]}
                 >
@@ -462,17 +462,17 @@ export default function StatsScreen({ navigation }: Props) {
                       {timerModeFilter === 'timer' ? 'タイマー' : 'ストップウォッチ'} {timerModePickerOpen ? '▲' : '▼'}
                     </Text>
                   </TouchableOpacity>
+                  <View style={s.chipAltDivider} />
                   <Animated.View
                     style={[
                       s.chipAltExpand,
                       {
-                        maxHeight: timerModeExpand.interpolate({ inputRange: [0, 1], outputRange: [0, 88] }),
                         opacity: timerModeExpand,
                       },
                     ]}
                   >
                   <View style={s.chipAltExpandInner}>
-                      {([
+                    {([
                       { k: 'stopwatch' as const, l: 'ストップウォッチ' },
                       { k: 'timer' as const, l: 'タイマー' },
                     ].filter((o) => o.k !== timerModeFilter)).map((o) => (
@@ -484,8 +484,7 @@ export default function StatsScreen({ navigation }: Props) {
                           if (timerModePickerOpen) toggleTimerModePicker();
                         }}
                       >
-                        <View style={s.chipAltBranch} />
-                        <Text style={s.chipAltText}>↳ {o.l}</Text>
+                        <Text style={s.chipAltText}>{o.l}</Text>
                       </TouchableOpacity>
                     ))}
                   </View>
