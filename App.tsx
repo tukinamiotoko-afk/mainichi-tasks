@@ -6,6 +6,7 @@ import { SQLiteProvider } from 'expo-sqlite';
 import { StatusBar } from 'expo-status-bar';
 import * as Notifications from 'expo-notifications';
 import * as SplashScreen from 'expo-splash-screen';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import HomeScreen from './src/screens/HomeScreen';
 import StatsScreen from './src/screens/StatsScreen';
 import NotificationScreen from './src/screens/NotificationScreen';
@@ -81,16 +82,18 @@ export default function App() {
   }, []);
 
   return (
-    <SQLiteProvider databaseName="daily_tasks.db" onInit={migrateDb}>
-      <ThemeProvider>
-        <PurchasesProvider>
-          <AdsProvider>
-            <TimerProvider>
-              <AppNavigation />
-            </TimerProvider>
-          </AdsProvider>
-        </PurchasesProvider>
-      </ThemeProvider>
-    </SQLiteProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SQLiteProvider databaseName="daily_tasks.db" onInit={migrateDb}>
+        <ThemeProvider>
+          <PurchasesProvider>
+            <AdsProvider>
+              <TimerProvider>
+                <AppNavigation />
+              </TimerProvider>
+            </AdsProvider>
+          </PurchasesProvider>
+        </ThemeProvider>
+      </SQLiteProvider>
+    </GestureHandlerRootView>
   );
 }

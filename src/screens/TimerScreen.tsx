@@ -1,10 +1,12 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, StatusBar, Alert, ScrollView, Modal, Dimensions, TextInput, Animated, Easing, PanResponder } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, StatusBar, Alert, ScrollView, Modal, Dimensions, TextInput, Animated, Easing } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
+import ReanimatedAnimated, { runOnJS, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { RootStackParamList } from '../../App';
 import { Task, TimeLog, getTasks, getTimeLogsForTask } from '../db/database';
 import { GRAD_START, GRAD_END } from '../constants/theme';
@@ -216,48 +218,43 @@ export default function TimerScreen({ navigation }: Props) {
   const [minuteInputs, setMinuteInputs] = useState<Record<string, string>>({});
   const [secondInputs, setSecondInputs] = useState<Record<string, string>>({});
   const [editingTimerId, setEditingTimerId] = useState<string | null>(null);
-  const fabPosition = useRef({ x: Math.max(screen.width - 72, 20), y: Math.max(screen.height - insets.bottom - 132, 120) });
-  const fabStartPosition = useRef(fabPosition.current);
-  const fabTranslateX = useRef(new Animated.Value(fabPosition.current.x)).current;
-  const fabTranslateY = useRef(new Animated.Value(fabPosition.current.y)).current;
-  const fabTapSlop = 6;
+  const fabStartX = Math.max(screen.width - 72, 20);
+  const fabStartY = Math.max(screen.height - insets.bottom - 132, 120);
+  const fabMaxX = screen.width - 60;
+  const fabMaxY = screen.height - insets.bottom - 124;
+  const fabX = useSharedValue(fabStartX);
+  const fabY = useSharedValue(fabStartY);
+  const fabGestureStartX = useSharedValue(fabStartX);
+  const fabGestureStartY = useSharedValue(fabStartY);
 
   const getExpandAnim = (itemKey: string) => {
     if (!expandAnims.current[itemKey]) expandAnims.current[itemKey] = new Animated.Value(0);
     return expandAnims.current[itemKey];
   };
 
-  const clampFab = (x: number, y: number) => ({
-    x: Math.max(8, Math.min(x, screen.width - 60)),
-    y: Math.max(100, Math.min(y, screen.height - insets.bottom - 124)),
-  });
-
-  const fabPanResponder = useRef(PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    onStartShouldSetPanResponderCapture: () => true,
-    onMoveShouldSetPanResponder: () => true,
-    onMoveShouldSetPanResponderCapture: () => true,
-    onPanResponderGrant: () => { fabStartPosition.current = fabPosition.current; },
-    onPanResponderTerminationRequest: () => false,
-    onPanResponderMove: (_, gesture) => {
-      const next = clampFab(fabStartPosition.current.x + gesture.dx, fabStartPosition.current.y + gesture.dy);
-      fabTranslateX.setValue(next.x);
-      fabTranslateY.setValue(next.y);
-    },
-    onPanResponderRelease: (_, gesture) => {
-      const next = clampFab(fabStartPosition.current.x + gesture.dx, fabStartPosition.current.y + gesture.dy);
-      fabPosition.current = next;
-      fabTranslateX.setValue(next.x);
-      fabTranslateY.setValue(next.y);
-      if (Math.abs(gesture.dx) <= fabTapSlop && Math.abs(gesture.dy) <= fabTapSlop) {
-        setPickerOpen(true);
-      }
-    },
-    onPanResponderTerminate: () => {
-      fabTranslateX.setValue(fabPosition.current.x);
-      fabTranslateY.setValue(fabPosition.current.y);
-    },
-  })).current;
+  const fabAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: fabX.value }, { translateY: fabY.value }],
+  }));
+  const panGesture = useMemo(() => Gesture.Pan()
+    .minDistance(0)
+    .onStart(() => {
+      fabGestureStartX.value = fabX.value;
+      fabGestureStartY.value = fabY.value;
+    })
+    .onUpdate((event) => {
+      fabX.value = Math.max(8, Math.min(fabGestureStartX.value + event.translationX, fabMaxX));
+      fabY.value = Math.max(100, Math.min(fabGestureStartY.value + event.translationY, fabMaxY));
+    })
+    .onEnd((event) => {
+      fabX.value = Math.max(8, Math.min(fabGestureStartX.value + event.translationX, fabMaxX));
+      fabY.value = Math.max(100, Math.min(fabGestureStartY.value + event.translationY, fabMaxY));
+    }), [fabGestureStartX, fabGestureStartY, fabMaxX, fabMaxY, fabX, fabY]);
+  const tapGesture = useMemo(() => Gesture.Tap()
+    .maxDistance(8)
+    .onEnd((_event, success) => {
+      if (success) runOnJS(setPickerOpen)(true);
+    }), []);
+  const fabGesture = useMemo(() => Gesture.Simultaneous(panGesture, tapGesture), [panGesture, tapGesture]);
 
   const runningCount = timers.filter((item) => item.startedAtMs).length;
   const visibleTimers = useMemo(() => timers.filter((item) => item.mode === currentTab), [timers, currentTab]);
@@ -653,17 +650,13 @@ export default function TimerScreen({ navigation }: Props) {
         </View>
       </Modal>
 
-      <Animated.View
-        style={[
-          s.fabWrap,
-          { transform: [{ translateX: fabTranslateX }, { translateY: fabTranslateY }] },
-        ]}
-        {...fabPanResponder.panHandlers}
-      >
-        <LinearGradient colors={grad.brand} start={GRAD_START} end={GRAD_END} style={s.fab}>
-          <Text style={s.fabText}>＋</Text>
-        </LinearGradient>
-      </Animated.View>
+      <GestureDetector gesture={fabGesture}>
+        <ReanimatedAnimated.View style={[s.fabWrap, fabAnimatedStyle]}>
+          <LinearGradient colors={grad.brand} start={GRAD_START} end={GRAD_END} style={s.fab}>
+            <Text style={s.fabText}>＋</Text>
+          </LinearGradient>
+        </ReanimatedAnimated.View>
+      </GestureDetector>
 
       <TabBar current="Timer" navigation={navigation} />
     </View>
