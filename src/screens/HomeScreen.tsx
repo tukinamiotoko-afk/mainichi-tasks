@@ -1617,7 +1617,7 @@ export default function HomeScreen({ navigation }: Props) {
     progress >= 1 ? ['#86efac', '#16a34a'] :
     progress >= 0.67 ? ['#bbf7d0', '#22c55e'] :
     progress >= 0.34 ? ['#fde68a', '#f59e0b'] :
-    ['#fda4af', '#e11d48']
+    ['#fecdd3', '#ef4444']
   ) as readonly [string, string];
   const sortedTasks = useMemo(() => [...tasks].sort((a, b) => {
     if (a.sort_order !== b.sort_order) return a.sort_order - b.sort_order;
