@@ -1016,7 +1016,7 @@ export default function HomeScreen({ navigation }: Props) {
     } else {
       await markComplete(db, id, selectedDate);
       if (count + 1 >= target) triggerCelebration();
-      recordAction();
+      recordAction('complete');
       maybeRequestReview();
     }
     load();
@@ -1108,7 +1108,7 @@ export default function HomeScreen({ navigation }: Props) {
     resetAddDraft();
     setShowAdd(false);
     load();
-    recordAction();
+    recordAction('add');
   };
 
   const closeAddSheet = () => {

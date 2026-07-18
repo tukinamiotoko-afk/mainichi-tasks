@@ -38,5 +38,6 @@ export const REWARDED_AD_UNIT_ID = Platform.select({
     : 'ca-app-pub-6253728869800176/5127180074',
 })!;
 
-// Show an interstitial after this many tracked actions (task add / complete).
-export const INTERSTITIAL_EVERY_N_ACTIONS = 3;
+// Show an interstitial after this many tracked actions.
+export const INTERSTITIAL_EVERY_N_COMPLETES = 5;
+export const INTERSTITIAL_EVERY_N_ADDS = 3;

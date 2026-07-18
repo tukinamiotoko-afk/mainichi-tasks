@@ -7,7 +7,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import { RootStackParamList } from '../../App';
 import { Task, getTasks } from '../db/database';
-import { GRAD, GRAD_START, GRAD_END } from '../constants/theme';
+import { GRAD_START, GRAD_END } from '../constants/theme';
 import TabBar from '../components/TabBar';
 import { useTheme, ColorSet } from '../contexts/ThemeContext';
 import { useTimerActions, useTimerState, useTimerClock, timerSeconds, displayTimerSeconds } from '../contexts/TimerContext';
@@ -43,13 +43,11 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   removeText: { color: C.muted, fontSize: 18, fontWeight: '900' },
   timerTime: { color: C.onDark, fontSize: 42, fontWeight: '900', textAlign: 'center', letterSpacing: 1 },
   timerControls: { flexDirection: 'row', gap: 8 },
-  controlBtn: { flex: 1, borderRadius: 10, paddingVertical: 11, alignItems: 'center' },
+  controlBtn: { flex: 1, borderRadius: 10, paddingVertical: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: '#ffffff', borderWidth: 1, borderColor: C.border, minHeight: 52 },
   controlBtnDisabled: { opacity: 0.45 },
-  pauseBtn: { backgroundColor: C.card, borderWidth: 1, borderColor: C.border },
-  saveBtn: { backgroundColor: C.danger },
-  controlText: { color: C.onPrimary, fontSize: 20, fontWeight: '900' },
-  pauseText: { color: C.onDark },
-  saveText: { color: C.onPrimary },
+  startText: { color: '#16a34a', fontSize: 24, fontWeight: '900' },
+  pauseText: { color: '#f59e0b', fontSize: 22, fontWeight: '900', letterSpacing: 0 },
+  saveText: { color: '#dc2626', fontSize: 20, fontWeight: '900' },
   emptyBox: { backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 12, padding: 20, alignItems: 'center', gap: 6 },
   emptyTitle: { color: C.stone, fontSize: 15, fontWeight: '900' },
   emptyBody: { color: C.muted, fontSize: 12, fontWeight: '700', textAlign: 'center' },
@@ -251,16 +249,14 @@ export default function TimerScreen({ navigation }: Props) {
               )}
               <Text style={s.timerTime}>{formatDuration(shownSeconds, true)}</Text>
               <View style={s.timerControls}>
-                <TouchableOpacity onPress={() => startTimer(item.task.id)} disabled={running} activeOpacity={0.86} style={{ flex: 1 }}>
-                  <LinearGradient colors={GRAD.success} start={GRAD_START} end={GRAD_END} style={[s.controlBtn, running && s.controlBtnDisabled]}>
-                    <Text style={s.controlText}>▶</Text>
-                  </LinearGradient>
+                <TouchableOpacity onPress={() => startTimer(item.task.id)} disabled={running} activeOpacity={0.86} style={[s.controlBtn, running && s.controlBtnDisabled]}>
+                  <Text style={s.startText}>▶</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[s.controlBtn, s.pauseBtn]} onPress={() => pauseTimer(item.task.id)} disabled={!running}>
-                  <Text style={[s.controlText, s.pauseText]}>⏸</Text>
+                <TouchableOpacity style={[s.controlBtn, !running && s.controlBtnDisabled]} onPress={() => pauseTimer(item.task.id)} disabled={!running}>
+                  <Text style={s.pauseText}>❚❚</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[s.controlBtn, s.saveBtn]} onPress={() => saveTimer(item.task.id)} disabled={seconds <= 0}>
-                  <Text style={[s.controlText, s.saveText]}>⏹</Text>
+                <TouchableOpacity style={[s.controlBtn, seconds <= 0 && s.controlBtnDisabled]} onPress={() => saveTimer(item.task.id)} disabled={seconds <= 0}>
+                  <Text style={s.saveText}>■</Text>
                 </TouchableOpacity>
               </View>
             </View>

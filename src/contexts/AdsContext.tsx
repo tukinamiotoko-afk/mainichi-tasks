@@ -3,11 +3,18 @@ import { Platform } from 'react-native';
 import mobileAds, {
   InterstitialAd, RewardedAd, AdEventType, RewardedAdEventType,
 } from 'react-native-google-mobile-ads';
-import { INTERSTITIAL_AD_UNIT_ID, REWARDED_AD_UNIT_ID, INTERSTITIAL_EVERY_N_ACTIONS } from '../constants/ads';
+import {
+  INTERSTITIAL_AD_UNIT_ID,
+  REWARDED_AD_UNIT_ID,
+  INTERSTITIAL_EVERY_N_ADDS,
+  INTERSTITIAL_EVERY_N_COMPLETES,
+} from '../constants/ads';
 import { usePurchases } from './PurchasesContext';
 
+type AdActionKind = 'add' | 'complete';
+
 type AdsCtx = {
-  recordAction: () => void;
+  recordAction: (kind: AdActionKind) => void;
   showRewardedAd: () => Promise<boolean>;
 };
 
@@ -32,7 +39,7 @@ const callIfFn = (fn: unknown) => {
 
 export function AdsProvider({ children }: { children: ReactNode }) {
   const { isPremium } = usePurchases();
-  const actionCountRef = useRef(0);
+  const actionCountsRef = useRef<Record<AdActionKind, number>>({ add: 0, complete: 0 });
   const interstitialRef = useRef<InterstitialAd | null>(null);
   const interstitialLoadedRef = useRef(false);
   const rewardedRef = useRef<RewardedAd | null>(null);
@@ -162,12 +169,13 @@ export function AdsProvider({ children }: { children: ReactNode }) {
     };
   }, [cleanupRewardedListeners, clearRewardedTimeout, loadInterstitial, loadRewarded]);
 
-  const recordAction = useCallback(() => {
+  const recordAction = useCallback((kind: AdActionKind) => {
     if (!supported || isPremium) return;
-    actionCountRef.current += 1;
-    debugAds('record action', actionCountRef.current, '/', INTERSTITIAL_EVERY_N_ACTIONS);
-    if (actionCountRef.current < INTERSTITIAL_EVERY_N_ACTIONS) return;
-    actionCountRef.current = 0;
+    const threshold = kind === 'complete' ? INTERSTITIAL_EVERY_N_COMPLETES : INTERSTITIAL_EVERY_N_ADDS;
+    actionCountsRef.current[kind] += 1;
+    debugAds('record action', kind, actionCountsRef.current[kind], '/', threshold);
+    if (actionCountsRef.current[kind] < threshold) return;
+    actionCountsRef.current[kind] = 0;
     const ad = interstitialRef.current;
     if (ad && interstitialLoadedRef.current) {
       try {
