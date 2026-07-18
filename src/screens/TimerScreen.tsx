@@ -267,7 +267,35 @@ export default function TimerScreen({ navigation }: Props) {
                 </TouchableOpacity>
               )}
               <View style={s.timerControls}>
-                <TouchableOpacity onPress={() => startTimer(item.key)} disabled={running} activeOpacity={0.86} style={[s.controlBtn, running && s.controlBtnDisabled]}>
+                <TouchableOpacity
+                  onPress={async () => {
+                    const started = await startTimer(item.key);
+                    if (started) return;
+                    Alert.alert(
+                      '本日の回数上限です',
+                      '無料版では1日に計測を開始できる回数に上限があります。広告を見ると+1回、プレミアムなら無制限です。',
+                      [
+                        { text: 'キャンセル', style: 'cancel' },
+                        {
+                          text: '広告を見て+1回',
+                          onPress: async () => {
+                            const earned = await showRewardedAd();
+                            if (earned) {
+                              await grantTimerBonus();
+                              await startTimer(item.key);
+                            } else {
+                              Alert.alert('広告を最後まで見られませんでした');
+                            }
+                          },
+                        },
+                        { text: 'プレミアムを見る', onPress: () => navigation.navigate('Upgrade') },
+                      ]
+                    );
+                  }}
+                  disabled={running}
+                  activeOpacity={0.86}
+                  style={[s.controlBtn, running && s.controlBtnDisabled]}
+                >
                   <Text style={s.startText}>▶</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={[s.controlBtn, !running && s.controlBtnDisabled]} onPress={() => pauseTimer(item.key)} disabled={!running}>

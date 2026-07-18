@@ -37,7 +37,7 @@ type TimerActions = {
   // null return means the free daily limit was hit — no timer was added.
   addTimer: (task: Task, opts?: AddTimerOptions) => Promise<number | null>;
   removeTimer: (itemKey: string) => void;
-  startTimer: (itemKey: string) => void;
+  startTimer: (itemKey: string) => Promise<boolean>;
   pauseTimer: (itemKey: string) => void;
   saveTimer: (itemKey: string) => Promise<void>;
   updateTargetSeconds: (itemKey: string, seconds: number) => Promise<void>;
@@ -152,13 +152,22 @@ export function TimerProvider({ children }: { children: ReactNode }) {
     });
   }, [persistPinnedTimers]);
 
-  const startTimer = useCallback((itemKey: string) => {
+  const startTimer = useCallback(async (itemKey: string): Promise<boolean> => {
+    const item = timersRef.current.find((t) => t.key === itemKey);
+    if (!item || item.startedAtMs) return true;
+    const isFreshStart = item.baseSeconds <= 0;
+    if (isFreshStart && !isPremium) {
+      const usage = await getTimerDailyUsage(db, today);
+      if (usage.starts >= FREE_TIMER_STARTS_PER_DAY + usage.bonus) return false;
+      await incrementTimerStarts(db, today);
+    }
     const startedAtMs = Date.now();
     const startedAtIso = new Date(startedAtMs).toISOString();
     setTimers((current) => current.map((item) => (
       item.key === itemKey && !item.startedAtMs ? { ...item, startedAtMs, startedAtIso } : item
     )));
-  }, []);
+    return true;
+  }, [db, today, isPremium]);
 
   const pauseTimer = useCallback((itemKey: string) => {
     const stamp = Date.now();
