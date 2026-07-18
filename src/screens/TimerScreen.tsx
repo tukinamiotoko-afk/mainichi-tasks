@@ -220,6 +220,7 @@ export default function TimerScreen({ navigation }: Props) {
   const fabStartPosition = useRef(fabPosition.current);
   const fabTranslateX = useRef(new Animated.Value(fabPosition.current.x)).current;
   const fabTranslateY = useRef(new Animated.Value(fabPosition.current.y)).current;
+  const fabTapSlop = 6;
 
   const getExpandAnim = (itemKey: string) => {
     if (!expandAnims.current[itemKey]) expandAnims.current[itemKey] = new Animated.Value(0);
@@ -232,9 +233,10 @@ export default function TimerScreen({ navigation }: Props) {
   });
 
   const fabPanResponder = useRef(PanResponder.create({
-    onStartShouldSetPanResponder: () => false,
-    onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dx) > 2 || Math.abs(gesture.dy) > 2,
-    onMoveShouldSetPanResponderCapture: (_, gesture) => Math.abs(gesture.dx) > 2 || Math.abs(gesture.dy) > 2,
+    onStartShouldSetPanResponder: () => true,
+    onStartShouldSetPanResponderCapture: () => true,
+    onMoveShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponderCapture: () => true,
     onPanResponderGrant: () => { fabStartPosition.current = fabPosition.current; },
     onPanResponderTerminationRequest: () => false,
     onPanResponderMove: (_, gesture) => {
@@ -247,6 +249,9 @@ export default function TimerScreen({ navigation }: Props) {
       fabPosition.current = next;
       fabTranslateX.setValue(next.x);
       fabTranslateY.setValue(next.y);
+      if (Math.abs(gesture.dx) <= fabTapSlop && Math.abs(gesture.dy) <= fabTapSlop) {
+        setPickerOpen(true);
+      }
     },
     onPanResponderTerminate: () => {
       fabTranslateX.setValue(fabPosition.current.x);
@@ -655,11 +660,9 @@ export default function TimerScreen({ navigation }: Props) {
         ]}
         {...fabPanResponder.panHandlers}
       >
-        <TouchableOpacity activeOpacity={0.85} onPress={() => setPickerOpen(true)}>
-          <LinearGradient colors={grad.brand} start={GRAD_START} end={GRAD_END} style={s.fab}>
-            <Text style={s.fabText}>＋</Text>
-          </LinearGradient>
-        </TouchableOpacity>
+        <LinearGradient colors={grad.brand} start={GRAD_START} end={GRAD_END} style={s.fab}>
+          <Text style={s.fabText}>＋</Text>
+        </LinearGradient>
       </Animated.View>
 
       <TabBar current="Timer" navigation={navigation} />
