@@ -915,7 +915,6 @@ export default function HomeScreen({ navigation }: Props) {
   const [newAutoTimerMinutes, setNewAutoTimerMinutes] = useState(25);
   const [newRepeatEnabled, setNewRepeatEnabled] = useState(false);
   const [newRepeatTarget, setNewRepeatTarget] = useState(2);
-  const [showNotifyGuide, setShowNotifyGuide] = useState(false);
   const [showBatteryGuide, setShowBatteryGuide] = useState(false);
   const onboardingShownRef = useRef(false);
 
@@ -977,8 +976,8 @@ export default function HomeScreen({ navigation }: Props) {
     (async () => {
       const notifyGuideDone = await getSetting(db, 'notifyGuideDone');
       if (!notifyGuideDone) {
-        setShowNotifyGuide(true);
-        return;
+        await ensurePermission();
+        await setSetting(db, 'notifyGuideDone', '1');
       }
       if (Platform.OS === 'android') {
         const batteryGuideDone = await getSetting(db, 'batterySaverGuideDone');
@@ -1259,27 +1258,6 @@ export default function HomeScreen({ navigation }: Props) {
     if (value && !(await ensurePermission())) return;
     await patchDetail({ notify: value ? 1 : 0 });
   };
-
-  const handleNotifyGuideLater = useCallback(async () => {
-    setShowNotifyGuide(false);
-    await setSetting(db, 'notifyGuideDone', '1');
-    if (Platform.OS === 'android') {
-      const batteryGuideDone = await getSetting(db, 'batterySaverGuideDone');
-      if (!batteryGuideDone) setShowBatteryGuide(true);
-    }
-  }, [db]);
-
-  const handleNotifyGuideEnable = useCallback(async () => {
-    const granted = await ensurePermission();
-    setShowNotifyGuide(false);
-    await setSetting(db, 'notifyGuideDone', '1');
-    if (Platform.OS === 'android') {
-      const batteryGuideDone = await getSetting(db, 'batterySaverGuideDone');
-      if (!batteryGuideDone) setShowBatteryGuide(true);
-    } else if (!granted) {
-      Alert.alert('通知は未許可です', 'あとから設定画面で通知をオンにできます。');
-    }
-  }, [db]);
 
   const closeBatteryGuide = useCallback(async () => {
     setShowBatteryGuide(false);
@@ -2531,25 +2509,6 @@ export default function HomeScreen({ navigation }: Props) {
               <TouchableOpacity style={s.timeConfirmBtnWrap} onPress={confirmTime} activeOpacity={0.85}>
                 <LinearGradient colors={grad.brand} start={GRAD_START} end={GRAD_END} style={s.timeConfirmBtn}>
                   <Text style={s.timeConfirmText}>決定</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      <Modal visible={showNotifyGuide} transparent animationType="fade" onRequestClose={() => {}}>
-        <View style={s.timeModalBg}>
-          <View style={[s.timeModalCard, { gap: 14 }]}>
-            <Text style={s.timeModalTitle}>通知をオンにしてください</Text>
-            <Text style={s.emptyBody}>通知がオフだと、予定時刻の通知や自動計測の開始通知が届きません。</Text>
-            <View style={s.timeBtnRow}>
-              <TouchableOpacity style={s.timeCancelBtn} onPress={handleNotifyGuideLater}>
-                <Text style={s.timeCancelText}>あとで</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={s.timeConfirmBtnWrap} onPress={handleNotifyGuideEnable} activeOpacity={0.85}>
-                <LinearGradient colors={grad.brand} start={GRAD_START} end={GRAD_END} style={s.timeConfirmBtn}>
-                  <Text style={s.timeConfirmText}>通知をオンにする</Text>
                 </LinearGradient>
               </TouchableOpacity>
             </View>
