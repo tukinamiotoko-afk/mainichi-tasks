@@ -233,8 +233,10 @@ export default function TimerScreen({ navigation }: Props) {
 
   const fabPanResponder = useRef(PanResponder.create({
     onStartShouldSetPanResponder: () => false,
-    onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dx) > 4 || Math.abs(gesture.dy) > 4,
+    onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dx) > 2 || Math.abs(gesture.dy) > 2,
+    onMoveShouldSetPanResponderCapture: (_, gesture) => Math.abs(gesture.dx) > 2 || Math.abs(gesture.dy) > 2,
     onPanResponderGrant: () => { fabStartPosition.current = fabPosition.current; },
+    onPanResponderTerminationRequest: () => false,
     onPanResponderMove: (_, gesture) => {
       const next = clampFab(fabStartPosition.current.x + gesture.dx, fabStartPosition.current.y + gesture.dy);
       fabTranslateX.setValue(next.x);
