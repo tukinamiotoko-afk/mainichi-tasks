@@ -17,7 +17,7 @@ import { RootStackParamList } from '../../App';
 import {
   Task, TaskFields, getToday, getTasks, addTask, updateTask, deleteTask,
   getCompletionCounts, markComplete, markIncomplete, resetCompletion, updateTaskSortOrders,
-  getSetting, setSetting, getTotalCompletionsCount,
+  getSetting, setSetting, getTotalCompletionsCount, getTimerSettingForTask,
 } from '../db/database';
 import {
   TASK_ICONS, PRIORITIES, priorityMeta, WEEKDAYS,
@@ -1207,6 +1207,15 @@ export default function HomeScreen({ navigation }: Props) {
     await patchDetail({ notify: value ? 1 : 0 });
   };
 
+  const getTimerPresetMinutes = useCallback(async (taskId: number): Promise<number | null> => {
+    const saved = await getTimerSettingForTask(db, taskId);
+    if (!saved || saved.target_seconds <= 0) {
+      Alert.alert('タイマー未設定', 'まず タイマーの方で時間を設定してください');
+      return null;
+    }
+    return Math.max(1, Math.round(saved.target_seconds / 60));
+  }, [db]);
+
   const done = useMemo(() => tasks.filter((t) => isTaskDone(t, completionCounts.get(t.id) ?? 0)).length, [tasks, completionCounts]);
   const total = tasks.length;
   const progress = total > 0 ? done / total : 0;
@@ -1561,12 +1570,10 @@ export default function HomeScreen({ navigation }: Props) {
     enabled: boolean,
     time: string | null,
     mode: string,
-    minutes: number,
     onToggleEnabled: (v: boolean) => void,
     onPick: () => void,
     onClear: () => void,
     onSetMode: (m: 'stopwatch' | 'timer') => void,
-    onSetMinutes: (m: number) => void,
   ) => (
     <View style={s.scheduleCard}>
       <View style={s.scheduleTopRow}>
@@ -1602,18 +1609,6 @@ export default function HomeScreen({ navigation }: Props) {
               <Text style={[s.notifyTypeText, mode === 'timer' && s.notifyTypeTextActive]}>⏱ タイマー</Text>
             </TouchableOpacity>
           </View>
-          {mode === 'timer' && (
-            <View style={s.timerDurationRow}>
-              <TextInput
-                style={s.timerDurationInput}
-                value={String(minutes)}
-                onChangeText={(v) => onSetMinutes(Math.max(1, parseInt(v.replace(/[^0-9]/g, ''), 10) || 25))}
-                keyboardType="number-pad"
-                maxLength={3}
-              />
-              <Text style={s.timerDurationLabel}>分</Text>
-            </View>
-          )}
           <Text style={s.scheduleHint}>指定時刻に通知が届き、タップするとその場で計測が始まります</Text>
         </>
       )}
@@ -2203,12 +2198,16 @@ export default function HomeScreen({ navigation }: Props) {
                     newAutoTimerEnabled,
                     newAutoTimerTime,
                     newAutoTimerMode,
-                    newAutoTimerMinutes,
                     (v) => (v ? requirePremium(() => setNewAutoTimerEnabled(true)) : setNewAutoTimerEnabled(false)),
                     () => openTimeEditor('autoTimerAdd', newAutoTimerTime),
                     () => setNewAutoTimerTime(null),
-                    setNewAutoTimerMode,
-                    setNewAutoTimerMinutes,
+                    (mode) => {
+                      if (mode === 'timer') {
+                        Alert.alert('タイマー未設定', 'まず タイマーの方で時間を設定してください');
+                        return;
+                      }
+                      setNewAutoTimerMode(mode);
+                    },
                   )}
 
                   <Text style={[s.sheetSection, { marginTop: 16 }]}>複数回</Text>
@@ -2344,12 +2343,32 @@ export default function HomeScreen({ navigation }: Props) {
                         !!detailTask.auto_timer_enabled,
                         detailTask.auto_timer_time,
                         detailTask.auto_timer_mode,
-                        detailTask.auto_timer_minutes,
-                        (v) => (v ? requirePremium(() => patchDetail({ auto_timer_enabled: 1 })) : patchDetail({ auto_timer_enabled: 0 })),
+                        async (v) => {
+                          if (!v) {
+                            await patchDetail({ auto_timer_enabled: 0 });
+                            return;
+                          }
+                          requirePremium(async () => {
+                            if (detailTask.auto_timer_mode === 'timer') {
+                              const minutes = await getTimerPresetMinutes(detailTask.id);
+                              if (minutes == null) return;
+                              await patchDetail({ auto_timer_enabled: 1, auto_timer_minutes: minutes });
+                              return;
+                            }
+                            await patchDetail({ auto_timer_enabled: 1 });
+                          });
+                        },
                         () => openTimeEditor('autoTimerEdit', detailTask.auto_timer_time),
                         () => patchDetail({ auto_timer_time: null }),
-                        (mode) => patchDetail({ auto_timer_mode: mode }),
-                        (mins) => patchDetail({ auto_timer_minutes: mins }),
+                        async (mode) => {
+                          if (mode === 'timer') {
+                            const minutes = await getTimerPresetMinutes(detailTask.id);
+                            if (minutes == null) return;
+                            await patchDetail({ auto_timer_mode: mode, auto_timer_minutes: minutes });
+                            return;
+                          }
+                          await patchDetail({ auto_timer_mode: mode });
+                        },
                       )}
 
                       <Text style={[s.sheetSection, { marginTop: 16 }]}>複数回</Text>
