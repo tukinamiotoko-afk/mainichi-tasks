@@ -15,6 +15,14 @@ import { useAds } from '../contexts/AdsContext';
 
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'Timer'> };
 
+function splitSeconds(totalSeconds: number): { minutes: string; seconds: string } {
+  const safe = Math.max(0, Math.round(totalSeconds));
+  return {
+    minutes: String(Math.floor(safe / 60)),
+    seconds: String(safe % 60).padStart(2, '0'),
+  };
+}
+
 const makeStyles = (C: ColorSet) => StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: C.body },
   body: { flex: 1, backgroundColor: C.body },
@@ -25,9 +33,11 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   modeText: { color: C.onDark, fontSize: 13, fontWeight: '900' },
   modeTextActive: { color: C.onPrimary },
   modeSub: { color: C.muted, fontSize: 11, fontWeight: '800', textAlign: 'center' },
-  minuteRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  minuteRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   minuteLabel: { color: C.muted, fontSize: 12, fontWeight: '700', textAlign: 'center' },
-  minuteInput: { color: C.primary, fontSize: 42, fontWeight: '900', minWidth: 140, textAlign: 'center', padding: 0 },
+  minuteInput: { color: C.primary, fontSize: 42, fontWeight: '900', minWidth: 84, textAlign: 'center', padding: 0 },
+  secondInput: { color: C.primary, fontSize: 42, fontWeight: '900', minWidth: 84, textAlign: 'center', padding: 0 },
+  timeInputBlock: { alignItems: 'center', gap: 2 },
   addBtnWrap: { flex: 1 },
   addBtn: { borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
   addBtnText: { color: C.onPrimary, fontSize: 14, fontWeight: '900' },
@@ -203,6 +213,7 @@ export default function TimerScreen({ navigation }: Props) {
     setPickerIconFilter(null);
   };
   const [minuteInputs, setMinuteInputs] = useState<Record<string, string>>({});
+  const [secondInputs, setSecondInputs] = useState<Record<string, string>>({});
   const [editingTimerId, setEditingTimerId] = useState<string | null>(null);
 
   const getExpandAnim = (itemKey: string) => {
@@ -265,7 +276,10 @@ export default function TimerScreen({ navigation }: Props) {
       );
       return;
     }
-    setMinuteInputs((prev) => ({ ...prev, [`${task.id}:${currentTab}`]: String(Math.round(target / 60)) }));
+    const nextKey = `${task.id}:${currentTab}`;
+    const split = splitSeconds(target);
+    setMinuteInputs((prev) => ({ ...prev, [nextKey]: split.minutes }));
+    setSecondInputs((prev) => ({ ...prev, [nextKey]: split.seconds }));
     setPickerOpen(false);
   };
 
@@ -280,9 +294,12 @@ export default function TimerScreen({ navigation }: Props) {
 
   const commitTimerMinutes = async (itemKey: string) => {
     const mins = parseInt(minuteInputs[itemKey] ?? '0', 10);
-    const secs = Math.max(0, isNaN(mins) ? 0 : mins) * 60;
-    setMinuteInputs((prev) => ({ ...prev, [itemKey]: String(Math.round(secs / 60)) }));
-    await updateTargetSeconds(itemKey, secs);
+    const secs = parseInt(secondInputs[itemKey] ?? '0', 10);
+    const total = Math.max(1, (Math.max(0, isNaN(mins) ? 0 : mins) * 60) + Math.max(0, Math.min(59, isNaN(secs) ? 0 : secs)));
+    const split = splitSeconds(total);
+    setMinuteInputs((prev) => ({ ...prev, [itemKey]: split.minutes }));
+    setSecondInputs((prev) => ({ ...prev, [itemKey]: split.seconds }));
+    await updateTargetSeconds(itemKey, total);
     setEditingTimerId((current) => (current === itemKey ? null : current));
   };
 
@@ -382,7 +399,9 @@ export default function TimerScreen({ navigation }: Props) {
                         activeOpacity={0.85}
                         onPress={() => {
                           if (!expanded && item.mode === 'timer' && !running) {
-                            setMinuteInputs((prev) => ({ ...prev, [item.key]: String(Math.round(item.targetSeconds / 60)) }));
+                            const split = splitSeconds(item.targetSeconds);
+                            setMinuteInputs((prev) => ({ ...prev, [item.key]: split.minutes }));
+                            setSecondInputs((prev) => ({ ...prev, [item.key]: split.seconds }));
                           }
                           toggleExpanded(item.key);
                         }}
@@ -411,25 +430,42 @@ export default function TimerScreen({ navigation }: Props) {
                 <View style={s.expandInner}>
                   {item.mode === 'timer' && editingTimerId === item.key ? (
                     <View style={s.minuteRow}>
-                      <TextInput
-                        style={s.minuteInput}
-                        value={minuteInputs[item.key] ?? String(Math.round(item.targetSeconds / 60))}
-                        onChangeText={(v) => setMinuteInputs((prev) => ({ ...prev, [item.key]: v.replace(/[^0-9]/g, '') }))}
-                        onBlur={async () => { await commitTimerMinutes(item.key); }}
-                        onSubmitEditing={async () => { await commitTimerMinutes(item.key); }}
-                        keyboardType="number-pad"
-                        returnKeyType="done"
-                        editable={!running}
-                        autoFocus
-                      />
-                      <Text style={s.minuteLabel}>分</Text>
+                      <View style={s.timeInputBlock}>
+                        <TextInput
+                          style={s.minuteInput}
+                          value={minuteInputs[item.key] ?? splitSeconds(item.targetSeconds).minutes}
+                          onChangeText={(v) => setMinuteInputs((prev) => ({ ...prev, [item.key]: v.replace(/[^0-9]/g, '') }))}
+                          onBlur={async () => { await commitTimerMinutes(item.key); }}
+                          onSubmitEditing={async () => { await commitTimerMinutes(item.key); }}
+                          keyboardType="number-pad"
+                          returnKeyType="done"
+                          editable={!running}
+                          autoFocus
+                        />
+                        <Text style={s.minuteLabel}>分</Text>
+                      </View>
+                      <View style={s.timeInputBlock}>
+                        <TextInput
+                          style={s.secondInput}
+                          value={secondInputs[item.key] ?? splitSeconds(item.targetSeconds).seconds}
+                          onChangeText={(v) => setSecondInputs((prev) => ({ ...prev, [item.key]: v.replace(/[^0-9]/g, '').slice(0, 2) }))}
+                          onBlur={async () => { await commitTimerMinutes(item.key); }}
+                          onSubmitEditing={async () => { await commitTimerMinutes(item.key); }}
+                          keyboardType="number-pad"
+                          returnKeyType="done"
+                          editable={!running}
+                        />
+                        <Text style={s.minuteLabel}>秒</Text>
+                      </View>
                     </View>
                   ) : (
                     <TouchableOpacity
                       activeOpacity={item.mode === 'timer' && !running ? 0.8 : 1}
                       onPress={() => {
                         if (item.mode !== 'timer' || running) return;
-                        setMinuteInputs((prev) => ({ ...prev, [item.key]: String(Math.round(item.targetSeconds / 60)) }));
+                        const split = splitSeconds(item.targetSeconds);
+                        setMinuteInputs((prev) => ({ ...prev, [item.key]: split.minutes }));
+                        setSecondInputs((prev) => ({ ...prev, [item.key]: split.seconds }));
                         setEditingTimerId(item.key);
                       }}
                     >

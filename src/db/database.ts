@@ -546,7 +546,7 @@ export async function saveTimerSettingForTask(
 ): Promise<void> {
   await db.runAsync(
     'INSERT OR REPLACE INTO timer_settings (task_id, target_seconds) VALUES (?, ?)',
-    [taskId, Math.max(60, Math.round(targetSeconds))]
+    [taskId, Math.max(1, Math.round(targetSeconds))]
   );
 }
 
