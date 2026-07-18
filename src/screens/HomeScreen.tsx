@@ -68,7 +68,6 @@ const CHIP_ANIM_SHADOW = {
   shadowRadius: 8,
   elevation: 3,
 } as const;
-const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
 
 // Minimal shape required to schedule a task's reminder.
 type Schedulable = {
@@ -350,7 +349,7 @@ function RiseInPressable({
     }).start();
   }, [anim, index]);
   return (
-    <AnimatedTouchableOpacity
+    <Animated.View
       style={[
         style,
         {
@@ -360,11 +359,15 @@ function RiseInPressable({
           ],
         },
       ]}
-      onPress={onPress}
-      activeOpacity={activeOpacity}
     >
-      {children}
-    </AnimatedTouchableOpacity>
+      <TouchableOpacity
+        style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
+        onPress={onPress}
+        activeOpacity={activeOpacity}
+      >
+        {children}
+      </TouchableOpacity>
+    </Animated.View>
   );
 }
 
@@ -383,13 +386,17 @@ function bounce(v: Animated.Value) {
 function PulseChip({ onPress, style, wrapStyle, children }: { onPress: () => void; style?: any; wrapStyle?: any; children: React.ReactNode }) {
   const scale = useRef(new Animated.Value(1)).current;
   return (
-    <AnimatedTouchableOpacity
+    <Animated.View
       style={[CHIP_ANIM_SHADOW, wrapStyle, style, { transform: [{ scale }] }]}
-      onPress={() => { bounce(scale); onPress(); }}
-      activeOpacity={0.8}
     >
-      {children}
-    </AnimatedTouchableOpacity>
+      <TouchableOpacity
+        style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
+        onPress={() => { bounce(scale); onPress(); }}
+        activeOpacity={0.8}
+      >
+        {children}
+      </TouchableOpacity>
+    </Animated.View>
   );
 }
 
