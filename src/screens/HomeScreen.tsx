@@ -34,6 +34,7 @@ import { usePurchases } from '../contexts/PurchasesContext';
 import { useAds } from '../contexts/AdsContext';
 
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'Home'> };
+const HOME_FAB_POSITION_KEY = 'homeFabPosition';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const daysToCsv = (days: number[]) => days.slice().sort((a, b) => a - b).join(',');
@@ -1144,6 +1145,20 @@ export default function HomeScreen({ navigation }: Props) {
     }
   }, [db, selectedDate]);
 
+  const restoreHomeFabPosition = useCallback(async () => {
+    try {
+      const saved = await getSetting(db, HOME_FAB_POSITION_KEY);
+      if (!saved) return;
+      const parsed = JSON.parse(saved) as { x?: number; y?: number };
+      const next = clampFab(
+        typeof parsed?.x === 'number' ? parsed.x : fabPosition.current.x,
+        typeof parsed?.y === 'number' ? parsed.y : fabPosition.current.y,
+      );
+      fabPosition.current = next;
+      fabAnim.setValue(next);
+    } catch {}
+  }, [db]);
+
   const refreshAllTaskNotifications = useCallback(async () => {
     const allTasks = await getTasks(db);
     for (const t of allTasks) {
@@ -1865,9 +1880,14 @@ export default function HomeScreen({ navigation }: Props) {
       const next = clampFab(fabStartPosition.current.x + gesture.dx, fabStartPosition.current.y + gesture.dy);
       fabPosition.current = next;
       fabAnim.setValue(next);
+      setSetting(db, HOME_FAB_POSITION_KEY, JSON.stringify(next)).catch(() => {});
     },
     onPanResponderTerminate: () => { fabAnim.setValue(fabPosition.current); },
   })).current;
+
+  useEffect(() => {
+    restoreHomeFabPosition();
+  }, [restoreHomeFabPosition]);
 
   useEffect(() => {
     Animated.timing(progressAnim, { toValue: progress, duration: 450, useNativeDriver: false }).start();

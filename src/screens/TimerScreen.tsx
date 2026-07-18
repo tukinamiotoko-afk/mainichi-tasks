@@ -168,8 +168,8 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   pickerIconChipActive: { borderColor: C.primary, backgroundColor: C.primarySoft },
   pickerIconChipText: { fontSize: 18 },
   fabWrap: { position: 'absolute', top: 0, left: 0, zIndex: 20 },
-  fab: { width: 58, height: 58, borderRadius: 29, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.25, shadowRadius: 6 },
-  fabText: { color: C.onPrimary, fontSize: 29, fontWeight: '400', lineHeight: 33 },
+  fab: { width: 64, height: 64, borderRadius: 32, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.25, shadowRadius: 6 },
+  fabText: { color: C.onPrimary, fontSize: 32, fontWeight: '400', lineHeight: 36 },
 });
 
 function formatDuration(totalSeconds: number, alwaysHours = false): string {
