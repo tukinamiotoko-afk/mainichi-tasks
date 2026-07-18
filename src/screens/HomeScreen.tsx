@@ -68,6 +68,7 @@ const CHIP_ANIM_SHADOW = {
   shadowRadius: 8,
   elevation: 3,
 } as const;
+const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
 
 // Minimal shape required to schedule a task's reminder.
 type Schedulable = {
@@ -324,6 +325,49 @@ function RiseIn({ index, style, children }: { index: number; style?: any; childr
   );
 }
 
+function RiseInPressable({
+  index,
+  style,
+  onPress,
+  children,
+  scale,
+  activeOpacity = 0.8,
+}: {
+  index: number;
+  style?: any;
+  onPress: () => void;
+  children: React.ReactNode;
+  scale?: Animated.Value;
+  activeOpacity?: number;
+}) {
+  const anim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(anim, {
+      toValue: 1,
+      duration: 260,
+      delay: Math.min(index, 14) * 35,
+      useNativeDriver: true,
+    }).start();
+  }, [anim, index]);
+  return (
+    <AnimatedTouchableOpacity
+      style={[
+        style,
+        {
+          transform: [
+            { translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) },
+            ...(scale ? [{ scale }] : []),
+          ],
+        },
+      ]}
+      onPress={onPress}
+      activeOpacity={activeOpacity}
+    >
+      {children}
+    </AnimatedTouchableOpacity>
+  );
+}
+
 // Quick bounce used across selectable chips for tactile feedback.
 function bounce(v: Animated.Value) {
   Animated.sequence([
@@ -339,11 +383,13 @@ function bounce(v: Animated.Value) {
 function PulseChip({ onPress, style, wrapStyle, children }: { onPress: () => void; style?: any; wrapStyle?: any; children: React.ReactNode }) {
   const scale = useRef(new Animated.Value(1)).current;
   return (
-    <Animated.View style={[CHIP_ANIM_SHADOW, wrapStyle, { transform: [{ scale }] }]}>
-      <TouchableOpacity style={style} onPress={() => { bounce(scale); onPress(); }} activeOpacity={0.8}>
-        {children}
-      </TouchableOpacity>
-    </Animated.View>
+    <AnimatedTouchableOpacity
+      style={[CHIP_ANIM_SHADOW, wrapStyle, style, { transform: [{ scale }] }]}
+      onPress={() => { bounce(scale); onPress(); }}
+      activeOpacity={0.8}
+    >
+      {children}
+    </AnimatedTouchableOpacity>
   );
 }
 
@@ -527,24 +573,16 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   iconChipWrap: {
     width: 44,
     height: 44,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: C.border,
-    backgroundColor: C.card,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.16,
-    shadowRadius: 10,
-    elevation: 5,
   },
   iconChip: {
     width: '100%',
     height: '100%',
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: C.border,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: C.card,
   },
   iconChipActive: { backgroundColor: C.iconChipActiveBg, borderColor: C.primary },
   iconEmoji: { fontSize: 22 },
@@ -560,11 +598,6 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
     paddingVertical: 8,
     alignItems: 'center',
     backgroundColor: C.card,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
   },
   typeChipText: { color: C.muted, fontSize: 12, fontWeight: '700' },
   typeChipTextActive: { color: C.onPrimary },
@@ -579,11 +612,6 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     backgroundColor: C.card,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
   },
   freqTypeChipActive: { backgroundColor: C.primary, borderColor: C.primary },
   freqTypeText: { color: C.muted, fontSize: 12, fontWeight: '700' },
@@ -598,11 +626,6 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: C.card,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
   },
   dayChipActive: { backgroundColor: C.primary, borderColor: C.primary },
   dayChipText: { color: C.onDark, fontSize: 13, fontWeight: '700' },
@@ -618,11 +641,6 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
     paddingVertical: 8,
     alignItems: 'center',
     backgroundColor: C.card,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
   },
   weekChipActive: { backgroundColor: C.primary, borderColor: C.primary },
   weekChipText: { color: C.onDark, fontSize: 12, fontWeight: '700' },
@@ -638,11 +656,6 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: C.card,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
   },
   monthDayChipActive: { backgroundColor: C.primary, borderColor: C.primary },
   monthDayText: { color: C.onDark, fontSize: 13, fontWeight: '700' },
@@ -716,17 +729,15 @@ function FreqTypeChips({ freqType, onSetType, s }: {
       {FREQ_TYPES.map((ft, i) => {
         const isActive = freqType === ft.value;
         return (
-          <RiseIn key={ft.value} index={i}>
-            <Animated.View style={[CHIP_ANIM_SHADOW, { transform: [{ scale: getScale(ft.value) }] }]}>
-              <TouchableOpacity
-                style={[s.freqTypeChip, isActive && s.freqTypeChipActive]}
-                onPress={() => { bounce(getScale(ft.value)); onSetType(ft.value); }}
-                activeOpacity={0.8}
-              >
-                <Text style={[s.freqTypeText, isActive && s.freqTypeTextActive]}>{ft.label}</Text>
-              </TouchableOpacity>
-            </Animated.View>
-          </RiseIn>
+          <RiseInPressable
+            key={ft.value}
+            index={i}
+            scale={getScale(ft.value)}
+            style={[CHIP_ANIM_SHADOW, s.freqTypeChip, isActive && s.freqTypeChipActive]}
+            onPress={() => { bounce(getScale(ft.value)); onSetType(ft.value); }}
+          >
+            <Text style={[s.freqTypeText, isActive && s.freqTypeTextActive]}>{ft.label}</Text>
+          </RiseInPressable>
         );
       })}
     </View>
@@ -2210,17 +2221,22 @@ export default function HomeScreen({ navigation }: Props) {
       </TouchableOpacity>
       {openPicker === 'icon' && (
         <View style={s.iconGrid}>
-          <RiseIn index={0} style={s.iconChipWrap}>
-            <TouchableOpacity style={[s.iconChip, icon === null && s.iconChipActive]} onPress={() => { onIcon(null); setOpenPicker(null); }}>
-              <Text style={s.iconNone}>なし</Text>
-            </TouchableOpacity>
-          </RiseIn>
+          <RiseInPressable
+            index={0}
+            style={[CHIP_ANIM_SHADOW, s.iconChipWrap, s.iconChip, icon === null && s.iconChipActive]}
+            onPress={() => { onIcon(null); setOpenPicker(null); }}
+          >
+            <Text style={s.iconNone}>なし</Text>
+          </RiseInPressable>
           {TASK_ICONS.map((ic, i) => (
-            <RiseIn key={ic} index={i + 1} style={s.iconChipWrap}>
-              <TouchableOpacity style={[s.iconChip, icon === ic && s.iconChipActive]} onPress={() => { onIcon(ic); setOpenPicker(null); }}>
-                <Text style={s.iconEmoji}>{ic}</Text>
-              </TouchableOpacity>
-            </RiseIn>
+            <RiseInPressable
+              key={ic}
+              index={i + 1}
+              style={[CHIP_ANIM_SHADOW, s.iconChipWrap, s.iconChip, icon === ic && s.iconChipActive]}
+              onPress={() => { onIcon(ic); setOpenPicker(null); }}
+            >
+              <Text style={s.iconEmoji}>{ic}</Text>
+            </RiseInPressable>
           ))}
         </View>
       )}
@@ -2240,14 +2256,14 @@ export default function HomeScreen({ navigation }: Props) {
       {openPicker === 'priority' && (
         <View style={s.typeRow}>
           {PRIORITIES.map((p, i) => (
-            <RiseIn key={p.value} index={i} style={[CHIP_ANIM_SHADOW, { flex: 1 }]}>
-              <TouchableOpacity
-                style={[s.typeChip, priority === p.value && { backgroundColor: p.color, borderColor: p.color }]}
-                onPress={() => { onPriority(p.value); setOpenPicker(null); }}
-              >
-                <Text style={[s.typeChipText, priority === p.value && s.typeChipTextActive]}>{p.label}</Text>
-              </TouchableOpacity>
-            </RiseIn>
+            <RiseInPressable
+              key={p.value}
+              index={i}
+              style={[CHIP_ANIM_SHADOW, s.typeChip, priority === p.value && { backgroundColor: p.color, borderColor: p.color }]}
+              onPress={() => { onPriority(p.value); setOpenPicker(null); }}
+            >
+              <Text style={[s.typeChipText, priority === p.value && s.typeChipTextActive]}>{p.label}</Text>
+            </RiseInPressable>
           ))}
         </View>
       )}
