@@ -1583,7 +1583,7 @@ export default function HomeScreen({ navigation }: Props) {
   const total = tasks.length;
   const progress = total > 0 ? done / total : 0;
   const headerGrad = useMemo(
-    () => [darkenHex(grad.header[0], 0.14), darkenHex(grad.header[1], 0.08)] as const,
+    () => [darkenHex(grad.header[0], 0.2), darkenHex(grad.header[1], 0.12)] as const,
     [grad.header]
   );
   // Gauge gradient color by completion ratio.
