@@ -172,7 +172,7 @@ async function scheduleTaskNotifs(task: Schedulable): Promise<string[]> {
   const isAlarm = task.notify_type === 'alarm';
   const channelId = isAlarm ? 'full' : 'silent';
   const content = {
-    title: '毎日タスク', body,
+    title: '', body,
     sound: isAlarm,
     android: { channelId },
   } as any;
@@ -249,7 +249,7 @@ async function scheduleAutoTimerNotifs(task: AutoTimerSchedulable): Promise<stri
   const body = `${task.icon ? task.icon + ' ' : ''}${task.title} の${modeLabel}計測を開始する時間です（タップで開始）`;
   const channelId = 'full';
   const content = {
-    title: '毎日タスク', body,
+    title: '', body,
     sound: true,
     android: { channelId },
     data: { kind: 'auto-timer', taskId: task.id, mode: task.auto_timer_mode, minutes: task.auto_timer_minutes },
