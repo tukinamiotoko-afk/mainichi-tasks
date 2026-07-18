@@ -61,18 +61,14 @@ const SORT_OPTS: { k: SortKey; l: string }[] = [
   { k: 'manual', l: '手動' }, { k: 'priority', l: '優先度' }, { k: 'time', l: '時刻' }, { k: 'name', l: '名前' },
 ];
 const SWIPE_DELETE_THRESHOLD = 92;
-const FLOAT_SHADOW_OFFSET = 4;
-const FLOAT_SHADOW_WRAP = {
-  position: 'relative' as const,
-  paddingBottom: FLOAT_SHADOW_OFFSET,
-};
 const FLOAT_SHADOW_BASE = {
   position: 'absolute' as const,
+  top: 0,
   left: 0,
   right: 0,
-  top: FLOAT_SHADOW_OFFSET,
   bottom: 0,
-  backgroundColor: 'rgba(15,23,42,0.16)',
+  backgroundColor: 'rgba(15,23,42,0.22)',
+  transform: [{ translateX: 3 }, { translateY: 5 }],
 };
 
 // Minimal shape required to schedule a task's reminder.
@@ -326,12 +322,26 @@ function RiseIn({ index, style, shadowStyle, children }: { index: number; style?
   return (
     <Animated.View
       style={[
-        shadowStyle && FLOAT_SHADOW_WRAP,
         style,
         { transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }] },
       ]}
     >
-      {shadowStyle && <View pointerEvents="none" style={[FLOAT_SHADOW_BASE, shadowStyle]} />}
+      {shadowStyle && (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            FLOAT_SHADOW_BASE,
+            shadowStyle,
+            {
+              opacity: anim.interpolate({
+                inputRange: [0, 0.85, 1],
+                outputRange: [0.2, 0.08, 0],
+                extrapolate: 'clamp',
+              }),
+            },
+          ]}
+        />
+      )}
       {children}
     </Animated.View>
   );
@@ -354,12 +364,26 @@ function PulseChip({ onPress, style, wrapStyle, shadowStyle, children }: { onPre
   return (
     <Animated.View
       style={[
-        shadowStyle && FLOAT_SHADOW_WRAP,
         wrapStyle,
         { transform: [{ scale }] },
       ]}
     >
-      {shadowStyle && <View pointerEvents="none" style={[FLOAT_SHADOW_BASE, shadowStyle]} />}
+      {shadowStyle && (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            FLOAT_SHADOW_BASE,
+            shadowStyle,
+            {
+              opacity: scale.interpolate({
+                inputRange: [0.92, 1, 1.18],
+                outputRange: [0.14, 0, 0.18],
+                extrapolate: 'clamp',
+              }),
+            },
+          ]}
+        />
+      )}
       <TouchableOpacity style={style} onPress={() => { bounce(scale); onPress(); }} activeOpacity={0.8}>
         {children}
       </TouchableOpacity>
