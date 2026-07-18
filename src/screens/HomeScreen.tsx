@@ -61,6 +61,13 @@ const SORT_OPTS: { k: SortKey; l: string }[] = [
   { k: 'manual', l: '手動' }, { k: 'priority', l: '優先度' }, { k: 'time', l: '時刻' }, { k: 'name', l: '名前' },
 ];
 const SWIPE_DELETE_THRESHOLD = 92;
+const CHIP_ANIM_SHADOW = {
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 3 },
+  shadowOpacity: 0.1,
+  shadowRadius: 8,
+  elevation: 3,
+} as const;
 
 // Minimal shape required to schedule a task's reminder.
 type Schedulable = {
@@ -332,7 +339,7 @@ function bounce(v: Animated.Value) {
 function PulseChip({ onPress, style, wrapStyle, children }: { onPress: () => void; style?: any; wrapStyle?: any; children: React.ReactNode }) {
   const scale = useRef(new Animated.Value(1)).current;
   return (
-    <Animated.View style={[wrapStyle, { transform: [{ scale }] }]}>
+    <Animated.View style={[CHIP_ANIM_SHADOW, wrapStyle, { transform: [{ scale }] }]}>
       <TouchableOpacity style={style} onPress={() => { bounce(scale); onPress(); }} activeOpacity={0.8}>
         {children}
       </TouchableOpacity>
@@ -710,7 +717,7 @@ function FreqTypeChips({ freqType, onSetType, s }: {
         const isActive = freqType === ft.value;
         return (
           <RiseIn key={ft.value} index={i}>
-            <Animated.View style={{ transform: [{ scale: getScale(ft.value) }] }}>
+            <Animated.View style={[CHIP_ANIM_SHADOW, { transform: [{ scale: getScale(ft.value) }] }]}>
               <TouchableOpacity
                 style={[s.freqTypeChip, isActive && s.freqTypeChipActive]}
                 onPress={() => { bounce(getScale(ft.value)); onSetType(ft.value); }}
@@ -2233,7 +2240,7 @@ export default function HomeScreen({ navigation }: Props) {
       {openPicker === 'priority' && (
         <View style={s.typeRow}>
           {PRIORITIES.map((p, i) => (
-            <RiseIn key={p.value} index={i} style={{ flex: 1 }}>
+            <RiseIn key={p.value} index={i} style={[CHIP_ANIM_SHADOW, { flex: 1 }]}>
               <TouchableOpacity
                 style={[s.typeChip, priority === p.value && { backgroundColor: p.color, borderColor: p.color }]}
                 onPress={() => { onPriority(p.value); setOpenPicker(null); }}
