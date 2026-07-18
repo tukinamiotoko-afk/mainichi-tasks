@@ -8,7 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import ReanimatedAnimated, { runOnJS, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { RootStackParamList } from '../../App';
-import { Task, TimeLog, getSetting, getTasks, getTimeLogsForTask, setSetting } from '../db/database';
+import { Task, TimeLog, deleteTimeLog, getSetting, getTasks, getTimeLogsForTask, setSetting } from '../db/database';
 import { GRAD_START, GRAD_END } from '../constants/theme';
 import TabBar from '../components/TabBar';
 import { useTheme, ColorSet } from '../contexts/ThemeContext';
@@ -135,8 +135,11 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
     elevation: 2,
   },
   historyRowTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  historyRowActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   historyDuration: { color: C.primary, fontSize: 14, fontWeight: '900' },
   historyMeta: { color: C.muted, fontSize: 12, fontWeight: '700' },
+  historyDeleteBtn: { paddingVertical: 2, paddingHorizontal: 2 },
+  historyDeleteText: { color: '#dc2626', fontSize: 12, fontWeight: '900' },
   sheetHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: C.border, alignSelf: 'center' },
   pickerTitle: { color: C.onDark, fontSize: 16, fontWeight: '900' },
   pickerList: { flex: 1 },
@@ -170,8 +173,8 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   pickerIconChipActive: { borderColor: C.primary, backgroundColor: C.primarySoft },
   pickerIconChipText: { fontSize: 18 },
   fabWrap: { position: 'absolute', top: 0, left: 0, zIndex: 20 },
-  fab: { width: 64, height: 64, borderRadius: 32, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.25, shadowRadius: 6 },
-  fabText: { color: C.onPrimary, fontSize: 32, fontWeight: '400', lineHeight: 36 },
+  fab: { width: 58, height: 58, borderRadius: 29, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.25, shadowRadius: 6 },
+  fabText: { color: C.onPrimary, fontSize: 29, fontWeight: '400', lineHeight: 33 },
 });
 
 function formatDuration(totalSeconds: number, alwaysHours = false): string {
@@ -404,6 +407,24 @@ export default function TimerScreen({ navigation }: Props) {
     } finally {
       setHistoryLoading(false);
     }
+  };
+
+  const confirmDeleteHistoryLog = (log: TimeLog) => {
+    Alert.alert(
+      '履歴を削除',
+      `${formatDuration(log.duration_seconds, true)} の履歴を削除しますか？`,
+      [
+        { text: 'キャンセル', style: 'cancel' },
+        {
+          text: '削除',
+          style: 'destructive',
+          onPress: async () => {
+            await deleteTimeLog(db, log.id);
+            setHistoryLogs((current) => current.filter((item) => item.id !== log.id));
+          },
+        },
+      ],
+    );
   };
 
   return (
@@ -683,7 +704,12 @@ export default function TimerScreen({ navigation }: Props) {
                 <View key={log.id} style={s.historyRow}>
                   <View style={s.historyRowTop}>
                     <Text style={s.historyDuration}>{formatDuration(log.duration_seconds, true)}</Text>
-                    <Text style={s.historyMeta}>{log.mode === 'timer' ? 'タイマー' : 'ストップウォッチ'}</Text>
+                    <View style={s.historyRowActions}>
+                      <Text style={s.historyMeta}>{log.mode === 'timer' ? 'タイマー' : 'ストップウォッチ'}</Text>
+                      <TouchableOpacity style={s.historyDeleteBtn} onPress={() => confirmDeleteHistoryLog(log)} activeOpacity={0.8}>
+                        <Text style={s.historyDeleteText}>削除</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
                   <Text style={s.historyMeta}>{formatLogStamp(log.started_at)} - {formatLogStamp(log.ended_at)}</Text>
                 </View>
