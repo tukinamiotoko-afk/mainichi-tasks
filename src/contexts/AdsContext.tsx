@@ -25,6 +25,7 @@ const debugAds = (...args: unknown[]) => {
     console.log('[Ads]', ...args);
   }
 };
+const REWARDED_TIMEOUT_MS = 15_000;
 
 export function AdsProvider({ children }: { children: ReactNode }) {
   const { isPremium } = usePurchases();
@@ -102,9 +103,18 @@ export function AdsProvider({ children }: { children: ReactNode }) {
       const ad = RewardedAd.createForAdRequest(REWARDED_AD_UNIT_ID);
       let earned = false;
       let settled = false;
+      let timeoutId: ReturnType<typeof setTimeout> | null = setTimeout(() => {
+        timeoutId = null;
+        debugAds('rewarded timeout', REWARDED_TIMEOUT_MS);
+        finish(false);
+      }, REWARDED_TIMEOUT_MS);
       const finish = (result: boolean) => {
         if (settled) return;
         settled = true;
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          timeoutId = null;
+        }
         debugAds('rewarded finish', result, 'earned=', earned);
         unsubLoaded(); unsubEarned(); unsubClosed(); unsubError();
         resolve(result);
