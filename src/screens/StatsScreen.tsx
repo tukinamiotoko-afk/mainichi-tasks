@@ -98,6 +98,8 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   monthLabel: { color: '#ffffff', fontSize: 17, fontWeight: '700' },
 
   chipRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  chipInlineGroup: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, flexWrap: 'nowrap' },
+  chipModeColumn: { alignItems: 'flex-start' },
   chip: { borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6 },
   chipActive: { backgroundColor: '#ffffff', borderColor: '#ffffff' },
   chipText: { color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '700' },
@@ -107,6 +109,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   chipAltText: { color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '700' },
   chipAltTextActive: { color: '#2563eb' },
   chipAltExpand: { overflow: 'hidden', width: '100%' },
+  chipAltExpandInner: { paddingTop: 8, gap: 8, alignItems: 'flex-start' },
 
   customBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.card, paddingHorizontal: 16, paddingVertical: 10, gap: 6, borderBottomWidth: 1, borderBottomColor: C.border },
   customLabel: { color: C.stone, fontSize: 11, fontWeight: '700' },
@@ -419,49 +422,53 @@ export default function StatsScreen({ navigation }: Props) {
           </>
         ) : (
           <>
-            <View style={s.chipRow}>
-              {([{ k: 'daily' as const, l: '日別' }, { k: 'summary' as const, l: '集計' }]).map((o) => (
-                <TouchableOpacity key={o.k} style={[s.chip, timerSubMode === o.k && s.chipActive]} onPress={() => setTimerSubMode(o.k)}>
-                  <Text style={[s.chipText, timerSubMode === o.k && s.chipTextActive]}>{o.l}</Text>
-                </TouchableOpacity>
-              ))}
-              <TouchableOpacity
-                style={[s.chip, s.chipAlt, s.selectorBtnOpen]}
-                onPress={toggleTimerModePicker}
-                activeOpacity={0.85}
-              >
-                <Text style={[s.chipAltText, timerModeFilter === 'timer' && s.chipAltTextActive]}>
-                  {timerModeFilter === 'timer' ? 'タイマー' : 'ストップウォッチ'} {timerModePickerOpen ? '▲' : '▼'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-            <Animated.View
-              style={[
-                s.chipAltExpand,
-                {
-                  maxHeight: timerModeExpand.interpolate({ inputRange: [0, 1], outputRange: [0, 56] }),
-                  opacity: timerModeExpand,
-                },
-              ]}
-            >
+            <View style={s.chipInlineGroup}>
               <View style={s.chipRow}>
-                {([
-                  { k: 'stopwatch' as const, l: 'ストップウォッチ' },
-                  { k: 'timer' as const, l: 'タイマー' },
-                ]).map((o) => (
-                  <TouchableOpacity
-                    key={o.k}
-                    style={[s.chip, s.chipAlt, timerModeFilter === o.k && s.chipAltActive]}
-                    onPress={() => {
-                      setTimerModeFilter(o.k);
-                      if (timerModePickerOpen) toggleTimerModePicker();
-                    }}
-                  >
-                    <Text style={[s.chipAltText, timerModeFilter === o.k && s.chipAltTextActive]}>{o.l}</Text>
+                {([{ k: 'daily' as const, l: '日別' }, { k: 'summary' as const, l: '集計' }]).map((o) => (
+                  <TouchableOpacity key={o.k} style={[s.chip, timerSubMode === o.k && s.chipActive]} onPress={() => setTimerSubMode(o.k)}>
+                    <Text style={[s.chipText, timerSubMode === o.k && s.chipTextActive]}>{o.l}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
-            </Animated.View>
+              <View style={s.chipModeColumn}>
+                <TouchableOpacity
+                  style={[s.chip, s.chipAlt, s.selectorBtnOpen]}
+                  onPress={toggleTimerModePicker}
+                  activeOpacity={0.85}
+                >
+                  <Text style={[s.chipAltText, timerModeFilter === 'timer' && s.chipAltTextActive]}>
+                    {timerModeFilter === 'timer' ? 'タイマー' : 'ストップウォッチ'} {timerModePickerOpen ? '▲' : '▼'}
+                  </Text>
+                </TouchableOpacity>
+                <Animated.View
+                  style={[
+                    s.chipAltExpand,
+                    {
+                      maxHeight: timerModeExpand.interpolate({ inputRange: [0, 1], outputRange: [0, 88] }),
+                      opacity: timerModeExpand,
+                    },
+                  ]}
+                >
+                  <View style={s.chipAltExpandInner}>
+                    {([
+                      { k: 'stopwatch' as const, l: 'ストップウォッチ' },
+                      { k: 'timer' as const, l: 'タイマー' },
+                    ]).map((o) => (
+                      <TouchableOpacity
+                        key={o.k}
+                        style={[s.chip, s.chipAlt, timerModeFilter === o.k && s.chipAltActive]}
+                        onPress={() => {
+                          setTimerModeFilter(o.k);
+                          if (timerModePickerOpen) toggleTimerModePicker();
+                        }}
+                      >
+                        <Text style={[s.chipAltText, timerModeFilter === o.k && s.chipAltTextActive]}>{o.l}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </Animated.View>
+              </View>
+            </View>
             {timerSubMode === 'daily' ? (
               <View style={s.monthNav}>
                 <TouchableOpacity onPress={() => setTimerDate(subtractDays(timerDate, 1))} style={s.navBtn}>
