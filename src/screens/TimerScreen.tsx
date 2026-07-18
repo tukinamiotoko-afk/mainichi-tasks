@@ -164,7 +164,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   pickerIconChip: { width: 40, height: 40, borderRadius: 12, borderWidth: 1.5, borderColor: C.border, backgroundColor: C.body, alignItems: 'center', justifyContent: 'center', marginRight: 8 },
   pickerIconChipActive: { borderColor: C.primary, backgroundColor: C.primarySoft },
   pickerIconChipText: { fontSize: 18 },
-  fabWrap: { position: 'absolute', zIndex: 20 },
+  fabWrap: { position: 'absolute', top: 0, left: 0, zIndex: 20 },
   fab: { width: 58, height: 58, borderRadius: 29, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.25, shadowRadius: 6 },
   fabText: { color: C.onPrimary, fontSize: 29, fontWeight: '400', lineHeight: 33 },
 });
@@ -218,7 +218,8 @@ export default function TimerScreen({ navigation }: Props) {
   const [editingTimerId, setEditingTimerId] = useState<string | null>(null);
   const fabPosition = useRef({ x: Math.max(screen.width - 72, 20), y: Math.max(screen.height - insets.bottom - 132, 120) });
   const fabStartPosition = useRef(fabPosition.current);
-  const fabAnim = useRef(new Animated.ValueXY(fabPosition.current)).current;
+  const fabTranslateX = useRef(new Animated.Value(fabPosition.current.x)).current;
+  const fabTranslateY = useRef(new Animated.Value(fabPosition.current.y)).current;
 
   const getExpandAnim = (itemKey: string) => {
     if (!expandAnims.current[itemKey]) expandAnims.current[itemKey] = new Animated.Value(0);
@@ -236,14 +237,19 @@ export default function TimerScreen({ navigation }: Props) {
     onPanResponderGrant: () => { fabStartPosition.current = fabPosition.current; },
     onPanResponderMove: (_, gesture) => {
       const next = clampFab(fabStartPosition.current.x + gesture.dx, fabStartPosition.current.y + gesture.dy);
-      fabAnim.setValue(next);
+      fabTranslateX.setValue(next.x);
+      fabTranslateY.setValue(next.y);
     },
     onPanResponderRelease: (_, gesture) => {
       const next = clampFab(fabStartPosition.current.x + gesture.dx, fabStartPosition.current.y + gesture.dy);
       fabPosition.current = next;
-      fabAnim.setValue(next);
+      fabTranslateX.setValue(next.x);
+      fabTranslateY.setValue(next.y);
     },
-    onPanResponderTerminate: () => { fabAnim.setValue(fabPosition.current); },
+    onPanResponderTerminate: () => {
+      fabTranslateX.setValue(fabPosition.current.x);
+      fabTranslateY.setValue(fabPosition.current.y);
+    },
   })).current;
 
   const runningCount = timers.filter((item) => item.startedAtMs).length;
@@ -640,7 +646,13 @@ export default function TimerScreen({ navigation }: Props) {
         </View>
       </Modal>
 
-      <Animated.View style={[s.fabWrap, fabAnim.getLayout()]} {...fabPanResponder.panHandlers}>
+      <Animated.View
+        style={[
+          s.fabWrap,
+          { transform: [{ translateX: fabTranslateX }, { translateY: fabTranslateY }] },
+        ]}
+        {...fabPanResponder.panHandlers}
+      >
         <TouchableOpacity activeOpacity={0.85} onPress={() => setPickerOpen(true)}>
           <LinearGradient colors={grad.brand} start={GRAD_START} end={GRAD_END} style={s.fab}>
             <Text style={s.fabText}>＋</Text>
