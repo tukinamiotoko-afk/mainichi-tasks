@@ -69,7 +69,7 @@ const FLOAT_SHADOW_BASE = {
   right: 0,
   bottom: 0,
   backgroundColor: 'rgba(15,23,42,0.48)',
-  transform: [{ translateX: 4 }, { translateY: 6 }],
+  transform: [{ translateX: 2 }, { translateY: 3 }],
 };
 
 // Minimal shape required to schedule a task's reminder.
@@ -461,7 +461,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   taskCard: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 12,
     paddingHorizontal: 14, paddingVertical: 14, gap: 12,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2,
+    shadowColor: '#000', shadowOffset: { width: 1, height: 3 }, shadowOpacity: 0.12, shadowRadius: 6, elevation: 4,
   },
   taskCardDone: { opacity: 0.6 },
   checkBox: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
