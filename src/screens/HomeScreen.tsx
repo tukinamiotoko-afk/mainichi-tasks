@@ -3,7 +3,7 @@ import {
   View, Text, FlatList, TouchableOpacity, Modal,
   TextInput, StyleSheet, Alert, KeyboardAvoidingView,
   Platform, StatusBar, Animated, ScrollView, PanResponder, Dimensions, Switch,
-  LayoutAnimation, UIManager, Easing,
+  LayoutAnimation, UIManager, Easing, Image, Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSQLiteContext } from 'expo-sqlite';
@@ -881,6 +881,9 @@ export default function HomeScreen({ navigation }: Props) {
   const [newAutoTimerMinutes, setNewAutoTimerMinutes] = useState(25);
   const [newRepeatEnabled, setNewRepeatEnabled] = useState(false);
   const [newRepeatTarget, setNewRepeatTarget] = useState(2);
+  const [showNotifyGuide, setShowNotifyGuide] = useState(false);
+  const [showBatteryGuide, setShowBatteryGuide] = useState(false);
+  const onboardingShownRef = useRef(false);
 
   // Task detail sheet
   const [detailTask, setDetailTask] = useState<Task | null>(null);
@@ -933,6 +936,22 @@ export default function HomeScreen({ navigation }: Props) {
       UIManager.setLayoutAnimationEnabledExperimental?.(true);
     }
   }, []);
+
+  useEffect(() => {
+    if (!tasksLoaded || onboardingShownRef.current) return;
+    onboardingShownRef.current = true;
+    (async () => {
+      const notifyGuideDone = await getSetting(db, 'notifyGuideDone');
+      if (!notifyGuideDone) {
+        setShowNotifyGuide(true);
+        return;
+      }
+      if (Platform.OS === 'android') {
+        const batteryGuideDone = await getSetting(db, 'batterySaverGuideDone');
+        if (!batteryGuideDone) setShowBatteryGuide(true);
+      }
+    })();
+  }, [db, tasksLoaded]);
 
   // Keep monthly-nth / every-n-days reminders (which can't natively repeat) armed for the next occurrence.
   useFocusEffect(useCallback(() => {
@@ -1206,6 +1225,44 @@ export default function HomeScreen({ navigation }: Props) {
     if (value && !(await ensurePermission())) return;
     await patchDetail({ notify: value ? 1 : 0 });
   };
+
+  const handleNotifyGuideLater = useCallback(async () => {
+    setShowNotifyGuide(false);
+    await setSetting(db, 'notifyGuideDone', '1');
+    if (Platform.OS === 'android') {
+      const batteryGuideDone = await getSetting(db, 'batterySaverGuideDone');
+      if (!batteryGuideDone) setShowBatteryGuide(true);
+    }
+  }, [db]);
+
+  const handleNotifyGuideEnable = useCallback(async () => {
+    const granted = await ensurePermission();
+    setShowNotifyGuide(false);
+    await setSetting(db, 'notifyGuideDone', '1');
+    if (Platform.OS === 'android') {
+      const batteryGuideDone = await getSetting(db, 'batterySaverGuideDone');
+      if (!batteryGuideDone) setShowBatteryGuide(true);
+    } else if (!granted) {
+      Alert.alert('通知は未許可です', 'あとから設定画面で通知をオンにできます。');
+    }
+  }, [db]);
+
+  const closeBatteryGuide = useCallback(async () => {
+    setShowBatteryGuide(false);
+    await setSetting(db, 'batterySaverGuideDone', '1');
+  }, [db]);
+
+  const openBatterySaverSettings = useCallback(async () => {
+    try {
+      await Linking.sendIntent('android.settings.BATTERY_SAVER_SETTINGS');
+    } catch {
+      try {
+        await Linking.openSettings();
+      } catch {}
+    } finally {
+      await closeBatteryGuide();
+    }
+  }, [closeBatteryGuide]);
 
   const getTimerPresetMinutes = useCallback(async (taskId: number): Promise<number | null> => {
     const saved = await getTimerSettingForTask(db, taskId);
@@ -2432,6 +2489,48 @@ export default function HomeScreen({ navigation }: Props) {
               <TouchableOpacity style={s.timeConfirmBtnWrap} onPress={confirmTime} activeOpacity={0.85}>
                 <LinearGradient colors={grad.brand} start={GRAD_START} end={GRAD_END} style={s.timeConfirmBtn}>
                   <Text style={s.timeConfirmText}>決定</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showNotifyGuide} transparent animationType="fade" onRequestClose={() => {}}>
+        <View style={s.timeModalBg}>
+          <View style={[s.timeModalCard, { gap: 14 }]}>
+            <Text style={s.timeModalTitle}>通知をオンにしてください</Text>
+            <Text style={s.emptyBody}>通知がオフだと、予定時刻の通知や自動計測の開始通知が届きません。</Text>
+            <View style={s.timeBtnRow}>
+              <TouchableOpacity style={s.timeCancelBtn} onPress={handleNotifyGuideLater}>
+                <Text style={s.timeCancelText}>あとで</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.timeConfirmBtnWrap} onPress={handleNotifyGuideEnable} activeOpacity={0.85}>
+                <LinearGradient colors={grad.brand} start={GRAD_START} end={GRAD_END} style={s.timeConfirmBtn}>
+                  <Text style={s.timeConfirmText}>通知をオンにする</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showBatteryGuide} transparent animationType="fade" onRequestClose={closeBatteryGuide}>
+        <View style={s.timeModalBg}>
+          <View style={[s.timeModalCard, { width: Math.min(screen.width - 24, 430), maxHeight: screen.height * 0.84, gap: 14 }]}>
+            <Text style={s.timeModalTitle}>バッテリーセーバーを確認してください</Text>
+            <Text style={s.emptyBody}>バッテリーセーバーがオンだと、通知が来ないことがあります。</Text>
+            <Image
+              source={require('../../assets/images/onboarding/guide_battery.jpg')}
+              style={{ width: '100%', height: Math.min(360, screen.height * 0.42), borderRadius: 14, resizeMode: 'contain', backgroundColor: '#ffffff' }}
+            />
+            <View style={s.timeBtnRow}>
+              <TouchableOpacity style={s.timeCancelBtn} onPress={closeBatteryGuide}>
+                <Text style={s.timeCancelText}>あとで</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.timeConfirmBtnWrap} onPress={openBatterySaverSettings} activeOpacity={0.85}>
+                <LinearGradient colors={grad.brand} start={GRAD_START} end={GRAD_END} style={s.timeConfirmBtn}>
+                  <Text style={s.timeConfirmText}>設定を開く</Text>
                 </LinearGradient>
               </TouchableOpacity>
             </View>
