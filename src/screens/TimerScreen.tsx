@@ -200,7 +200,7 @@ export default function TimerScreen({ navigation }: Props) {
   const [pickerIconFilterOpen, setPickerIconFilterOpen] = useState(false);
   const [pickerIconFilter, setPickerIconFilter] = useState<string | null>(null);
   const [currentTab, setCurrentTab] = useState<'stopwatch' | 'timer'>('stopwatch');
-  const [expandedKey, setExpandedKey] = useState<string | null>(null);
+  const [expandedKeys, setExpandedKeys] = useState<Record<string, boolean>>({});
   const expandAnims = useRef<Record<string, Animated.Value>>({});
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyTask, setHistoryTask] = useState<Task | null>(null);
@@ -304,26 +304,16 @@ export default function TimerScreen({ navigation }: Props) {
   };
 
   const toggleExpanded = (itemKey: string) => {
-    const nextIsOpen = expandedKey !== itemKey;
+    const nextIsOpen = !expandedKeys[itemKey];
     const currentAnim = getExpandAnim(itemKey);
-    const animations: Animated.CompositeAnimation[] = [];
-    if (expandedKey && expandedKey !== itemKey) {
-      animations.push(Animated.timing(getExpandAnim(expandedKey), {
-        toValue: 0,
-        duration: 180,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: false,
-      }));
-    }
-    animations.push(Animated.timing(currentAnim, {
+    setExpandedKeys((current) => ({ ...current, [itemKey]: nextIsOpen }));
+    if (!nextIsOpen) setEditingTimerId((current) => (current === itemKey ? null : current));
+    Animated.timing(currentAnim, {
       toValue: nextIsOpen ? 1 : 0,
       duration: 220,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: false,
-    }));
-    setExpandedKey(nextIsOpen ? itemKey : null);
-    if (!nextIsOpen) setEditingTimerId((current) => (current === itemKey ? null : current));
-    Animated.parallel(animations).start();
+    }).start();
   };
 
   const openHistory = async (task: Task) => {
@@ -377,7 +367,7 @@ export default function TimerScreen({ navigation }: Props) {
           const seconds = timerSeconds(item, now);
           const shownSeconds = displayTimerSeconds(item, now);
           const running = !!item.startedAtMs;
-          const expanded = expandedKey === item.key;
+          const expanded = !!expandedKeys[item.key];
           const expandAnim = getExpandAnim(item.key);
           return (
             <View key={item.key} style={s.timerCard}>
