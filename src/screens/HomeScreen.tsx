@@ -43,6 +43,18 @@ const DRAG_ROW_HEIGHT = 88;
 const DRAG_GAP = 10;
 const DRAG_SLOT = DRAG_ROW_HEIGHT + DRAG_GAP; // actual slot size including gap
 
+function darkenHex(hex: string, amount: number): string {
+  const clean = hex.replace('#', '');
+  const safe = clean.length === 3
+    ? clean.split('').map((c) => c + c).join('')
+    : clean.padEnd(6, '0').slice(0, 6);
+  const factor = Math.max(0, Math.min(1, 1 - amount));
+  const r = Math.max(0, Math.min(255, Math.round(parseInt(safe.slice(0, 2), 16) * factor)));
+  const g = Math.max(0, Math.min(255, Math.round(parseInt(safe.slice(2, 4), 16) * factor)));
+  const b = Math.max(0, Math.min(255, Math.round(parseInt(safe.slice(4, 6), 16) * factor)));
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+}
+
 type FilterStatus = 'all' | 'incomplete' | 'done';
 type FilterFreq = 'all' | 'daily' | 'other';
 type FilterDue = 'all' | 'today';
@@ -1570,6 +1582,10 @@ export default function HomeScreen({ navigation }: Props) {
   const done = useMemo(() => tasks.filter((t) => isTaskDone(t, completionCounts.get(t.id) ?? 0)).length, [tasks, completionCounts]);
   const total = tasks.length;
   const progress = total > 0 ? done / total : 0;
+  const headerGrad = useMemo(
+    () => [darkenHex(grad.header[0], 0.14), darkenHex(grad.header[1], 0.08)] as const,
+    [grad.header]
+  );
   // Gauge gradient color by completion ratio.
   const gaugeColors = (
     progress >= 1 ? ['#86efac', '#16a34a'] :
@@ -2273,7 +2289,7 @@ export default function HomeScreen({ navigation }: Props) {
     <View style={s.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
-      <LinearGradient colors={grad.header} start={GRAD_START} end={GRAD_END} style={[s.headerCard, { paddingTop: insets.top + 12 }]}>
+      <LinearGradient colors={headerGrad} start={GRAD_START} end={GRAD_END} style={[s.headerCard, { paddingTop: insets.top + 12 }]}>
         <View style={s.dateNavRow}>
           <TouchableOpacity onPress={() => shiftSelected(-1)} style={s.dateNavBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
             <Text style={s.dateNavArrow}>‹</Text>
