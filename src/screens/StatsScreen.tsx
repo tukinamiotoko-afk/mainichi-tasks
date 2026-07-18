@@ -110,6 +110,18 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   chipAltTextActive: { color: '#2563eb' },
   chipAltExpand: { overflow: 'hidden', width: '100%' },
   chipAltExpandInner: { paddingTop: 8, gap: 8, alignItems: 'flex-start' },
+  chipAltStack: {
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.4)',
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    paddingHorizontal: 14,
+    paddingTop: 6,
+    paddingBottom: 6,
+  },
+  chipAltStackOpen: { backgroundColor: 'rgba(255,255,255,0.3)' },
+  chipAltTopBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
 
   customBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.card, paddingHorizontal: 16, paddingVertical: 10, gap: 6, borderBottomWidth: 1, borderBottomColor: C.border },
   customLabel: { color: C.stone, fontSize: 11, fontWeight: '700' },
@@ -431,24 +443,33 @@ export default function StatsScreen({ navigation }: Props) {
                 ))}
               </View>
               <View style={s.chipModeColumn}>
-                <TouchableOpacity
-                  style={[s.chip, s.chipAlt, s.selectorBtnOpen]}
-                  onPress={toggleTimerModePicker}
-                  activeOpacity={0.85}
-                >
-                  <Text style={[s.chipAltText, timerModeFilter === 'timer' && s.chipAltTextActive]}>
-                    {timerModeFilter === 'timer' ? 'タイマー' : 'ストップウォッチ'} {timerModePickerOpen ? '▲' : '▼'}
-                  </Text>
-                </TouchableOpacity>
                 <Animated.View
                   style={[
-                    s.chipAltExpand,
+                    s.chipAltStack,
+                    timerModePickerOpen && s.chipAltStackOpen,
                     {
-                      maxHeight: timerModeExpand.interpolate({ inputRange: [0, 1], outputRange: [0, 88] }),
-                      opacity: timerModeExpand,
+                      maxHeight: timerModeExpand.interpolate({ inputRange: [0, 1], outputRange: [34, 126] }),
                     },
                   ]}
                 >
+                  <TouchableOpacity
+                    style={s.chipAltTopBtn}
+                    onPress={toggleTimerModePicker}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={[s.chipAltText, timerModeFilter === 'timer' && s.chipAltTextActive]}>
+                      {timerModeFilter === 'timer' ? 'タイマー' : 'ストップウォッチ'} {timerModePickerOpen ? '▲' : '▼'}
+                    </Text>
+                  </TouchableOpacity>
+                  <Animated.View
+                    style={[
+                      s.chipAltExpand,
+                      {
+                        maxHeight: timerModeExpand.interpolate({ inputRange: [0, 1], outputRange: [0, 88] }),
+                        opacity: timerModeExpand,
+                      },
+                    ]}
+                  >
                   <View style={s.chipAltExpandInner}>
                     {([
                       { k: 'stopwatch' as const, l: 'ストップウォッチ' },
@@ -466,6 +487,7 @@ export default function StatsScreen({ navigation }: Props) {
                       </TouchableOpacity>
                     ))}
                   </View>
+                  </Animated.View>
                 </Animated.View>
               </View>
             </View>
