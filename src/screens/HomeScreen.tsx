@@ -4,7 +4,7 @@ import {
   View, Text, FlatList, TouchableOpacity, Modal,
   TextInput, StyleSheet, Alert, KeyboardAvoidingView,
   Platform, StatusBar, Animated, ScrollView, PanResponder, Dimensions, Switch,
-  LayoutAnimation, UIManager, Easing, Image, Linking,
+  LayoutAnimation, UIManager, Easing, Image, Linking, InteractionManager,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSQLiteContext } from 'expo-sqlite';
@@ -1900,7 +1900,10 @@ export default function HomeScreen({ navigation }: Props) {
   })).current;
 
   useEffect(() => {
-    restoreHomeFabPosition();
+    const task = InteractionManager.runAfterInteractions(() => {
+      restoreHomeFabPosition();
+    });
+    return () => task.cancel();
   }, [restoreHomeFabPosition]);
 
   useEffect(() => {

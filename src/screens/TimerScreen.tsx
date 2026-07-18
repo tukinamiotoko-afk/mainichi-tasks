@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, StatusBar, Alert, ScrollView, Modal, Dimensions, TextInput, Animated, Easing } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, StatusBar, Alert, ScrollView, Modal, Dimensions, TextInput, Animated, Easing, InteractionManager } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useFocusEffect } from '@react-navigation/native';
@@ -309,7 +309,10 @@ export default function TimerScreen({ navigation }: Props) {
 
   useFocusEffect(useCallback(() => {
     load();
-    restoreFabPosition();
+    const task = InteractionManager.runAfterInteractions(() => {
+      restoreFabPosition();
+    });
+    return () => task.cancel();
   }, [load, restoreFabPosition]));
 
   const availableTasks = tasks.filter((task) => !timers.some((item) => item.task.id === task.id && item.mode === currentTab));

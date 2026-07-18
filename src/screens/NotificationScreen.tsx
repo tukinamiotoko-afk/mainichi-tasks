@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, StatusBar, Switch, Linking, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, StatusBar, Switch, Linking, Alert, InteractionManager } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useFocusEffect } from '@react-navigation/native';
@@ -98,7 +98,12 @@ export default function NotificationScreen({ navigation }: Props) {
     if (timerFab === 'manual' || timerFab === 'left_bottom' || timerFab === 'right_bottom') setTimerFabMode(timerFab);
   }, [db]);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  useFocusEffect(useCallback(() => {
+    const task = InteractionManager.runAfterInteractions(() => {
+      load();
+    });
+    return () => task.cancel();
+  }, [load]));
 
   const toggleTagRight = async (val: boolean) => {
     setTagRight(val);
