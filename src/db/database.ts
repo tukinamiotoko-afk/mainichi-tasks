@@ -440,7 +440,20 @@ export async function addTimeLog(
   );
 }
 
-export async function getTimeLogsForDate(db: SQLite.SQLiteDatabase, date: string): Promise<TimeLog[]> {
+export async function getTimeLogsForDate(
+  db: SQLite.SQLiteDatabase,
+  date: string,
+  mode?: 'stopwatch' | 'timer'
+): Promise<TimeLog[]> {
+  if (mode) {
+    return db.getAllAsync<TimeLog>(
+      `SELECT l.id, l.task_id, t.title, t.icon, l.date, l.duration_seconds, l.started_at, l.ended_at, l.mode
+       FROM time_logs l JOIN tasks t ON l.task_id = t.id
+       WHERE l.date = ? AND l.mode = ?
+       ORDER BY l.ended_at DESC`,
+      [date, mode]
+    );
+  }
   return db.getAllAsync<TimeLog>(
     `SELECT l.id, l.task_id, t.title, t.icon, l.date, l.duration_seconds, l.started_at, l.ended_at, l.mode
      FROM time_logs l JOIN tasks t ON l.task_id = t.id
@@ -484,8 +497,18 @@ export async function getTotalTimeForDate(db: SQLite.SQLiteDatabase, date: strin
 export type TimeLogTotal = { task_id: number; title: string; icon: string | null; total_seconds: number };
 
 export async function getTimeLogTotalsInRange(
-  db: SQLite.SQLiteDatabase, startDate: string, endDate: string
+  db: SQLite.SQLiteDatabase, startDate: string, endDate: string, mode?: 'stopwatch' | 'timer'
 ): Promise<TimeLogTotal[]> {
+  if (mode) {
+    return db.getAllAsync<TimeLogTotal>(
+      `SELECT l.task_id, t.title, t.icon, SUM(l.duration_seconds) as total_seconds
+       FROM time_logs l JOIN tasks t ON l.task_id = t.id
+       WHERE l.date >= ? AND l.date <= ? AND l.mode = ?
+       GROUP BY l.task_id
+       ORDER BY total_seconds DESC`,
+      [startDate, endDate, mode]
+    );
+  }
   return db.getAllAsync<TimeLogTotal>(
     `SELECT l.task_id, t.title, t.icon, SUM(l.duration_seconds) as total_seconds
      FROM time_logs l JOIN tasks t ON l.task_id = t.id

@@ -27,6 +27,7 @@ type Period = '7日' | '30日' | '全期間' | '任意';
 type FreqFilter = 'すべて' | '毎日' | 'その他';
 type DropdownKey = 'period' | 'freq';
 type TimerSubMode = 'daily' | 'summary';
+type TimerModeFilter = 'stopwatch' | 'timer';
 type Rate = {
   task: Task; completed: number; total: number; rate: number;
   isRepeat: boolean; instancesDone: number; instancesTarget: number;
@@ -211,6 +212,7 @@ export default function StatsScreen({ navigation }: Props) {
 
   // ── Timer history state ──
   const [timerSubMode, setTimerSubMode] = useState<TimerSubMode>('daily');
+  const [timerModeFilter, setTimerModeFilter] = useState<TimerModeFilter>('stopwatch');
   const [timerDate, setTimerDate] = useState(today);
   const [dayLogs, setDayLogs] = useState<TimeLog[]>([]);
   const [timeTotals, setTimeTotals] = useState<TimeLogTotal[]>([]);
@@ -262,8 +264,8 @@ export default function StatsScreen({ navigation }: Props) {
   }, [db, year, month]);
 
   const loadDayLogs = useCallback(async () => {
-    setDayLogs(await getTimeLogsForDate(db, timerDate));
-  }, [db, timerDate]);
+    setDayLogs(await getTimeLogsForDate(db, timerDate, timerModeFilter));
+  }, [db, timerDate, timerModeFilter]);
 
   const loadTimeTotals = useCallback(async () => {
     let start: string;
@@ -272,8 +274,8 @@ export default function StatsScreen({ navigation }: Props) {
     else if (period === '30日') start = subtractDays(today, 29);
     else if (period === '全期間') start = '0000-01-01';
     else start = toDateString(customStart);
-    setTimeTotals(await getTimeLogTotalsInRange(db, start, end));
-  }, [db, period, today, customStart, customEnd]);
+    setTimeTotals(await getTimeLogTotalsInRange(db, start, end, timerModeFilter));
+  }, [db, period, today, customStart, customEnd, timerModeFilter]);
 
   useFocusEffect(useCallback(() => { loadRates(); loadCalendar(); loadDayLogs(); loadTimeTotals(); }, [loadRates, loadCalendar, loadDayLogs, loadTimeTotals]));
 
@@ -400,6 +402,16 @@ export default function StatsScreen({ navigation }: Props) {
           </>
         ) : (
           <>
+            <View style={s.chipRow}>
+              {([
+                { k: 'stopwatch' as const, l: 'ストップウォッチ' },
+                { k: 'timer' as const, l: 'タイマー' },
+              ]).map((o) => (
+                <TouchableOpacity key={o.k} style={[s.chip, timerModeFilter === o.k && s.chipActive]} onPress={() => setTimerModeFilter(o.k)}>
+                  <Text style={[s.chipText, timerModeFilter === o.k && s.chipTextActive]}>{o.l}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
             {timerSubMode === 'daily' ? (
               <>
                 <View style={s.monthNav}>
