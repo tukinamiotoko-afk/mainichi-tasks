@@ -740,9 +740,6 @@ const TaskRow = React.memo(function TaskRow({
     ? {
         transform: [{ translateY: dragY }, { scale: dragScale }],
         zIndex: 30,
-        elevation: 8,
-        shadowOpacity: 0.18,
-        shadowRadius: 10,
       }
     : null;
   // always bound (harmless at rest, since it's reset to 0 whenever no drag
