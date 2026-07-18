@@ -517,6 +517,13 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
     elevation: 2,
   },
   iconGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingVertical: 6 },
+  iconChipWrap: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
   iconChip: {
     width: 44,
     height: 44,
@@ -2196,13 +2203,13 @@ export default function HomeScreen({ navigation }: Props) {
       </TouchableOpacity>
       {openPicker === 'icon' && (
         <View style={s.iconGrid}>
-          <RiseIn index={0}>
+          <RiseIn index={0} style={s.iconChipWrap}>
             <TouchableOpacity style={[s.iconChip, icon === null && s.iconChipActive]} onPress={() => { onIcon(null); setOpenPicker(null); }}>
               <Text style={s.iconNone}>なし</Text>
             </TouchableOpacity>
           </RiseIn>
           {TASK_ICONS.map((ic, i) => (
-            <RiseIn key={ic} index={i + 1}>
+            <RiseIn key={ic} index={i + 1} style={s.iconChipWrap}>
               <TouchableOpacity style={[s.iconChip, icon === ic && s.iconChipActive]} onPress={() => { onIcon(ic); setOpenPicker(null); }}>
                 <Text style={s.iconEmoji}>{ic}</Text>
               </TouchableOpacity>
