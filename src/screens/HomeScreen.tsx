@@ -1019,7 +1019,6 @@ export default function HomeScreen({ navigation }: Props) {
   const [showThumb, setShowThumb] = useState(false);
   const thumbAnim = useRef(new Animated.Value(0)).current;
   const thumbOpacity = useRef(new Animated.Value(0)).current;
-  const progressAnim = useRef(new Animated.Value(0)).current;
   const bloomAnim = useRef(new Animated.Value(0)).current;
   const fabPosition = useRef({ x: Math.max(screen.width - 72, 20), y: Math.max(screen.height - insets.bottom - 132, 120) });
   const fabStartPosition = useRef(fabPosition.current);
@@ -1120,10 +1119,6 @@ export default function HomeScreen({ navigation }: Props) {
   const splashHiddenRef = useRef(false);
   const notificationRefreshDoneRef = useRef(false);
   const exactAlarmRefreshPendingRef = useRef(false);
-  // Bumped whenever the list is (re)loaded, so rows replay their entrance
-  // animation on screen focus / date change instead of just on first mount.
-  const [listAnimKey, setListAnimKey] = useState(0);
-
   const load = useCallback(async () => {
     try {
       const [ts, counts, layout] = await Promise.all([
@@ -1139,7 +1134,6 @@ export default function HomeScreen({ navigation }: Props) {
       fabPosition.current = nextFab;
       fabAnim.setValue(nextFab);
       setTasksLoaded(true);
-      setListAnimKey((k) => k + 1);
     } finally {
       if (!splashHiddenRef.current) {
         splashHiddenRef.current = true;
@@ -1874,10 +1868,6 @@ export default function HomeScreen({ navigation }: Props) {
   })).current;
 
   useEffect(() => {
-    Animated.timing(progressAnim, { toValue: progress, duration: 450, useNativeDriver: false }).start();
-  }, [progress, progressAnim]);
-
-  useEffect(() => {
     Animated.timing(panelAnim, { toValue: activePanel ? 1 : 0, duration: 200, useNativeDriver: true }).start();
   }, [activePanel, panelAnim]);
 
@@ -2320,7 +2310,7 @@ export default function HomeScreen({ navigation }: Props) {
         <View style={s.progressRow}>
           <View style={s.progressBg}>
             <Animated.View
-              style={[s.progressFill, { width: progressAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }]}
+              style={[s.progressFill, { width: `${Math.max(0, Math.min(1, progress)) * 100}%` }]}
             >
               <LinearGradient colors={gaugeColors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.progressGrad} />
             </Animated.View>
@@ -2357,29 +2347,27 @@ export default function HomeScreen({ navigation }: Props) {
             </View>
           ) : null
         }
-        renderItem={({ item, index }) => (
-          <RiseIn key={listAnimKey} index={index} shadowStyle={s.taskCardShadow}>
-            <TaskRow
-              item={item}
-              count={completionCounts.get(item.id) ?? 0}
-              isDone={isTaskDone(item, completionCounts.get(item.id) ?? 0)}
-              isDragging={activeDragId === item.id}
-              isSwiping={swipingId === item.id}
-              reorderEnabled={reorderEnabled}
-              tagRight={tagRight}
-              s={s}
-              panHandlers={getPanResponder(item.id).panHandlers}
-              shiftAnim={getShiftAnim(item.id)}
-              dragY={dragY}
-              dragScale={dragScale}
-              swipeAnim={swipeAnim}
-              onToggle={toggle}
-              onLongPressCheck={longPressCheck}
-              onOpenDetail={openDetail}
-              onStartDrag={startDrag}
-              onMeasureHeight={handleRowLayout}
-            />
-          </RiseIn>
+        renderItem={({ item }) => (
+          <TaskRow
+            item={item}
+            count={completionCounts.get(item.id) ?? 0}
+            isDone={isTaskDone(item, completionCounts.get(item.id) ?? 0)}
+            isDragging={activeDragId === item.id}
+            isSwiping={swipingId === item.id}
+            reorderEnabled={reorderEnabled}
+            tagRight={tagRight}
+            s={s}
+            panHandlers={getPanResponder(item.id).panHandlers}
+            shiftAnim={getShiftAnim(item.id)}
+            dragY={dragY}
+            dragScale={dragScale}
+            swipeAnim={swipeAnim}
+            onToggle={toggle}
+            onLongPressCheck={longPressCheck}
+            onOpenDetail={openDetail}
+            onStartDrag={startDrag}
+            onMeasureHeight={handleRowLayout}
+          />
         )}
         ListFooterComponent={<View style={{ height: 80 }} />}
       />
