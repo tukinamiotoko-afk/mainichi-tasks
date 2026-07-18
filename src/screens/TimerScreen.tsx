@@ -93,7 +93,7 @@ export default function TimerScreen({ navigation }: Props) {
   const sheetHeight = Math.max(360, Math.round(Dimensions.get('window').height * 0.82));
 
   const [tasks, setTasks] = useState<Task[]>([]);
-  const { timers, mode } = useTimerState();
+  const { timers } = useTimerState();
   const { addTimer: addTimerAction, removeTimer, startTimer, pauseTimer, saveTimer, updateTargetSeconds, setMode, grantTimerBonus } = useTimerActions();
   const { showRewardedAd } = useAds();
   const now = useTimerClock();
@@ -180,22 +180,6 @@ export default function TimerScreen({ navigation }: Props) {
     <View style={s.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor={C.body} />
       <ScrollView style={s.body} contentContainerStyle={[s.content, { paddingTop: insets.top + 16 }]}>
-        <View style={s.modeRow}>
-          <TouchableOpacity
-            style={[s.modeBtn, mode === 'stopwatch' && s.modeBtnActive]}
-            onPress={() => setMode('stopwatch')}
-            activeOpacity={0.85}
-          >
-            <Text style={[s.modeText, mode === 'stopwatch' && s.modeTextActive]}>ストップウォッチ</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[s.modeBtn, mode === 'timer' && s.modeBtnActive]}
-            onPress={() => setMode('timer')}
-            activeOpacity={0.85}
-          >
-            <Text style={[s.modeText, mode === 'timer' && s.modeTextActive]}>タイマー</Text>
-          </TouchableOpacity>
-        </View>
         <Text style={s.modeSub}>動作中 {runningCount}件</Text>
 
         <TouchableOpacity style={s.addBtnWrap} onPress={() => setPickerOpen(true)} activeOpacity={0.86}>
@@ -212,7 +196,7 @@ export default function TimerScreen({ navigation }: Props) {
           </View>
         ) : timers.map((item) => {
           const seconds = timerSeconds(item, now);
-          const shownSeconds = displayTimerSeconds(item, now, mode, item.targetSeconds);
+          const shownSeconds = displayTimerSeconds(item, now);
           const running = !!item.startedAtMs;
           return (
             <View key={item.task.id} style={s.timerCard}>
@@ -228,15 +212,33 @@ export default function TimerScreen({ navigation }: Props) {
                   <Text style={s.removeText}>×</Text>
                 </TouchableOpacity>
               </View>
-              {mode === 'timer' && (
+              <View style={s.modeRow}>
+                <TouchableOpacity
+                  style={[s.modeBtn, item.mode === 'stopwatch' && s.modeBtnActive]}
+                  onPress={() => setMode(item.task.id, 'stopwatch')}
+                  activeOpacity={0.85}
+                  disabled={running}
+                >
+                  <Text style={[s.modeText, item.mode === 'stopwatch' && s.modeTextActive]}>ストップウォッチ</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[s.modeBtn, item.mode === 'timer' && s.modeBtnActive]}
+                  onPress={() => setMode(item.task.id, 'timer')}
+                  activeOpacity={0.85}
+                  disabled={running}
+                >
+                  <Text style={[s.modeText, item.mode === 'timer' && s.modeTextActive]}>タイマー</Text>
+                </TouchableOpacity>
+              </View>
+              {item.mode === 'timer' && (
                 <View style={s.minuteRow}>
                   <TextInput
                     style={s.minuteInput}
                     value={minuteInputs[item.task.id] ?? String(Math.round(item.targetSeconds / 60))}
                     onChangeText={(v) => setMinuteInputs((prev) => ({ ...prev, [item.task.id]: v.replace(/[^0-9]/g, '') }))}
                     onBlur={async () => {
-                      const mins = parseInt(minuteInputs[item.task.id] ?? '25', 10);
-                      const secs = Math.max(1, isNaN(mins) ? 25 : mins) * 60;
+                      const mins = parseInt(minuteInputs[item.task.id] ?? '0', 10);
+                      const secs = Math.max(0, isNaN(mins) ? 0 : mins) * 60;
                       setMinuteInputs((prev) => ({ ...prev, [item.task.id]: String(Math.round(secs / 60)) }));
                       await updateTargetSeconds(item.task.id, secs);
                     }}

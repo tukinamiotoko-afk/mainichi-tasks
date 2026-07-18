@@ -15,6 +15,7 @@ export type TimerItem = {
   startedAtMs: number | null;
   startedAtIso: string | null;
   targetSeconds: number;
+  mode: TimerMode;
 };
 
 export function timerSeconds(item: TimerItem, now: number): number {
@@ -22,9 +23,9 @@ export function timerSeconds(item: TimerItem, now: number): number {
   return item.baseSeconds + Math.floor((now - item.startedAtMs) / 1000);
 }
 
-export function displayTimerSeconds(item: TimerItem, now: number, mode: TimerMode, targetSeconds: number): number {
+export function displayTimerSeconds(item: TimerItem, now: number): number {
   const elapsed = timerSeconds(item, now);
-  return mode === 'timer' ? Math.max(targetSeconds - elapsed, 0) : elapsed;
+  return item.mode === 'timer' ? Math.max(item.targetSeconds - elapsed, 0) : elapsed;
 }
 
 type AddTimerOptions = { targetSeconds?: number; autoStart?: boolean; mode?: TimerMode };
@@ -37,12 +38,12 @@ type TimerActions = {
   pauseTimer: (taskId: number) => void;
   saveTimer: (taskId: number) => Promise<void>;
   updateTargetSeconds: (taskId: number, seconds: number) => Promise<void>;
-  setMode: (mode: TimerMode) => void;
+  setMode: (taskId: number, mode: TimerMode) => void;
   isTiming: (taskId: number) => boolean;
   grantTimerBonus: () => Promise<void>;
 };
 
-type TimerState = { timers: TimerItem[]; mode: TimerMode };
+type TimerState = { timers: TimerItem[] };
 
 const TimerActionsContext = createContext<TimerActions | null>(null);
 const TimerStateContext = createContext<TimerState | null>(null);
@@ -53,7 +54,6 @@ export function TimerProvider({ children }: { children: ReactNode }) {
   const today = getToday();
   const { isPremium } = usePurchases();
   const [timers, setTimers] = useState<TimerItem[]>([]);
-  const [mode, setModeState] = useState<TimerMode>('stopwatch');
   const [now, setNow] = useState(Date.now());
   const timersRef = useRef<TimerItem[]>([]);
   timersRef.current = timers;
@@ -64,7 +64,9 @@ export function TimerProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(id);
   }, []);
 
-  const setMode = useCallback((m: TimerMode) => setModeState(m), []);
+  const setMode = useCallback((taskId: number, m: TimerMode) => {
+    setTimers((current) => current.map((item) => (item.task.id === taskId ? { ...item, mode: m } : item)));
+  }, []);
 
   const grantTimerBonus = useCallback(async () => {
     await addTimerBonus(db, today);
@@ -79,18 +81,18 @@ export function TimerProvider({ children }: { children: ReactNode }) {
     let target = opts?.targetSeconds;
     if (target === undefined) {
       const saved = await getTimerSettingForTask(db, task.id);
-      target = saved?.target_seconds ?? 25 * 60;
+      target = saved?.target_seconds ?? 0;
     } else {
       await saveTimerSettingForTask(db, task.id, target);
     }
     if (alreadyAdded) return target;
     if (!isPremium) await incrementTimerStarts(db, today);
-    if (opts?.mode) setModeState(opts.mode);
+    const itemMode: TimerMode = opts?.mode ?? 'stopwatch';
     const startedAtMs = opts?.autoStart ? Date.now() : null;
     const startedAtIso = startedAtMs ? new Date(startedAtMs).toISOString() : null;
     setTimers((current) => {
       if (current.some((item) => item.task.id === task.id)) return current;
-      return [...current, { task, baseSeconds: 0, startedAtMs, startedAtIso, targetSeconds: target! }];
+      return [...current, { task, baseSeconds: 0, startedAtMs, startedAtIso, targetSeconds: target!, mode: itemMode }];
     });
     return target;
   }, [db, today, isPremium]);
@@ -121,7 +123,7 @@ export function TimerProvider({ children }: { children: ReactNode }) {
     if (!timer || savingRef.current.has(taskId)) return;
     const endedAtMs = Date.now();
     const elapsed = timerSeconds(timer, endedAtMs);
-    const duration = mode === 'timer' ? Math.min(elapsed, timer.targetSeconds) : elapsed;
+    const duration = timer.mode === 'timer' ? Math.min(elapsed, timer.targetSeconds) : elapsed;
     if (duration <= 0) return;
     savingRef.current.add(taskId);
     const endedAt = new Date(endedAtMs).toISOString();
@@ -132,7 +134,7 @@ export function TimerProvider({ children }: { children: ReactNode }) {
       item.task.id === taskId ? { ...item, baseSeconds: 0, startedAtMs: null, startedAtIso: null } : item
     )));
     savingRef.current.delete(taskId);
-  }, [db, mode, today]);
+  }, [db, today]);
 
   const updateTargetSeconds = useCallback(async (taskId: number, seconds: number) => {
     setTimers((current) => current.map((t) => (t.task.id === taskId ? { ...t, targetSeconds: seconds } : t)));
@@ -163,18 +165,17 @@ export function TimerProvider({ children }: { children: ReactNode }) {
 
   // auto-stop-and-save a countdown once it reaches its target
   useEffect(() => {
-    if (mode !== 'timer') return;
     timers.forEach((item) => {
-      if (item.startedAtMs && timerSeconds(item, now) >= item.targetSeconds) {
+      if (item.mode === 'timer' && item.startedAtMs && timerSeconds(item, now) >= item.targetSeconds) {
         saveTimer(item.task.id);
       }
     });
-  }, [mode, now, timers, saveTimer]);
+  }, [now, timers, saveTimer]);
 
   const actions = useMemo<TimerActions>(() => ({
     addTimer, removeTimer, startTimer, pauseTimer, saveTimer, updateTargetSeconds, setMode, isTiming, grantTimerBonus,
   }), [addTimer, removeTimer, startTimer, pauseTimer, saveTimer, updateTargetSeconds, setMode, isTiming, grantTimerBonus]);
-  const state = useMemo<TimerState>(() => ({ timers, mode }), [timers, mode]);
+  const state = useMemo<TimerState>(() => ({ timers }), [timers]);
 
   return (
     <TimerActionsContext.Provider value={actions}>
