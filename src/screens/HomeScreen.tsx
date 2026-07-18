@@ -341,6 +341,20 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   taskTitle: { color: C.onDark, fontSize: 14, fontWeight: '500', lineHeight: 20 },
   taskTitleDone: { color: C.muted, textDecorationLine: 'line-through' },
   taskMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
+  taskSide: { alignItems: 'flex-end', justifyContent: 'center', gap: 6, minHeight: 24 },
+  taskStatusRow: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 18 },
+  taskStatusIcon: {
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffffcc',
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+  },
+  taskStatusIconText: { fontSize: 10, lineHeight: 12 },
   priorityBadge: { borderRadius: 4, paddingHorizontal: 6, paddingVertical: 1 },
   priorityBadgeText: { color: C.onPrimary, fontSize: 9, fontWeight: '800' },
   scheduleTag: { color: C.stone, fontSize: 10, fontWeight: '700' },
@@ -683,6 +697,8 @@ const TaskRow = React.memo(function TaskRow({
     ? { transform: [{ translateY: shiftAnim }] }
     : null;
   const priority = priorityMeta(item.priority);
+  const notifyIcon = item.notify ? (item.notify_type === 'alarm' ? '⏰' : '🔔') : null;
+  const autoMeasureIcon = item.auto_timer_enabled ? '⏱' : null;
 
   return (
     <View style={s.swipeWrap} onLayout={(e) => onMeasureHeight(e.nativeEvent.layout.height)}>
@@ -732,26 +748,42 @@ const TaskRow = React.memo(function TaskRow({
           return (
             <>
               {tagRight ? checkEl : tagEl}
-              <TouchableOpacity
-                style={s.taskBody}
-                onPress={() => onOpenDetail(item)}
-                onLongPress={reorderEnabled ? () => onStartDrag(item.id) : undefined}
+                <TouchableOpacity
+                  style={s.taskBody}
+                  onPress={() => onOpenDetail(item)}
+                  onLongPress={reorderEnabled ? () => onStartDrag(item.id) : undefined}
                 delayLongPress={250}
                 activeOpacity={0.7}
-              >
-                <View style={s.taskTextWrap}>
-                  <Text style={[s.taskTitle, isDone && s.taskTitleDone]} numberOfLines={2}>{item.title}</Text>
-                  <View style={s.taskMetaRow}>
-                    {item.scheduled_time && <Text style={s.scheduleTag}>{item.notify ? '🔔 ' : ''}{item.scheduled_time}</Text>}
-                    <Text style={s.freqTag}>{frequencyLabel(item)}</Text>
+                >
+                  <View style={s.taskTextWrap}>
+                    <Text style={[s.taskTitle, isDone && s.taskTitleDone]} numberOfLines={2}>{item.title}</Text>
+                    <View style={s.taskMetaRow}>
+                      {item.scheduled_time && <Text style={s.scheduleTag}>{item.notify ? '🔔 ' : ''}{item.scheduled_time}</Text>}
+                      <Text style={s.freqTag}>{frequencyLabel(item)}</Text>
+                    </View>
                   </View>
-                </View>
-                {isRepeat ? (
-                  count > 0 && <View style={s.doneBadge}><Text style={s.doneBadgeText}>{Math.min(count, target)}/{target}完了</Text></View>
-                ) : (
-                  isDone && <View style={s.doneBadge}><Text style={s.doneBadgeText}>完了</Text></View>
-                )}
-              </TouchableOpacity>
+                  <View style={s.taskSide}>
+                    {(notifyIcon || autoMeasureIcon) && (
+                      <View style={s.taskStatusRow}>
+                        {notifyIcon && (
+                          <View style={s.taskStatusIcon}>
+                            <Text style={s.taskStatusIconText}>{notifyIcon}</Text>
+                          </View>
+                        )}
+                        {autoMeasureIcon && (
+                          <View style={s.taskStatusIcon}>
+                            <Text style={s.taskStatusIconText}>{autoMeasureIcon}</Text>
+                          </View>
+                        )}
+                      </View>
+                    )}
+                    {isRepeat ? (
+                      count > 0 && <View style={s.doneBadge}><Text style={s.doneBadgeText}>{Math.min(count, target)}/{target}完了</Text></View>
+                    ) : (
+                      isDone && <View style={s.doneBadge}><Text style={s.doneBadgeText}>完了</Text></View>
+                    )}
+                  </View>
+                </TouchableOpacity>
               {tagRight ? tagEl : checkEl}
             </>
           );
