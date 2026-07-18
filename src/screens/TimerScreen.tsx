@@ -99,16 +99,18 @@ export default function TimerScreen({ navigation }: Props) {
   const [pickerSortKey, setPickerSortKey] = useState<'manual' | 'priority' | 'name'>('manual');
   const [pickerIconFilterOpen, setPickerIconFilterOpen] = useState(false);
   const [pickerIconFilter, setPickerIconFilter] = useState<string | null>(null);
+  const [currentTab, setCurrentTab] = useState<'stopwatch' | 'timer'>('stopwatch');
   const closePicker = () => {
     setPickerOpen(false);
     setPickerSortKey('manual');
     setPickerIconFilterOpen(false);
     setPickerIconFilter(null);
   };
-  const [minuteInputs, setMinuteInputs] = useState<Record<number, string>>({});
-  const [editingTimerId, setEditingTimerId] = useState<number | null>(null);
+  const [minuteInputs, setMinuteInputs] = useState<Record<string, string>>({});
+  const [editingTimerId, setEditingTimerId] = useState<string | null>(null);
 
   const runningCount = timers.filter((item) => item.startedAtMs).length;
+  const visibleTimers = useMemo(() => timers.filter((item) => item.mode === currentTab), [timers, currentTab]);
 
   const load = useCallback(async () => {
     const loadedTasks = await getTasks(db);
@@ -117,7 +119,7 @@ export default function TimerScreen({ navigation }: Props) {
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  const availableTasks = tasks.filter((task) => !timers.some((item) => item.task.id === task.id));
+  const availableTasks = tasks.filter((task) => !timers.some((item) => item.task.id === task.id && item.mode === currentTab));
   const iconGroups = useMemo(() => {
     const map = new Map<string, number>();
     for (const t of availableTasks) {
@@ -137,7 +139,7 @@ export default function TimerScreen({ navigation }: Props) {
   }, [availableTasks, pickerIconFilter, pickerSortKey]);
 
   const addTimer = async (task: Task) => {
-    const target = await addTimerAction(task);
+    const target = await addTimerAction(task, { mode: currentTab });
     if (target === null) {
       setPickerOpen(false);
       Alert.alert(
@@ -162,25 +164,25 @@ export default function TimerScreen({ navigation }: Props) {
       );
       return;
     }
-    setMinuteInputs((prev) => ({ ...prev, [task.id]: String(Math.round(target / 60)) }));
+    setMinuteInputs((prev) => ({ ...prev, [`${task.id}:${currentTab}`]: String(Math.round(target / 60)) }));
     setPickerOpen(false);
   };
 
-  const handleRemoveTimer = (taskId: number) => {
-    const timer = timers.find((item) => item.task.id === taskId);
+  const handleRemoveTimer = (itemKey: string) => {
+    const timer = timers.find((item) => item.key === itemKey);
     if (timer?.startedAtMs) {
       Alert.alert('計測中です', '保存してから外してください。');
       return;
     }
-    removeTimer(taskId);
+    removeTimer(itemKey);
   };
 
-  const commitTimerMinutes = async (taskId: number) => {
-    const mins = parseInt(minuteInputs[taskId] ?? '0', 10);
+  const commitTimerMinutes = async (itemKey: string) => {
+    const mins = parseInt(minuteInputs[itemKey] ?? '0', 10);
     const secs = Math.max(0, isNaN(mins) ? 0 : mins) * 60;
-    setMinuteInputs((prev) => ({ ...prev, [taskId]: String(Math.round(secs / 60)) }));
-    await updateTargetSeconds(taskId, secs);
-    setEditingTimerId((current) => (current === taskId ? null : current));
+    setMinuteInputs((prev) => ({ ...prev, [itemKey]: String(Math.round(secs / 60)) }));
+    await updateTargetSeconds(itemKey, secs);
+    setEditingTimerId((current) => (current === itemKey ? null : current));
   };
 
   return (
@@ -189,24 +191,41 @@ export default function TimerScreen({ navigation }: Props) {
       <ScrollView style={s.body} contentContainerStyle={[s.content, { paddingTop: insets.top + 16 }]}>
         <Text style={s.modeSub}>動作中 {runningCount}件</Text>
 
+        <View style={s.modeRow}>
+          <TouchableOpacity
+            style={[s.modeBtn, currentTab === 'stopwatch' && s.modeBtnActive]}
+            onPress={() => { setCurrentTab('stopwatch'); setEditingTimerId(null); }}
+            activeOpacity={0.85}
+          >
+            <Text style={[s.modeText, currentTab === 'stopwatch' && s.modeTextActive]}>ストップウォッチ</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[s.modeBtn, currentTab === 'timer' && s.modeBtnActive]}
+            onPress={() => { setCurrentTab('timer'); setEditingTimerId(null); }}
+            activeOpacity={0.85}
+          >
+            <Text style={[s.modeText, currentTab === 'timer' && s.modeTextActive]}>タイマー</Text>
+          </TouchableOpacity>
+        </View>
+
         <TouchableOpacity style={s.addBtnWrap} onPress={() => setPickerOpen(true)} activeOpacity={0.86}>
           <LinearGradient colors={grad.brand} start={GRAD_START} end={GRAD_END} style={s.addBtn}>
-            <Text style={s.addBtnText}>＋ 測るものを追加</Text>
+            <Text style={s.addBtnText}>＋ {currentTab === 'timer' ? 'タイマー' : 'ストップウォッチ'}を追加</Text>
           </LinearGradient>
         </TouchableOpacity>
 
-        <Text style={s.sectionTitle}>計測するもの</Text>
-        {timers.length === 0 ? (
+        <Text style={s.sectionTitle}>{currentTab === 'timer' ? 'タイマー' : 'ストップウォッチ'}</Text>
+        {visibleTimers.length === 0 ? (
           <View style={s.emptyBox}>
             <Text style={s.emptyTitle}>まだ何もありません</Text>
-            <Text style={s.emptyBody}>追加ボタンから、測りたいタスクを入れてください</Text>
+            <Text style={s.emptyBody}>追加ボタンから、{currentTab === 'timer' ? 'タイマー' : 'ストップウォッチ'}を入れてください</Text>
           </View>
-        ) : timers.map((item) => {
+        ) : visibleTimers.map((item) => {
           const seconds = timerSeconds(item, now);
           const shownSeconds = displayTimerSeconds(item, now);
           const running = !!item.startedAtMs;
           return (
-            <View key={item.task.id} style={s.timerCard}>
+            <View key={item.key} style={s.timerCard}>
               <View style={s.timerTop}>
                 <View style={s.taskMark}>
                   <Text style={s.taskMarkText}>{item.task.icon ?? '⏱'}</Text>
@@ -215,36 +234,18 @@ export default function TimerScreen({ navigation }: Props) {
                   <Text style={s.timerTitle} numberOfLines={1}>{item.task.title}</Text>
                   <Text style={s.timerState}>{running ? '計測中' : seconds > 0 ? '一時停止中' : '待機中'}</Text>
                 </View>
-                <TouchableOpacity style={s.removeBtn} onPress={() => handleRemoveTimer(item.task.id)}>
+                <TouchableOpacity style={s.removeBtn} onPress={() => handleRemoveTimer(item.key)}>
                   <Text style={s.removeText}>×</Text>
                 </TouchableOpacity>
               </View>
-              <View style={s.modeRow}>
-                <TouchableOpacity
-                  style={[s.modeBtn, item.mode === 'stopwatch' && s.modeBtnActive]}
-                  onPress={() => setMode(item.task.id, 'stopwatch')}
-                  activeOpacity={0.85}
-                  disabled={running}
-                >
-                  <Text style={[s.modeText, item.mode === 'stopwatch' && s.modeTextActive]}>ストップウォッチ</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[s.modeBtn, item.mode === 'timer' && s.modeBtnActive]}
-                  onPress={() => setMode(item.task.id, 'timer')}
-                  activeOpacity={0.85}
-                  disabled={running}
-                >
-                  <Text style={[s.modeText, item.mode === 'timer' && s.modeTextActive]}>タイマー</Text>
-                </TouchableOpacity>
-              </View>
-              {item.mode === 'timer' && editingTimerId === item.task.id && (
+              {item.mode === 'timer' && editingTimerId === item.key && (
                 <View style={s.minuteRow}>
                   <TextInput
                     style={s.minuteInput}
-                    value={minuteInputs[item.task.id] ?? String(Math.round(item.targetSeconds / 60))}
-                    onChangeText={(v) => setMinuteInputs((prev) => ({ ...prev, [item.task.id]: v.replace(/[^0-9]/g, '') }))}
-                    onBlur={async () => { await commitTimerMinutes(item.task.id); }}
-                    onSubmitEditing={async () => { await commitTimerMinutes(item.task.id); }}
+                    value={minuteInputs[item.key] ?? String(Math.round(item.targetSeconds / 60))}
+                    onChangeText={(v) => setMinuteInputs((prev) => ({ ...prev, [item.key]: v.replace(/[^0-9]/g, '') }))}
+                    onBlur={async () => { await commitTimerMinutes(item.key); }}
+                    onSubmitEditing={async () => { await commitTimerMinutes(item.key); }}
                     keyboardType="number-pad"
                     returnKeyType="done"
                     editable={!running}
@@ -253,26 +254,26 @@ export default function TimerScreen({ navigation }: Props) {
                   <Text style={s.minuteLabel}>分</Text>
                 </View>
               )}
-              {item.mode === 'timer' && editingTimerId === item.task.id ? null : (
+              {item.mode === 'timer' && editingTimerId === item.key ? null : (
                 <TouchableOpacity
                   activeOpacity={item.mode === 'timer' && !running ? 0.8 : 1}
                   onPress={() => {
                     if (item.mode !== 'timer' || running) return;
-                    setMinuteInputs((prev) => ({ ...prev, [item.task.id]: String(Math.round(item.targetSeconds / 60)) }));
-                    setEditingTimerId(item.task.id);
+                    setMinuteInputs((prev) => ({ ...prev, [item.key]: String(Math.round(item.targetSeconds / 60)) }));
+                    setEditingTimerId(item.key);
                   }}
                 >
                   <Text style={s.timerTime}>{formatDuration(shownSeconds, true)}</Text>
                 </TouchableOpacity>
               )}
               <View style={s.timerControls}>
-                <TouchableOpacity onPress={() => startTimer(item.task.id)} disabled={running} activeOpacity={0.86} style={[s.controlBtn, running && s.controlBtnDisabled]}>
+                <TouchableOpacity onPress={() => startTimer(item.key)} disabled={running} activeOpacity={0.86} style={[s.controlBtn, running && s.controlBtnDisabled]}>
                   <Text style={s.startText}>▶</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[s.controlBtn, !running && s.controlBtnDisabled]} onPress={() => pauseTimer(item.task.id)} disabled={!running}>
+                <TouchableOpacity style={[s.controlBtn, !running && s.controlBtnDisabled]} onPress={() => pauseTimer(item.key)} disabled={!running}>
                   <Text style={s.pauseText}>❚❚</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[s.controlBtn, seconds <= 0 && s.controlBtnDisabled]} onPress={() => saveTimer(item.task.id)} disabled={seconds <= 0}>
+                <TouchableOpacity style={[s.controlBtn, seconds <= 0 && s.controlBtnDisabled]} onPress={() => saveTimer(item.key)} disabled={seconds <= 0}>
                   <Text style={s.saveText}>■</Text>
                 </TouchableOpacity>
               </View>
@@ -286,7 +287,7 @@ export default function TimerScreen({ navigation }: Props) {
           <TouchableOpacity style={s.modalBackdrop} activeOpacity={1} onPress={closePicker} />
           <View style={[s.pickerSheet, { height: sheetHeight, paddingBottom: insets.bottom + 18 }]}>
             <View style={s.sheetHandle} />
-            <Text style={s.pickerTitle}>測るタスクを追加</Text>
+            <Text style={s.pickerTitle}>{currentTab === 'timer' ? 'タイマーを追加' : 'ストップウォッチを追加'}</Text>
             {availableTasks.length > 0 && (
               <>
                 <View style={s.pickerControlRow}>
@@ -341,7 +342,7 @@ export default function TimerScreen({ navigation }: Props) {
               {availableTasks.length === 0 ? (
                 <View style={s.emptyBox}>
                   <Text style={s.emptyTitle}>追加できるタスクがありません</Text>
-                  <Text style={s.emptyBody}>タスク画面で追加するか、計測中カードを外してください</Text>
+                  <Text style={s.emptyBody}>タスク画面で追加するか、この種別のカードを外してください</Text>
                 </View>
               ) : visibleTasks.length === 0 ? (
                 <View style={s.emptyBox}>

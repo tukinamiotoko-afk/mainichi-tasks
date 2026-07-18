@@ -10,6 +10,7 @@ import { usePurchases } from './PurchasesContext';
 
 export type TimerMode = 'stopwatch' | 'timer';
 export type TimerItem = {
+  key: string;
   task: Task;
   baseSeconds: number;
   startedAtMs: number | null;
@@ -29,17 +30,18 @@ export function displayTimerSeconds(item: TimerItem, now: number): number {
 }
 
 type AddTimerOptions = { targetSeconds?: number; autoStart?: boolean; mode?: TimerMode };
+const timerItemKey = (taskId: number, mode: TimerMode) => `${taskId}:${mode}`;
 
 type TimerActions = {
   // null return means the free daily limit was hit — no timer was added.
   addTimer: (task: Task, opts?: AddTimerOptions) => Promise<number | null>;
-  removeTimer: (taskId: number) => void;
-  startTimer: (taskId: number) => void;
-  pauseTimer: (taskId: number) => void;
-  saveTimer: (taskId: number) => Promise<void>;
-  updateTargetSeconds: (taskId: number, seconds: number) => Promise<void>;
-  setMode: (taskId: number, mode: TimerMode) => void;
-  isTiming: (taskId: number) => boolean;
+  removeTimer: (itemKey: string) => void;
+  startTimer: (itemKey: string) => void;
+  pauseTimer: (itemKey: string) => void;
+  saveTimer: (itemKey: string) => Promise<void>;
+  updateTargetSeconds: (itemKey: string, seconds: number) => Promise<void>;
+  setMode: (itemKey: string, mode: TimerMode) => void;
+  isTiming: (itemKey: string) => boolean;
   grantTimerBonus: () => Promise<void>;
 };
 
@@ -69,21 +71,26 @@ export function TimerProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
     (async () => {
       const raw = await getSetting(db, TIMER_PINNED_IDS_KEY);
-      const ids = (raw ?? '').split(',').map((v) => Number(v)).filter((v) => Number.isInteger(v) && v > 0);
-      if (ids.length === 0) return;
+      const entries = (raw ?? '').split(',').map((v) => v.trim()).filter(Boolean);
+      if (entries.length === 0) return;
       const allTasks = await getTasks(db);
       const taskMap = new Map(allTasks.map((task) => [task.id, task]));
-      const restored = await Promise.all(ids.map(async (taskId) => {
+      const restored = await Promise.all(entries.map(async (entry) => {
+        const [taskIdRaw, modeRaw] = entry.split(':');
+        const taskId = Number(taskIdRaw);
+        const mode: TimerMode = modeRaw === 'timer' ? 'timer' : 'stopwatch';
+        if (!Number.isInteger(taskId) || taskId <= 0) return null;
         const task = taskMap.get(taskId);
         if (!task) return null;
         const saved = await getTimerSettingForTask(db, taskId);
         return {
+          key: timerItemKey(taskId, mode),
           task,
           baseSeconds: 0,
           startedAtMs: null,
           startedAtIso: null,
           targetSeconds: saved?.target_seconds ?? 0,
-          mode: 'stopwatch' as TimerMode,
+          mode,
         };
       }));
       if (!cancelled) setTimers((current) => current.length > 0 ? current : restored.filter(Boolean) as TimerItem[]);
@@ -92,20 +99,26 @@ export function TimerProvider({ children }: { children: ReactNode }) {
   }, [db]);
 
   const persistPinnedTimers = useCallback(async (items: TimerItem[]) => {
-    const value = items.map((item) => String(item.task.id)).join(',');
+    const value = items.map((item) => timerItemKey(item.task.id, item.mode)).join(',');
     await setSetting(db, TIMER_PINNED_IDS_KEY, value);
   }, [db]);
 
-  const setMode = useCallback((taskId: number, m: TimerMode) => {
-    setTimers((current) => current.map((item) => (item.task.id === taskId ? { ...item, mode: m } : item)));
-  }, []);
+  const setMode = useCallback((itemKey: string, m: TimerMode) => {
+    setTimers((current) => {
+      const next = current.map((item) => (item.key === itemKey ? { ...item, mode: m, key: timerItemKey(item.task.id, m) } : item));
+      persistPinnedTimers(next).catch(() => {});
+      return next;
+    });
+  }, [persistPinnedTimers]);
 
   const grantTimerBonus = useCallback(async () => {
     await addTimerBonus(db, today);
   }, [db, today]);
 
   const addTimer = useCallback(async (task: Task, opts?: AddTimerOptions): Promise<number | null> => {
-    const alreadyAdded = timersRef.current.some((item) => item.task.id === task.id);
+    const itemMode: TimerMode = opts?.mode ?? 'stopwatch';
+    const itemKey = timerItemKey(task.id, itemMode);
+    const alreadyAdded = timersRef.current.some((item) => item.key === itemKey);
     if (!alreadyAdded && !isPremium) {
       const usage = await getTimerDailyUsage(db, today);
       if (usage.starts >= FREE_TIMER_STARTS_PER_DAY + usage.bonus) return null;
@@ -119,67 +132,67 @@ export function TimerProvider({ children }: { children: ReactNode }) {
     }
     if (alreadyAdded) return target;
     if (!isPremium) await incrementTimerStarts(db, today);
-    const itemMode: TimerMode = opts?.mode ?? 'stopwatch';
     const startedAtMs = opts?.autoStart ? Date.now() : null;
     const startedAtIso = startedAtMs ? new Date(startedAtMs).toISOString() : null;
     setTimers((current) => {
-      if (current.some((item) => item.task.id === task.id)) return current;
-      const next = [...current, { task, baseSeconds: 0, startedAtMs, startedAtIso, targetSeconds: target!, mode: itemMode }];
+      if (current.some((item) => item.key === itemKey)) return current;
+      const next = [...current, { key: itemKey, task, baseSeconds: 0, startedAtMs, startedAtIso, targetSeconds: target!, mode: itemMode }];
       persistPinnedTimers(next).catch(() => {});
       return next;
     });
     return target;
   }, [db, today, isPremium, persistPinnedTimers]);
 
-  const removeTimer = useCallback((taskId: number) => {
+  const removeTimer = useCallback((itemKey: string) => {
     setTimers((current) => {
-      const next = current.filter((item) => item.task.id !== taskId);
+      const next = current.filter((item) => item.key !== itemKey);
       persistPinnedTimers(next).catch(() => {});
       return next;
     });
   }, [persistPinnedTimers]);
 
-  const startTimer = useCallback((taskId: number) => {
+  const startTimer = useCallback((itemKey: string) => {
     const startedAtMs = Date.now();
     const startedAtIso = new Date(startedAtMs).toISOString();
     setTimers((current) => current.map((item) => (
-      item.task.id === taskId && !item.startedAtMs ? { ...item, startedAtMs, startedAtIso } : item
+      item.key === itemKey && !item.startedAtMs ? { ...item, startedAtMs, startedAtIso } : item
     )));
   }, []);
 
-  const pauseTimer = useCallback((taskId: number) => {
+  const pauseTimer = useCallback((itemKey: string) => {
     const stamp = Date.now();
     setTimers((current) => current.map((item) => (
-      item.task.id === taskId && item.startedAtMs
+      item.key === itemKey && item.startedAtMs
         ? { ...item, baseSeconds: timerSeconds(item, stamp), startedAtMs: null, startedAtIso: null }
         : item
     )));
   }, []);
 
-  const saveTimer = useCallback(async (taskId: number) => {
-    const timer = timersRef.current.find((item) => item.task.id === taskId);
-    if (!timer || savingRef.current.has(taskId)) return;
+  const saveTimer = useCallback(async (itemKey: string) => {
+    const timer = timersRef.current.find((item) => item.key === itemKey);
+    if (!timer || savingRef.current.has(timer.task.id)) return;
     const endedAtMs = Date.now();
     const elapsed = timerSeconds(timer, endedAtMs);
     const duration = timer.mode === 'timer' ? Math.min(elapsed, timer.targetSeconds) : elapsed;
     if (duration <= 0) return;
-    savingRef.current.add(taskId);
+    savingRef.current.add(timer.task.id);
     const endedAt = new Date(endedAtMs).toISOString();
     const startedAt = timer.startedAtIso ?? new Date(endedAtMs - duration * 1000).toISOString();
-    await addTimeLog(db, taskId, duration, startedAt, endedAt, timer.mode);
-    await markComplete(db, taskId, today);
+    await addTimeLog(db, timer.task.id, duration, startedAt, endedAt, timer.mode);
+    await markComplete(db, timer.task.id, today);
     setTimers((current) => current.map((item) => (
-      item.task.id === taskId ? { ...item, baseSeconds: 0, startedAtMs: null, startedAtIso: null } : item
+      item.key === itemKey ? { ...item, baseSeconds: 0, startedAtMs: null, startedAtIso: null } : item
     )));
-    savingRef.current.delete(taskId);
+    savingRef.current.delete(timer.task.id);
   }, [db, today]);
 
-  const updateTargetSeconds = useCallback(async (taskId: number, seconds: number) => {
-    setTimers((current) => current.map((t) => (t.task.id === taskId ? { ...t, targetSeconds: seconds } : t)));
-    await saveTimerSettingForTask(db, taskId, seconds);
+  const updateTargetSeconds = useCallback(async (itemKey: string, seconds: number) => {
+    const timer = timersRef.current.find((t) => t.key === itemKey);
+    setTimers((current) => current.map((t) => (t.key === itemKey ? { ...t, targetSeconds: seconds } : t)));
+    if (timer) await saveTimerSettingForTask(db, timer.task.id, seconds);
   }, [db]);
 
-  const isTiming = useCallback((taskId: number) => timersRef.current.some((t) => t.task.id === taskId), []);
+  const isTiming = useCallback((itemKey: string) => timersRef.current.some((t) => t.key === itemKey), []);
 
   // tapping an auto-timer notification starts the matching task's timer/stopwatch
   const handleAutoTimerResponse = useCallback(async (data: any) => {
@@ -205,7 +218,7 @@ export function TimerProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     timers.forEach((item) => {
       if (item.mode === 'timer' && item.startedAtMs && timerSeconds(item, now) >= item.targetSeconds) {
-        saveTimer(item.task.id);
+        saveTimer(item.key);
       }
     });
   }, [now, timers, saveTimer]);
