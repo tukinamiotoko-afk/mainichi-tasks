@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, Platform, StatusBar, ScrollView, Dimensions } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, Platform, StatusBar, ScrollView, Dimensions, Animated } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useFocusEffect } from '@react-navigation/native';
@@ -106,6 +106,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   chipAltActive: { backgroundColor: '#fef3c7', borderColor: '#fef3c7' },
   chipAltText: { color: '#fef3c7', fontSize: 12, fontWeight: '700' },
   chipAltTextActive: { color: '#92400e' },
+  chipAltExpand: { overflow: 'hidden', width: '100%' },
 
   customBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.card, paddingHorizontal: 16, paddingVertical: 10, gap: 6, borderBottomWidth: 1, borderBottomColor: C.border },
   customLabel: { color: C.stone, fontSize: 11, fontWeight: '700' },
@@ -184,6 +185,8 @@ export default function StatsScreen({ navigation }: Props) {
   const [mode, setMode] = useState<Mode>('rate');
   const [openDropdown, setOpenDropdown] = useState<DropdownKey | null>(null);
   const [headerHeight, setHeaderHeight] = useState(0);
+  const [timerModePickerOpen, setTimerModePickerOpen] = useState(false);
+  const timerModeExpand = useMemo(() => new Animated.Value(0), []);
 
   // ── Rate (execution rate) state ──
   const [period, setPeriod] = useState<Period>('7日');
@@ -335,6 +338,16 @@ export default function StatsScreen({ navigation }: Props) {
   const toggleDropdown = (key: DropdownKey) =>
     setOpenDropdown(prev => prev === key ? null : key);
 
+  const toggleTimerModePicker = () => {
+    const next = !timerModePickerOpen;
+    setTimerModePickerOpen(next);
+    Animated.timing(timerModeExpand, {
+      toValue: next ? 1 : 0,
+      duration: 180,
+      useNativeDriver: false,
+    }).start();
+  };
+
   const periodDisplay = PERIOD_OPTIONS.find(o => o.value === period)?.label ?? period;
   const freqDisplay = freqFilter;
 
@@ -412,19 +425,43 @@ export default function StatsScreen({ navigation }: Props) {
                   <Text style={[s.chipText, timerSubMode === o.k && s.chipTextActive]}>{o.l}</Text>
                 </TouchableOpacity>
               ))}
-              {([
-                { k: 'stopwatch' as const, l: 'ストップウォッチ' },
-                { k: 'timer' as const, l: 'タイマー' },
-              ]).map((o) => (
-                <TouchableOpacity
-                  key={o.k}
-                  style={[s.chip, s.chipAlt, timerModeFilter === o.k && s.chipAltActive]}
-                  onPress={() => setTimerModeFilter(o.k)}
-                >
-                  <Text style={[s.chipAltText, timerModeFilter === o.k && s.chipAltTextActive]}>{o.l}</Text>
-                </TouchableOpacity>
-              ))}
+              <TouchableOpacity
+                style={[s.chip, s.chipAlt, s.selectorBtnOpen]}
+                onPress={toggleTimerModePicker}
+                activeOpacity={0.85}
+              >
+                <Text style={[s.chipAltText, timerModeFilter === 'timer' && s.chipAltTextActive]}>
+                  {timerModeFilter === 'timer' ? 'タイマー' : 'ストップウォッチ'} {timerModePickerOpen ? '▲' : '▼'}
+                </Text>
+              </TouchableOpacity>
             </View>
+            <Animated.View
+              style={[
+                s.chipAltExpand,
+                {
+                  maxHeight: timerModeExpand.interpolate({ inputRange: [0, 1], outputRange: [0, 56] }),
+                  opacity: timerModeExpand,
+                },
+              ]}
+            >
+              <View style={s.chipRow}>
+                {([
+                  { k: 'stopwatch' as const, l: 'ストップウォッチ' },
+                  { k: 'timer' as const, l: 'タイマー' },
+                ]).map((o) => (
+                  <TouchableOpacity
+                    key={o.k}
+                    style={[s.chip, s.chipAlt, timerModeFilter === o.k && s.chipAltActive]}
+                    onPress={() => {
+                      setTimerModeFilter(o.k);
+                      if (timerModePickerOpen) toggleTimerModePicker();
+                    }}
+                  >
+                    <Text style={[s.chipAltText, timerModeFilter === o.k && s.chipAltTextActive]}>{o.l}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </Animated.View>
             {timerSubMode === 'daily' ? (
               <View style={s.monthNav}>
                 <TouchableOpacity onPress={() => setTimerDate(subtractDays(timerDate, 1))} style={s.navBtn}>
