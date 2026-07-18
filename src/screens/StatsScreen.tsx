@@ -474,7 +474,7 @@ export default function StatsScreen({ navigation }: Props) {
                     {([
                       { k: 'stopwatch' as const, l: 'ストップウォッチ' },
                       { k: 'timer' as const, l: 'タイマー' },
-                    ]).map((o) => (
+                    ].filter((o) => o.k !== timerModeFilter)).map((o) => (
                       <TouchableOpacity
                         key={o.k}
                         style={[s.chip, s.chipAlt, timerModeFilter === o.k && s.chipAltActive]}
