@@ -112,9 +112,24 @@ async function ensurePermission(): Promise<boolean> {
   return true;
 }
 
+async function ensureAndroidNotificationChannels(): Promise<void> {
+  if (Platform.OS !== 'android') return;
+  await Notifications.setNotificationChannelAsync('full', {
+    name: '通常通知',
+    importance: Notifications.AndroidImportance.HIGH,
+    sound: 'default',
+  });
+  await Notifications.setNotificationChannelAsync('silent', {
+    name: 'サイレント通知',
+    importance: Notifications.AndroidImportance.DEFAULT,
+    sound: null,
+  });
+}
+
 // Schedule reminders for a task according to its recurrence. Returns identifiers.
 async function scheduleTaskNotifs(task: Schedulable): Promise<string[]> {
   if (!task.scheduled_time) return [];
+  await ensureAndroidNotificationChannels();
   const [h, m] = task.scheduled_time.split(':').map(Number);
   const body = `${task.icon ? task.icon + ' ' : ''}${task.title} の時間です`;
   const isAlarm = task.notify_type === 'alarm';
@@ -154,8 +169,8 @@ async function scheduleTaskNotifs(task: Schedulable): Promise<string[]> {
         }
       }
     }
-  } catch {
-    // ignore scheduling failures (e.g. permission revoked); UI still works.
+  } catch (e) {
+    console.log('[Notif] scheduleTaskNotifs error', task.title, String(e));
   }
   console.log('[Notif] scheduleTaskNotifs', JSON.stringify({
     title: task.title,
@@ -190,6 +205,7 @@ async function rescheduleTask(task: Schedulable): Promise<string | null> {
 // TimerContext) can start the right measurement without any other state.
 async function scheduleAutoTimerNotifs(task: AutoTimerSchedulable): Promise<string[]> {
   if (!task.auto_timer_time) return [];
+  await ensureAndroidNotificationChannels();
   const [h, m] = task.auto_timer_time.split(':').map(Number);
   const modeLabel = task.auto_timer_mode === 'timer' ? 'タイマー' : 'ストップウォッチ';
   const body = `${task.icon ? task.icon + ' ' : ''}${task.title} の${modeLabel}計測を開始する時間です（タップで開始）`;
@@ -230,8 +246,8 @@ async function scheduleAutoTimerNotifs(task: AutoTimerSchedulable): Promise<stri
         }
       }
     }
-  } catch {
-    // ignore scheduling failures (e.g. permission revoked); UI still works.
+  } catch (e) {
+    console.log('[Notif] scheduleAutoTimerNotifs error', task.title, String(e));
   }
   return ids;
 }
