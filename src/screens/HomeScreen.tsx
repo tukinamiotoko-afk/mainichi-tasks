@@ -233,7 +233,7 @@ async function rescheduleAutoTimer(task: AutoTimerSchedulable): Promise<string |
   return ids.length ? ids.join(',') : null;
 }
 
-// Each option fades up on mount, staggered by index, so the list "floats up".
+// Each row rises into place on mount, staggered by index, without dimming.
 function RiseIn({ index, style, children }: { index: number; style?: any; children: React.ReactNode }) {
   const anim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -245,7 +245,7 @@ function RiseIn({ index, style, children }: { index: number; style?: any; childr
     }).start();
   }, [anim, index]);
   return (
-    <Animated.View style={[style, { opacity: anim, transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }] }]}>
+    <Animated.View style={[style, { transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }] }]}>
       {children}
     </Animated.View>
   );
