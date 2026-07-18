@@ -33,6 +33,8 @@ export type FlowBranch = {
   branch_side: 'left' | 'right';
 };
 
+const settingCache = new Map<string, string | null>();
+
 export async function migrateDb(db: SQLite.SQLiteDatabase): Promise<void> {
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS tasks (
@@ -173,12 +175,16 @@ export async function migrateDb(db: SQLite.SQLiteDatabase): Promise<void> {
 }
 
 export async function getSetting(db: SQLite.SQLiteDatabase, key: string): Promise<string | null> {
+  if (settingCache.has(key)) return settingCache.get(key) ?? null;
   const row = await db.getFirstAsync<{ value: string | null }>('SELECT value FROM app_settings WHERE key = ?', [key]);
-  return row?.value ?? null;
+  const value = row?.value ?? null;
+  settingCache.set(key, value);
+  return value;
 }
 
 export async function setSetting(db: SQLite.SQLiteDatabase, key: string, value: string): Promise<void> {
   await db.runAsync('INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)', [key, value]);
+  settingCache.set(key, value);
 }
 
 export type TimerDailyUsage = { starts: number; bonus: number };
