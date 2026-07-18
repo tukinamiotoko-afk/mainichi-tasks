@@ -422,6 +422,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
     paddingTop: 16,
     zIndex: 20,
   },
+  panelFloatWrap: { position: 'relative' },
   panelShadow: { borderRadius: 12 },
   listHeader: { marginBottom: 4 },
   sectionBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 10, paddingBottom: 4 },
@@ -442,7 +443,14 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   fChipTextActive: { color: C.onPrimary },
   filterHint: { color: C.muted, fontSize: 10, fontWeight: '600', marginTop: 4 },
 
-  swipeWrap: { borderRadius: 12 },
+  swipeWrap: {
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 2, height: 4 },
+    shadowOpacity: 0.16,
+    shadowRadius: 8,
+    elevation: 5,
+  },
   swipeDeleteBg: {
     position: 'absolute',
     top: 0,
@@ -461,7 +469,6 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   taskCard: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 12,
     paddingHorizontal: 14, paddingVertical: 14, gap: 12,
-    shadowColor: '#000', shadowOffset: { width: 1, height: 3 }, shadowOpacity: 0.12, shadowRadius: 6, elevation: 4,
   },
   taskCardDone: { opacity: 0.6 },
   checkBox: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
@@ -1566,10 +1573,10 @@ export default function HomeScreen({ navigation }: Props) {
   const progress = total > 0 ? done / total : 0;
   // Gauge gradient color by completion ratio.
   const gaugeColors = (
-    progress >= 1 ? ['#34d399', '#059669'] :
-    progress >= 0.67 ? ['#4ade80', '#16a34a'] :
-    progress >= 0.34 ? ['#facc15', '#f59e0b'] :
-    ['#fb7185', '#e11d48']
+    progress >= 1 ? ['#86efac', '#16a34a'] :
+    progress >= 0.67 ? ['#bbf7d0', '#22c55e'] :
+    progress >= 0.34 ? ['#fde68a', '#f59e0b'] :
+    ['#fda4af', '#e11d48']
   ) as readonly [string, string];
   const sortedTasks = useMemo(() => [...tasks].sort((a, b) => {
     if (a.sort_order !== b.sort_order) return a.sort_order - b.sort_order;
@@ -2369,20 +2376,21 @@ export default function HomeScreen({ navigation }: Props) {
           transform: [{ translateY: panelAnim.interpolate({ inputRange: [0, 1], outputRange: [-16, 0] }) }],
         }]}
       >
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            FLOAT_SHADOW_BASE,
-            s.panelShadow,
-            {
-              opacity: panelAnim.interpolate({
-                inputRange: [0, 0.85, 1],
-                outputRange: [0.38, 0.16, 0],
-                extrapolate: 'clamp',
-              }),
-            },
-          ]}
-        />
+        <View style={s.panelFloatWrap}>
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              FLOAT_SHADOW_BASE,
+              s.panelShadow,
+              {
+                opacity: panelAnim.interpolate({
+                  inputRange: [0, 0.85, 1],
+                  outputRange: [0.34, 0.14, 0],
+                  extrapolate: 'clamp',
+                }),
+              },
+            ]}
+          />
         {lastPanelRef.current === 'filter' ? (
           <View style={s.filterPanel}>
             <Text style={s.filterLabel}>状態</Text>
@@ -2423,6 +2431,7 @@ export default function HomeScreen({ navigation }: Props) {
             {!reorderEnabled && <Text style={s.filterHint}>※ この表示中はドラッグでの並び替えはできません（「手動」かつ絞り込み「すべて」で可能）</Text>}
           </View>
         )}
+        </View>
       </Animated.View>
       </View>
 
