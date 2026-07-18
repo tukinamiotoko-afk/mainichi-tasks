@@ -68,7 +68,7 @@ const FLOAT_SHADOW_BASE = {
   left: 0,
   right: 0,
   bottom: 0,
-  backgroundColor: 'rgba(15,23,42,0.22)',
+  backgroundColor: 'rgba(15,23,42,0.32)',
   transform: [{ translateX: 3 }, { translateY: 5 }],
 };
 
