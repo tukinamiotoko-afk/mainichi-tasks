@@ -47,7 +47,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   controlBtnDisabled: { opacity: 0.45 },
   pauseBtn: { backgroundColor: C.card, borderWidth: 1, borderColor: C.border },
   saveBtn: { backgroundColor: C.danger },
-  controlText: { color: C.onPrimary, fontSize: 13, fontWeight: '900' },
+  controlText: { color: C.onPrimary, fontSize: 20, fontWeight: '900' },
   pauseText: { color: C.onDark },
   saveText: { color: C.onPrimary },
   emptyBox: { backgroundColor: C.card, borderWidth: 1, borderColor: C.border, borderRadius: 12, padding: 20, alignItems: 'center', gap: 6 },
@@ -253,14 +253,14 @@ export default function TimerScreen({ navigation }: Props) {
               <View style={s.timerControls}>
                 <TouchableOpacity onPress={() => startTimer(item.task.id)} disabled={running} activeOpacity={0.86} style={{ flex: 1 }}>
                   <LinearGradient colors={GRAD.success} start={GRAD_START} end={GRAD_END} style={[s.controlBtn, running && s.controlBtnDisabled]}>
-                    <Text style={s.controlText}>開始</Text>
+                    <Text style={s.controlText}>▶</Text>
                   </LinearGradient>
                 </TouchableOpacity>
                 <TouchableOpacity style={[s.controlBtn, s.pauseBtn]} onPress={() => pauseTimer(item.task.id)} disabled={!running}>
-                  <Text style={[s.controlText, s.pauseText]}>一時停止</Text>
+                  <Text style={[s.controlText, s.pauseText]}>⏸</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={[s.controlBtn, s.saveBtn]} onPress={() => saveTimer(item.task.id)} disabled={seconds <= 0}>
-                  <Text style={[s.controlText, s.saveText]}>完全停止</Text>
+                  <Text style={[s.controlText, s.saveText]}>⏹</Text>
                 </TouchableOpacity>
               </View>
             </View>

@@ -595,7 +595,7 @@ export default function StatsScreen({ navigation }: Props) {
             renderItem={({ item }) => (
               <View style={s.rateCard}>
                 <View style={s.rateHeader}>
-                  <Text style={s.rateTitle} numberOfLines={1}>{item.title}</Text>
+                  <Text style={s.rateTitle} numberOfLines={1}>{item.icon ? `${item.icon} ` : ''}{item.title}</Text>
                   <Text style={s.timerDuration}>{formatDuration(item.duration_seconds)}</Text>
                 </View>
                 <View style={s.rateHeader}>

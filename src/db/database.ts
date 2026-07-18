@@ -16,7 +16,7 @@ export type Task = {
 };
 export type NotificationSetting = { id: number; time: string; notification_type: string; identifier: string | null; task_id: number | null };
 export type CompletionDetail = { task_id: number; title: string; icon: string | null; date: string; completed_at: string | null };
-export type TimeLog = { id: number; task_id: number; title: string; date: string; duration_seconds: number; started_at: string; ended_at: string; mode: 'stopwatch' | 'timer' };
+export type TimeLog = { id: number; task_id: number; title: string; icon: string | null; date: string; duration_seconds: number; started_at: string; ended_at: string; mode: 'stopwatch' | 'timer' };
 export type TimerSetting = { task_id: number; target_seconds: number };
 export type FlowProject = { id: number; title: string; sort_order: number };
 export type FlowStep = { id: number; project_id: number; title: string; sort_order: number };
@@ -442,7 +442,7 @@ export async function addTimeLog(
 
 export async function getTimeLogsForDate(db: SQLite.SQLiteDatabase, date: string): Promise<TimeLog[]> {
   return db.getAllAsync<TimeLog>(
-    `SELECT l.id, l.task_id, t.title, l.date, l.duration_seconds, l.started_at, l.ended_at, l.mode
+    `SELECT l.id, l.task_id, t.title, t.icon, l.date, l.duration_seconds, l.started_at, l.ended_at, l.mode
      FROM time_logs l JOIN tasks t ON l.task_id = t.id
      WHERE l.date = ?
      ORDER BY l.ended_at DESC`,
