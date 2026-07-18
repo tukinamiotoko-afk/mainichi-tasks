@@ -450,6 +450,29 @@ export async function getTimeLogsForDate(db: SQLite.SQLiteDatabase, date: string
   );
 }
 
+export async function getTimeLogsForTask(
+  db: SQLite.SQLiteDatabase,
+  taskId: number,
+  mode?: 'stopwatch' | 'timer'
+): Promise<TimeLog[]> {
+  if (mode) {
+    return db.getAllAsync<TimeLog>(
+      `SELECT l.id, l.task_id, t.title, t.icon, l.date, l.duration_seconds, l.started_at, l.ended_at, l.mode
+       FROM time_logs l JOIN tasks t ON l.task_id = t.id
+       WHERE l.task_id = ? AND l.mode = ?
+       ORDER BY l.ended_at DESC`,
+      [taskId, mode]
+    );
+  }
+  return db.getAllAsync<TimeLog>(
+    `SELECT l.id, l.task_id, t.title, t.icon, l.date, l.duration_seconds, l.started_at, l.ended_at, l.mode
+     FROM time_logs l JOIN tasks t ON l.task_id = t.id
+     WHERE l.task_id = ?
+     ORDER BY l.ended_at DESC`,
+    [taskId]
+  );
+}
+
 export async function getTotalTimeForDate(db: SQLite.SQLiteDatabase, date: string): Promise<number> {
   const row = await db.getFirstAsync<{ total: number | null }>(
     'SELECT SUM(duration_seconds) as total FROM time_logs WHERE date = ?',

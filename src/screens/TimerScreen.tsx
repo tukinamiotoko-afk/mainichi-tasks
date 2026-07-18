@@ -1,12 +1,12 @@
-import React, { useCallback, useMemo, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, StatusBar, Alert, ScrollView, Modal, Dimensions, TextInput } from 'react-native';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, StatusBar, Alert, ScrollView, Modal, Dimensions, TextInput, Animated, Easing } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import { RootStackParamList } from '../../App';
-import { Task, getTasks } from '../db/database';
+import { Task, TimeLog, getTasks, getTimeLogsForTask } from '../db/database';
 import { GRAD_START, GRAD_END } from '../constants/theme';
 import TabBar from '../components/TabBar';
 import { useTheme, ColorSet } from '../contexts/ThemeContext';
@@ -41,6 +41,13 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   timerState: { color: C.muted, fontSize: 11, fontWeight: '800' },
   removeBtn: { width: 30, height: 30, borderRadius: 15, backgroundColor: C.body, alignItems: 'center', justifyContent: 'center' },
   removeText: { color: C.muted, fontSize: 18, fontWeight: '900' },
+  cardActionRow: { flexDirection: 'row', gap: 8 },
+  cardActionBtn: { flex: 1, borderRadius: 10, borderWidth: 1, borderColor: C.border, backgroundColor: C.body, paddingVertical: 10, alignItems: 'center', justifyContent: 'center' },
+  cardActionPrimary: { backgroundColor: C.primarySoft, borderColor: C.primary },
+  cardActionText: { color: C.muted, fontSize: 12, fontWeight: '800' },
+  cardActionTextPrimary: { color: C.primary, fontSize: 12, fontWeight: '900' },
+  expandWrap: { overflow: 'hidden' },
+  expandInner: { gap: 12, paddingTop: 10 },
   timerTime: { color: C.onDark, fontSize: 42, fontWeight: '900', textAlign: 'center', letterSpacing: 1 },
   timerControls: { flexDirection: 'row', gap: 8 },
   controlBtn: { flex: 1, borderRadius: 10, paddingVertical: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#ffffff', borderWidth: 1, borderColor: C.border, minHeight: 46 },
@@ -54,6 +61,15 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   modalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' },
   modalBackdrop: { ...StyleSheet.absoluteFillObject },
   pickerSheet: { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: C.card, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 18, gap: 12 },
+  historySheet: { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: C.card, borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 18, gap: 12, maxHeight: '72%' },
+  historyHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  historyTitle: { flex: 1, color: C.onDark, fontSize: 16, fontWeight: '900' },
+  historySub: { color: C.muted, fontSize: 12, fontWeight: '700' },
+  historyList: { gap: 8, paddingBottom: 12 },
+  historyRow: { borderWidth: 1, borderColor: C.border, borderRadius: 12, padding: 12, gap: 6, backgroundColor: C.body },
+  historyRowTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  historyDuration: { color: C.primary, fontSize: 14, fontWeight: '900' },
+  historyMeta: { color: C.muted, fontSize: 12, fontWeight: '700' },
   sheetHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: C.border, alignSelf: 'center' },
   pickerTitle: { color: C.onDark, fontSize: 16, fontWeight: '900' },
   pickerList: { flex: 1 },
@@ -83,6 +99,11 @@ function formatDuration(totalSeconds: number, alwaysHours = false): string {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
+function formatLogStamp(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
 export default function TimerScreen({ navigation }: Props) {
   const db = useSQLiteContext();
   const insets = useSafeAreaInsets();
@@ -100,6 +121,12 @@ export default function TimerScreen({ navigation }: Props) {
   const [pickerIconFilterOpen, setPickerIconFilterOpen] = useState(false);
   const [pickerIconFilter, setPickerIconFilter] = useState<string | null>(null);
   const [currentTab, setCurrentTab] = useState<'stopwatch' | 'timer'>('stopwatch');
+  const [expandedKey, setExpandedKey] = useState<string | null>(null);
+  const expandAnims = useRef<Record<string, Animated.Value>>({});
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyTask, setHistoryTask] = useState<Task | null>(null);
+  const [historyLogs, setHistoryLogs] = useState<TimeLog[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const closePicker = () => {
     setPickerOpen(false);
     setPickerSortKey('manual');
@@ -108,6 +135,11 @@ export default function TimerScreen({ navigation }: Props) {
   };
   const [minuteInputs, setMinuteInputs] = useState<Record<string, string>>({});
   const [editingTimerId, setEditingTimerId] = useState<string | null>(null);
+
+  const getExpandAnim = (itemKey: string) => {
+    if (!expandAnims.current[itemKey]) expandAnims.current[itemKey] = new Animated.Value(0);
+    return expandAnims.current[itemKey];
+  };
 
   const runningCount = timers.filter((item) => item.startedAtMs).length;
   const visibleTimers = useMemo(() => timers.filter((item) => item.mode === currentTab), [timers, currentTab]);
@@ -185,6 +217,41 @@ export default function TimerScreen({ navigation }: Props) {
     setEditingTimerId((current) => (current === itemKey ? null : current));
   };
 
+  const toggleExpanded = (itemKey: string) => {
+    const nextIsOpen = expandedKey !== itemKey;
+    const currentAnim = getExpandAnim(itemKey);
+    const animations: Animated.CompositeAnimation[] = [];
+    if (expandedKey && expandedKey !== itemKey) {
+      animations.push(Animated.timing(getExpandAnim(expandedKey), {
+        toValue: 0,
+        duration: 180,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: false,
+      }));
+    }
+    animations.push(Animated.timing(currentAnim, {
+      toValue: nextIsOpen ? 1 : 0,
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }));
+    setExpandedKey(nextIsOpen ? itemKey : null);
+    if (!nextIsOpen) setEditingTimerId((current) => (current === itemKey ? null : current));
+    Animated.parallel(animations).start();
+  };
+
+  const openHistory = async (task: Task) => {
+    setHistoryTask(task);
+    setHistoryOpen(true);
+    setHistoryLoading(true);
+    try {
+      const logs = await getTimeLogsForTask(db, task.id, currentTab);
+      setHistoryLogs(logs);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
   return (
     <View style={s.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor={C.body} />
@@ -214,7 +281,7 @@ export default function TimerScreen({ navigation }: Props) {
           </LinearGradient>
         </TouchableOpacity>
 
-        <Text style={s.sectionTitle}>{currentTab === 'timer' ? 'タイマー' : 'ストップウォッチ'}</Text>
+        <Text style={s.sectionTitle}>{currentTab === 'timer' ? 'タイマー' : 'ストップウォッチ'}カード</Text>
         {visibleTimers.length === 0 ? (
           <View style={s.emptyBox}>
             <Text style={s.emptyTitle}>まだ何もありません</Text>
@@ -224,6 +291,8 @@ export default function TimerScreen({ navigation }: Props) {
           const seconds = timerSeconds(item, now);
           const shownSeconds = displayTimerSeconds(item, now);
           const running = !!item.startedAtMs;
+          const expanded = expandedKey === item.key;
+          const expandAnim = getExpandAnim(item.key);
           return (
             <View key={item.key} style={s.timerCard}>
               <View style={s.timerTop}>
@@ -238,73 +307,104 @@ export default function TimerScreen({ navigation }: Props) {
                   <Text style={s.removeText}>×</Text>
                 </TouchableOpacity>
               </View>
-              {item.mode === 'timer' && editingTimerId === item.key && (
-                <View style={s.minuteRow}>
-                  <TextInput
-                    style={s.minuteInput}
-                    value={minuteInputs[item.key] ?? String(Math.round(item.targetSeconds / 60))}
-                    onChangeText={(v) => setMinuteInputs((prev) => ({ ...prev, [item.key]: v.replace(/[^0-9]/g, '') }))}
-                    onBlur={async () => { await commitTimerMinutes(item.key); }}
-                    onSubmitEditing={async () => { await commitTimerMinutes(item.key); }}
-                    keyboardType="number-pad"
-                    returnKeyType="done"
-                    editable={!running}
-                    autoFocus
-                  />
-                  <Text style={s.minuteLabel}>分</Text>
-                </View>
-              )}
-              {item.mode === 'timer' && editingTimerId === item.key ? null : (
+              <View style={s.cardActionRow}>
+                <TouchableOpacity style={s.cardActionBtn} activeOpacity={0.85} onPress={() => openHistory(item.task)}>
+                  <Text style={s.cardActionText}>履歴</Text>
+                </TouchableOpacity>
                 <TouchableOpacity
-                  activeOpacity={item.mode === 'timer' && !running ? 0.8 : 1}
+                  style={[s.cardActionBtn, s.cardActionPrimary]}
+                  activeOpacity={0.85}
                   onPress={() => {
-                    if (item.mode !== 'timer' || running) return;
-                    setMinuteInputs((prev) => ({ ...prev, [item.key]: String(Math.round(item.targetSeconds / 60)) }));
-                    setEditingTimerId(item.key);
+                    if (!expanded && item.mode === 'timer' && !running) {
+                      setMinuteInputs((prev) => ({ ...prev, [item.key]: String(Math.round(item.targetSeconds / 60)) }));
+                    }
+                    toggleExpanded(item.key);
                   }}
                 >
-                  <Text style={s.timerTime}>{formatDuration(shownSeconds, true)}</Text>
-                </TouchableOpacity>
-              )}
-              <View style={s.timerControls}>
-                <TouchableOpacity
-                  onPress={async () => {
-                    const started = await startTimer(item.key);
-                    if (started) return;
-                    Alert.alert(
-                      '本日の回数上限です',
-                      '無料版では1日に計測を開始できる回数に上限があります。広告を見ると+1回、プレミアムなら無制限です。',
-                      [
-                        { text: 'キャンセル', style: 'cancel' },
-                        {
-                          text: '広告を見て+1回',
-                          onPress: async () => {
-                            const earned = await showRewardedAd();
-                            if (earned) {
-                              await grantTimerBonus();
-                              await startTimer(item.key);
-                            } else {
-                              Alert.alert('広告を最後まで見られませんでした');
-                            }
-                          },
-                        },
-                        { text: 'プレミアムを見る', onPress: () => navigation.navigate('Upgrade') },
-                      ]
-                    );
-                  }}
-                  disabled={running}
-                  activeOpacity={0.86}
-                  style={[s.controlBtn, running && s.controlBtnDisabled]}
-                >
-                  <Text style={s.startText}>▶</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={[s.controlBtn, !running && s.controlBtnDisabled]} onPress={() => pauseTimer(item.key)} disabled={!running}>
-                  <Text style={s.pauseText}>❚❚</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={[s.controlBtn, seconds <= 0 && s.controlBtnDisabled]} onPress={() => saveTimer(item.key)} disabled={seconds <= 0}>
-                  <Text style={s.saveText}>■</Text>
+                  <Text style={[s.cardActionText, s.cardActionTextPrimary]}>{expanded ? '閉じる' : '計測する'}</Text>
                 </TouchableOpacity>
               </View>
+              <Animated.View
+                style={[
+                  s.expandWrap,
+                  {
+                    maxHeight: expandAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 280] }),
+                    opacity: expandAnim,
+                    transform: [{
+                      translateY: expandAnim.interpolate({ inputRange: [0, 1], outputRange: [-8, 0] }),
+                    }],
+                  },
+                ]}
+              >
+                <View style={s.expandInner}>
+                  {item.mode === 'timer' && editingTimerId === item.key ? (
+                    <View style={s.minuteRow}>
+                      <TextInput
+                        style={s.minuteInput}
+                        value={minuteInputs[item.key] ?? String(Math.round(item.targetSeconds / 60))}
+                        onChangeText={(v) => setMinuteInputs((prev) => ({ ...prev, [item.key]: v.replace(/[^0-9]/g, '') }))}
+                        onBlur={async () => { await commitTimerMinutes(item.key); }}
+                        onSubmitEditing={async () => { await commitTimerMinutes(item.key); }}
+                        keyboardType="number-pad"
+                        returnKeyType="done"
+                        editable={!running}
+                        autoFocus
+                      />
+                      <Text style={s.minuteLabel}>分</Text>
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      activeOpacity={item.mode === 'timer' && !running ? 0.8 : 1}
+                      onPress={() => {
+                        if (item.mode !== 'timer' || running) return;
+                        setMinuteInputs((prev) => ({ ...prev, [item.key]: String(Math.round(item.targetSeconds / 60)) }));
+                        setEditingTimerId(item.key);
+                      }}
+                    >
+                      <Text style={s.timerTime}>{formatDuration(shownSeconds, true)}</Text>
+                    </TouchableOpacity>
+                  )}
+                  <View style={s.timerControls}>
+                    <TouchableOpacity
+                      onPress={async () => {
+                        const started = await startTimer(item.key);
+                        if (started) return;
+                        Alert.alert(
+                          '本日の回数上限です',
+                          '無料版では1日に計測を開始できる回数に上限があります。広告を見ると+1回、プレミアムなら無制限です。',
+                          [
+                            { text: 'キャンセル', style: 'cancel' },
+                            {
+                              text: '広告を見て+1回',
+                              onPress: async () => {
+                                const earned = await showRewardedAd();
+                                if (earned) {
+                                  await grantTimerBonus();
+                                  await startTimer(item.key);
+                                } else {
+                                  Alert.alert('広告を最後まで見られませんでした');
+                                }
+                              },
+                            },
+                            { text: 'プレミアムを見る', onPress: () => navigation.navigate('Upgrade') },
+                          ]
+                        );
+                      }}
+                      disabled={running}
+                      activeOpacity={0.86}
+                      style={[s.controlBtn, running && s.controlBtnDisabled]}
+                    >
+                      <Text style={s.startText}>▶</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[s.controlBtn, !running && s.controlBtnDisabled]} onPress={() => pauseTimer(item.key)} disabled={!running}>
+                      <Text style={s.pauseText}>❚❚</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[s.controlBtn, seconds <= 0 && s.controlBtnDisabled]} onPress={() => saveTimer(item.key)} disabled={seconds <= 0}>
+                      <Text style={s.saveText}>■</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </Animated.View>
             </View>
           );
         })}
@@ -382,6 +482,41 @@ export default function TimerScreen({ navigation }: Props) {
                   <Text style={s.pickerText} numberOfLines={2}>{task.title}</Text>
                   <Text style={s.pickerAdd}>追加</Text>
                 </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={historyOpen} transparent animationType="slide" onRequestClose={() => setHistoryOpen(false)} statusBarTranslucent>
+        <View style={s.modalBg}>
+          <TouchableOpacity style={s.modalBackdrop} activeOpacity={1} onPress={() => setHistoryOpen(false)} />
+          <View style={[s.historySheet, { paddingBottom: insets.bottom + 18 }]}>
+            <View style={s.sheetHandle} />
+            <View style={s.historyHead}>
+              <Text style={s.pickerIcon}>{historyTask?.icon ?? (currentTab === 'timer' ? '⏱' : '⏲️')}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={s.historyTitle} numberOfLines={1}>{historyTask?.title ?? '履歴'}</Text>
+                <Text style={s.historySub}>{currentTab === 'timer' ? 'タイマー' : 'ストップウォッチ'}の履歴</Text>
+              </View>
+            </View>
+            <ScrollView showsVerticalScrollIndicator contentContainerStyle={s.historyList}>
+              {historyLoading ? (
+                <View style={s.emptyBox}>
+                  <Text style={s.emptyBody}>読み込み中...</Text>
+                </View>
+              ) : historyLogs.length === 0 ? (
+                <View style={s.emptyBox}>
+                  <Text style={s.emptyTitle}>履歴はまだありません</Text>
+                </View>
+              ) : historyLogs.map((log) => (
+                <View key={log.id} style={s.historyRow}>
+                  <View style={s.historyRowTop}>
+                    <Text style={s.historyDuration}>{formatDuration(log.duration_seconds, true)}</Text>
+                    <Text style={s.historyMeta}>{log.mode === 'timer' ? 'タイマー' : 'ストップウォッチ'}</Text>
+                  </View>
+                  <Text style={s.historyMeta}>{formatLogStamp(log.started_at)} - {formatLogStamp(log.ended_at)}</Text>
+                </View>
               ))}
             </ScrollView>
           </View>

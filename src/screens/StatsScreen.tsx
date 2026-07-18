@@ -346,7 +346,7 @@ export default function StatsScreen({ navigation }: Props) {
         <View style={s.segRow}>
           {(['rate', 'calendar', 'timer'] as Mode[]).map((m) => (
             <TouchableOpacity key={m} style={[s.segChip, mode === m && s.segChipActive]} onPress={() => { setOpenDropdown(null); setMode(m); }}>
-              <Text style={[s.segText, mode === m && s.segTextActive]}>{m === 'rate' ? '実行率' : m === 'calendar' ? 'カレンダー' : 'タイマー'}</Text>
+              <Text style={[s.segText, mode === m && s.segTextActive]}>{m === 'rate' ? '実行率' : m === 'calendar' ? 'カレンダー' : '計測'}</Text>
             </TouchableOpacity>
           ))}
         </View>
