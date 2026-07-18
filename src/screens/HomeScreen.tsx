@@ -492,7 +492,17 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   metaSelectIconEmpty: { opacity: 0.35 },
   metaSelectText: { color: C.onDark, fontSize: 13, fontWeight: '700' },
   metaSelectArrow: { color: C.muted, fontSize: 11, fontWeight: '800' },
-  prioritySwatch: { width: 28, height: 20, borderRadius: 7, borderWidth: 1 },
+  prioritySwatch: {
+    width: 28,
+    height: 20,
+    borderRadius: 7,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+  },
   iconGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingVertical: 6 },
   iconChip: {
     width: 44,
