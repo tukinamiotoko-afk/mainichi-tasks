@@ -19,7 +19,7 @@ import { RootStackParamList } from '../../App';
 import {
   Task, TaskFields, getToday, getTasks, addTask, updateTask, deleteTask,
   getCompletionCounts, markComplete, markIncomplete, resetCompletion, updateTaskSortOrders,
-  getSetting, setSetting, getTotalCompletionsCount, getTimerSettingForTask,
+  getSetting, getSettingCached, setSetting, getTotalCompletionsCount, getTimerSettingForTask,
 } from '../db/database';
 import {
   TASK_ICONS, PRIORITIES, priorityMeta, WEEKDAYS,
@@ -1012,6 +1012,7 @@ export default function HomeScreen({ navigation }: Props) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [tasksLoaded, setTasksLoaded] = useState(false);
   const [tagRight, setTagRight] = useState(false);
+  const [fabReady, setFabReady] = useState(false);
   const tasksRef = useRef<Task[]>([]);
   const [completionCounts, setCompletionCounts] = useState<Map<number, number>>(new Map());
   const completionCountsRef = useRef<Map<number, number>>(completionCounts);
@@ -1142,6 +1143,15 @@ export default function HomeScreen({ navigation }: Props) {
     }
   }, [db, selectedDate]);
 
+  const applyFabSide = useCallback((leftHanded: boolean) => {
+    const nextFab = clampFab(
+      leftHanded ? 8 : Math.max(screen.width - 72, 20),
+      Math.max(screen.height - insets.bottom - 132, 120),
+    );
+    fabPosition.current = nextFab;
+    fabAnim.setValue(nextFab);
+  }, [fabAnim, insets.bottom, screen.height, screen.width]);
+
   const refreshAllTaskNotifications = useCallback(async () => {
     const allTasks = await getTasks(db);
     for (const t of allTasks) {
@@ -1170,7 +1180,21 @@ export default function HomeScreen({ navigation }: Props) {
     }
   }, [db]);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  useFocusEffect(useCallback(() => {
+    setFabReady(false);
+    const cachedLayout = getSettingCached('card_layout');
+    if (cachedLayout === 'tag_left' || cachedLayout === 'tag_right') {
+      const nextTagRight = cachedLayout === 'tag_right';
+      setTagRight(nextTagRight);
+      applyFabSide(nextTagRight);
+    }
+    const frame = requestAnimationFrame(() => setFabReady(true));
+    load();
+    return () => {
+      cancelAnimationFrame(frame);
+      setFabReady(false);
+    };
+  }, [applyFabSide, load]));
 
   useEffect(() => {
     tasksRef.current = tasks;
@@ -2441,13 +2465,15 @@ export default function HomeScreen({ navigation }: Props) {
 
       <TabBar current="Home" navigation={navigation} />
 
-      <Animated.View style={[s.fabWrap, fabAnim.getLayout()]} {...fabPanResponder.panHandlers}>
-        <TouchableOpacity onPress={() => setShowAdd(true)} activeOpacity={0.85}>
-          <LinearGradient colors={grad.brand} start={GRAD_START} end={GRAD_END} style={s.fab}>
-            <Text style={s.fabText}>＋</Text>
-          </LinearGradient>
-        </TouchableOpacity>
-      </Animated.View>
+      {fabReady && (
+        <Animated.View style={[s.fabWrap, fabAnim.getLayout()]} {...fabPanResponder.panHandlers}>
+          <TouchableOpacity onPress={() => setShowAdd(true)} activeOpacity={0.85}>
+            <LinearGradient colors={grad.brand} start={GRAD_START} end={GRAD_END} style={s.fab}>
+              <Text style={s.fabText}>＋</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </Animated.View>
+      )}
 
       {showThumb && (
         <View style={s.thumbOverlay} pointerEvents="none">

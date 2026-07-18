@@ -35,6 +35,10 @@ export type FlowBranch = {
 
 const settingCache = new Map<string, string | null>();
 
+export function getSettingCached(key: string): string | null | undefined {
+  return settingCache.get(key);
+}
+
 export async function migrateDb(db: SQLite.SQLiteDatabase): Promise<void> {
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS tasks (
