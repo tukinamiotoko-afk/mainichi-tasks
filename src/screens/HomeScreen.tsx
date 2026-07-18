@@ -343,7 +343,9 @@ function RiseIn({ index, style, shadowStyle, children }: { index: number; style?
           ]}
         />
       )}
-      {children}
+      <View style={{ zIndex: 1 }}>
+        {children}
+      </View>
     </Animated.View>
   );
 }
@@ -385,7 +387,7 @@ function PulseChip({ onPress, style, wrapStyle, shadowStyle, children }: { onPre
           ]}
         />
       )}
-      <TouchableOpacity style={style} onPress={() => { bounce(scale); onPress(); }} activeOpacity={0.8}>
+      <TouchableOpacity style={[style, { zIndex: 1 }]} onPress={() => { bounce(scale); onPress(); }} activeOpacity={0.8}>
         {children}
       </TouchableOpacity>
     </Animated.View>
@@ -571,7 +573,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   iconGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingVertical: 6 },
   iconChipWrap: { width: 44, height: 44 },
   iconChipShadow: { borderRadius: 12 },
-  iconChip: { width: 44, height: 44, borderRadius: 12, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
+  iconChip: { width: 44, height: 44, borderRadius: 12, borderWidth: 1, borderColor: C.border, alignItems: 'center', justifyContent: 'center', backgroundColor: C.card },
   iconChipActive: { backgroundColor: C.iconChipActiveBg, borderColor: C.primary },
   iconEmoji: { fontSize: 22 },
   iconNone: { color: C.muted, fontSize: 11, fontWeight: '700' },
@@ -586,6 +588,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
     borderRadius: 20,
     paddingVertical: 8,
     alignItems: 'center',
+    backgroundColor: C.card,
   },
   typeChipText: { color: C.muted, fontSize: 12, fontWeight: '700' },
   typeChipTextActive: { color: C.onPrimary },
@@ -600,6 +603,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
     borderRadius: 20,
     paddingHorizontal: 12,
     paddingVertical: 8,
+    backgroundColor: C.card,
   },
   freqTypeChipActive: { backgroundColor: C.primary, borderColor: C.primary },
   freqTypeText: { color: C.muted, fontSize: 12, fontWeight: '700' },
@@ -614,6 +618,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
     borderColor: C.border,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: C.card,
   },
   dayChipActive: { backgroundColor: C.primary, borderColor: C.primary },
   dayChipText: { color: C.onDark, fontSize: 13, fontWeight: '700' },
@@ -629,6 +634,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
     borderColor: C.border,
     paddingVertical: 8,
     alignItems: 'center',
+    backgroundColor: C.card,
   },
   weekChipActive: { backgroundColor: C.primary, borderColor: C.primary },
   weekChipText: { color: C.onDark, fontSize: 12, fontWeight: '700' },
@@ -644,6 +650,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
     borderColor: C.border,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: C.card,
   },
   monthDayChipActive: { backgroundColor: C.primary, borderColor: C.primary },
   monthDayText: { color: C.onDark, fontSize: 13, fontWeight: '700' },
