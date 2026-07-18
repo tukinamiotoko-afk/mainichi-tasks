@@ -41,7 +41,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   timerState: { color: C.muted, fontSize: 11, fontWeight: '800', minHeight: 16 },
   removeBtn: { width: 30, height: 30, borderRadius: 15, backgroundColor: C.body, alignItems: 'center', justifyContent: 'center' },
   removeText: { color: C.muted, fontSize: 18, fontWeight: '900' },
-  cardActionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 14 },
+  cardActionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', gap: 14 },
   cardActionBtn: { paddingVertical: 2, alignItems: 'center', justifyContent: 'center' },
   cardActionPrimary: {},
   cardActionText: { color: C.muted, fontSize: 11, fontWeight: '700' },
