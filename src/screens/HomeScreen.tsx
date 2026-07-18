@@ -126,6 +126,43 @@ async function ensureAndroidNotificationChannels(): Promise<void> {
   });
 }
 
+function dailyTrigger(hour: number, minute: number, channelId: string) {
+  return {
+    type: Notifications.SchedulableTriggerInputTypes.DAILY,
+    hour,
+    minute,
+    channelId,
+  } as any;
+}
+
+function weeklyTrigger(weekday: number, hour: number, minute: number, channelId: string) {
+  return {
+    type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
+    weekday,
+    hour,
+    minute,
+    channelId,
+  } as any;
+}
+
+function monthlyTrigger(day: number, hour: number, minute: number, channelId: string) {
+  return {
+    type: Notifications.SchedulableTriggerInputTypes.MONTHLY,
+    day,
+    hour,
+    minute,
+    channelId,
+  } as any;
+}
+
+function dateTrigger(date: Date, channelId: string) {
+  return {
+    type: Notifications.SchedulableTriggerInputTypes.DATE,
+    date,
+    channelId,
+  } as any;
+}
+
 // Schedule reminders for a task according to its recurrence. Returns identifiers.
 async function scheduleTaskNotifs(task: Schedulable): Promise<string[]> {
   if (!task.scheduled_time) return [];
@@ -133,39 +170,40 @@ async function scheduleTaskNotifs(task: Schedulable): Promise<string[]> {
   const [h, m] = task.scheduled_time.split(':').map(Number);
   const body = `${task.icon ? task.icon + ' ' : ''}${task.title} の時間です`;
   const isAlarm = task.notify_type === 'alarm';
+  const channelId = isAlarm ? 'full' : 'silent';
   const content = {
     title: '毎日タスク', body,
     sound: isAlarm,
-    android: { channelId: isAlarm ? 'full' : 'silent' },
+    android: { channelId },
   } as any;
   const ids: string[] = [];
   try {
     if (task.freq_type === 'daily') {
-      ids.push(await Notifications.scheduleNotificationAsync({ content, trigger: { hour: h, minute: m, repeats: true } as any }));
+      ids.push(await Notifications.scheduleNotificationAsync({ content, trigger: dailyTrigger(h, m, channelId) }));
     } else if (task.freq_type === 'weekly') {
       for (const d of parseDays(task.freq_days)) {
-        ids.push(await Notifications.scheduleNotificationAsync({ content, trigger: { weekday: d + 1, hour: h, minute: m, repeats: true } as any }));
+        ids.push(await Notifications.scheduleNotificationAsync({ content, trigger: weeklyTrigger(d + 1, h, m, channelId) }));
       }
     } else if (task.freq_type === 'monthly_day') {
-      ids.push(await Notifications.scheduleNotificationAsync({ content, trigger: { day: task.freq_day ?? 1, hour: h, minute: m, repeats: true } as any }));
+      ids.push(await Notifications.scheduleNotificationAsync({ content, trigger: monthlyTrigger(task.freq_day ?? 1, h, m, channelId) }));
     } else if (task.freq_type === 'monthly_nth') {
       const when = nextNthWeekdayDate(monthlyNthWeeks(task), monthlyNthWeekdays(task), h, m);
-      ids.push(await Notifications.scheduleNotificationAsync({ content, trigger: { date: when } as any }));
+      ids.push(await Notifications.scheduleNotificationAsync({ content, trigger: dateTrigger(when, channelId) }));
     } else if (task.freq_type === 'every_n_days') {
       if (task.once_date) {
         const when = nextEveryNDaysDate(task.once_date, task.freq_interval ?? 2, h, m);
-        ids.push(await Notifications.scheduleNotificationAsync({ content, trigger: { date: when } as any }));
+        ids.push(await Notifications.scheduleNotificationAsync({ content, trigger: dateTrigger(when, channelId) }));
       }
     } else if (task.freq_type === 'once') {
       const when = task.once_date ? new Date(`${task.once_date}T${task.scheduled_time}:00`) : new Date();
       if (when.getTime() > Date.now()) {
-        ids.push(await Notifications.scheduleNotificationAsync({ content, trigger: { date: when } as any }));
+        ids.push(await Notifications.scheduleNotificationAsync({ content, trigger: dateTrigger(when, channelId) }));
       }
     } else if (task.freq_type === 'dates') {
       for (const ds of parseDateList(task.freq_dates)) {
         const when = new Date(`${ds}T${task.scheduled_time}:00`);
         if (when.getTime() > Date.now()) {
-          ids.push(await Notifications.scheduleNotificationAsync({ content, trigger: { date: when } as any }));
+          ids.push(await Notifications.scheduleNotificationAsync({ content, trigger: dateTrigger(when, channelId) }));
         }
       }
     }
@@ -209,40 +247,41 @@ async function scheduleAutoTimerNotifs(task: AutoTimerSchedulable): Promise<stri
   const [h, m] = task.auto_timer_time.split(':').map(Number);
   const modeLabel = task.auto_timer_mode === 'timer' ? 'タイマー' : 'ストップウォッチ';
   const body = `${task.icon ? task.icon + ' ' : ''}${task.title} の${modeLabel}計測を開始する時間です（タップで開始）`;
+  const channelId = 'full';
   const content = {
     title: '毎日タスク', body,
     sound: true,
-    android: { channelId: 'full' },
+    android: { channelId },
     data: { kind: 'auto-timer', taskId: task.id, mode: task.auto_timer_mode, minutes: task.auto_timer_minutes },
   } as any;
   const ids: string[] = [];
   try {
     if (task.freq_type === 'daily') {
-      ids.push(await Notifications.scheduleNotificationAsync({ content, trigger: { hour: h, minute: m, repeats: true } as any }));
+      ids.push(await Notifications.scheduleNotificationAsync({ content, trigger: dailyTrigger(h, m, channelId) }));
     } else if (task.freq_type === 'weekly') {
       for (const d of parseDays(task.freq_days)) {
-        ids.push(await Notifications.scheduleNotificationAsync({ content, trigger: { weekday: d + 1, hour: h, minute: m, repeats: true } as any }));
+        ids.push(await Notifications.scheduleNotificationAsync({ content, trigger: weeklyTrigger(d + 1, h, m, channelId) }));
       }
     } else if (task.freq_type === 'monthly_day') {
-      ids.push(await Notifications.scheduleNotificationAsync({ content, trigger: { day: task.freq_day ?? 1, hour: h, minute: m, repeats: true } as any }));
+      ids.push(await Notifications.scheduleNotificationAsync({ content, trigger: monthlyTrigger(task.freq_day ?? 1, h, m, channelId) }));
     } else if (task.freq_type === 'monthly_nth') {
       const when = nextNthWeekdayDate(monthlyNthWeeks(task), monthlyNthWeekdays(task), h, m);
-      ids.push(await Notifications.scheduleNotificationAsync({ content, trigger: { date: when } as any }));
+      ids.push(await Notifications.scheduleNotificationAsync({ content, trigger: dateTrigger(when, channelId) }));
     } else if (task.freq_type === 'every_n_days') {
       if (task.once_date) {
         const when = nextEveryNDaysDate(task.once_date, task.freq_interval ?? 2, h, m);
-        ids.push(await Notifications.scheduleNotificationAsync({ content, trigger: { date: when } as any }));
+        ids.push(await Notifications.scheduleNotificationAsync({ content, trigger: dateTrigger(when, channelId) }));
       }
     } else if (task.freq_type === 'once') {
       const when = task.once_date ? new Date(`${task.once_date}T${task.auto_timer_time}:00`) : new Date();
       if (when.getTime() > Date.now()) {
-        ids.push(await Notifications.scheduleNotificationAsync({ content, trigger: { date: when } as any }));
+        ids.push(await Notifications.scheduleNotificationAsync({ content, trigger: dateTrigger(when, channelId) }));
       }
     } else if (task.freq_type === 'dates') {
       for (const ds of parseDateList(task.freq_dates)) {
         const when = new Date(`${ds}T${task.auto_timer_time}:00`);
         if (when.getTime() > Date.now()) {
-          ids.push(await Notifications.scheduleNotificationAsync({ content, trigger: { date: when } as any }));
+          ids.push(await Notifications.scheduleNotificationAsync({ content, trigger: dateTrigger(when, channelId) }));
         }
       }
     }
