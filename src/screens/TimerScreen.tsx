@@ -36,9 +36,9 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   timerTop: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   taskMark: { width: 34, height: 34, borderRadius: 17, backgroundColor: C.scheduleCardBg, alignItems: 'center', justifyContent: 'center' },
   taskMarkText: { fontSize: 18 },
-  timerTitleWrap: { flex: 1, gap: 2 },
+  timerTitleWrap: { flex: 1, gap: 3 },
   timerTitle: { color: C.onDark, fontSize: 15, fontWeight: '900' },
-  timerState: { color: C.muted, fontSize: 11, fontWeight: '800' },
+  timerState: { color: C.muted, fontSize: 11, fontWeight: '800', minHeight: 16 },
   removeBtn: { width: 30, height: 30, borderRadius: 15, backgroundColor: C.body, alignItems: 'center', justifyContent: 'center' },
   removeText: { color: C.muted, fontSize: 18, fontWeight: '900' },
   cardActionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 14 },
@@ -301,27 +301,30 @@ export default function TimerScreen({ navigation }: Props) {
                 </View>
                 <View style={s.timerTitleWrap}>
                   <Text style={s.timerTitle} numberOfLines={1}>{item.task.title}</Text>
-                  <Text style={s.timerState}>{running ? '計測中' : seconds > 0 ? '一時停止中' : '待機中'}</Text>
+                  {running || seconds > 0 ? (
+                    <Text style={s.timerState}>{running ? '計測中' : '一時停止中'}</Text>
+                  ) : (
+                    <View style={s.cardActionRow}>
+                      <TouchableOpacity style={s.cardActionBtn} activeOpacity={0.85} onPress={() => openHistory(item.task)}>
+                        <Text style={s.cardActionText}>履歴</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[s.cardActionBtn, s.cardActionPrimary]}
+                        activeOpacity={0.85}
+                        onPress={() => {
+                          if (!expanded && item.mode === 'timer' && !running) {
+                            setMinuteInputs((prev) => ({ ...prev, [item.key]: String(Math.round(item.targetSeconds / 60)) }));
+                          }
+                          toggleExpanded(item.key);
+                        }}
+                      >
+                        <Text style={[s.cardActionText, s.cardActionTextPrimary]}>{expanded ? '閉じる' : '計測する'}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
                 </View>
                 <TouchableOpacity style={s.removeBtn} onPress={() => handleRemoveTimer(item.key)}>
                   <Text style={s.removeText}>×</Text>
-                </TouchableOpacity>
-              </View>
-              <View style={s.cardActionRow}>
-                <TouchableOpacity style={s.cardActionBtn} activeOpacity={0.85} onPress={() => openHistory(item.task)}>
-                  <Text style={s.cardActionText}>履歴</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[s.cardActionBtn, s.cardActionPrimary]}
-                  activeOpacity={0.85}
-                  onPress={() => {
-                    if (!expanded && item.mode === 'timer' && !running) {
-                      setMinuteInputs((prev) => ({ ...prev, [item.key]: String(Math.round(item.targetSeconds / 60)) }));
-                    }
-                    toggleExpanded(item.key);
-                  }}
-                >
-                  <Text style={[s.cardActionText, s.cardActionTextPrimary]}>{expanded ? '閉じる' : '計測する'}</Text>
                 </TouchableOpacity>
               </View>
               <Animated.View
