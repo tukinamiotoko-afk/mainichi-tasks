@@ -13,6 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Notifications from 'expo-notifications';
 import * as SplashScreen from 'expo-splash-screen';
 import * as StoreReview from 'expo-store-review';
+import * as IntentLauncher from 'expo-intent-launcher';
 import { RootStackParamList } from '../../App';
 import {
   Task, TaskFields, getToday, getTasks, addTask, updateTask, deleteTask,
@@ -35,6 +36,7 @@ type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'Home'>
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const daysToCsv = (days: number[]) => days.slice().sort((a, b) => a - b).join(',');
+const ANDROID_PACKAGE_NAME = 'com.rockonions.mainichitask';
 const DRAG_ROW_HEIGHT = 88;
 const DRAG_GAP = 10;
 const DRAG_SLOT = DRAG_ROW_HEIGHT + DRAG_GAP; // actual slot size including gap
@@ -1286,8 +1288,19 @@ export default function HomeScreen({ navigation }: Props) {
 
   const openBatterySaverSettings = useCallback(async () => {
     try {
-      await Linking.openSettings();
+      await IntentLauncher.startActivityAsync('android.settings.VIEW_ADVANCED_POWER_USAGE_DETAIL', {
+        data: `package:${ANDROID_PACKAGE_NAME}`,
+      });
     } catch {
+      try {
+        await IntentLauncher.startActivityAsync(IntentLauncher.ActivityAction.APPLICATION_DETAILS_SETTINGS, {
+          data: `package:${ANDROID_PACKAGE_NAME}`,
+        });
+      } catch {
+        try {
+          await Linking.openSettings();
+        } catch {}
+      }
     } finally {
       await closeBatteryGuide();
     }
