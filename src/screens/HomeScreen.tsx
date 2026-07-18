@@ -1210,7 +1210,7 @@ export default function HomeScreen({ navigation }: Props) {
   const getTimerPresetMinutes = useCallback(async (taskId: number): Promise<number | null> => {
     const saved = await getTimerSettingForTask(db, taskId);
     if (!saved || saved.target_seconds <= 0) {
-      Alert.alert('タイマー未設定', 'まず タイマーの方で時間を設定してください');
+      Alert.alert('タイマー未設定', '自動計測でタイマーを使用するためには、計測タブに移動してタイマーの時間を設定してください。');
       return null;
     }
     return Math.max(1, Math.round(saved.target_seconds / 60));
@@ -2203,7 +2203,7 @@ export default function HomeScreen({ navigation }: Props) {
                     () => setNewAutoTimerTime(null),
                     (mode) => {
                       if (mode === 'timer') {
-                        Alert.alert('タイマー未設定', 'まず タイマーの方で時間を設定してください');
+                        Alert.alert('タイマー未設定', '自動計測でタイマーを使用するためには、計測タブに移動してタイマーの時間を設定してください。');
                         return;
                       }
                       setNewAutoTimerMode(mode);
