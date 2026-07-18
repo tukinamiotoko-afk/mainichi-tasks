@@ -4,7 +4,7 @@ import {
   View, Text, FlatList, TouchableOpacity, Modal,
   TextInput, StyleSheet, Alert, KeyboardAvoidingView,
   Platform, StatusBar, Animated, ScrollView, PanResponder, Dimensions, Switch,
-  LayoutAnimation, UIManager, Easing, Image, Linking, InteractionManager,
+  LayoutAnimation, UIManager, Easing, Image, Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSQLiteContext } from 'expo-sqlite';
@@ -34,9 +34,6 @@ import { usePurchases } from '../contexts/PurchasesContext';
 import { useAds } from '../contexts/AdsContext';
 
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'Home'> };
-const HOME_FAB_POSITION_KEY = 'homeFabPosition';
-const HOME_FAB_MODE_KEY = 'homeFabMode';
-type FabMode = 'manual' | 'left_bottom' | 'right_bottom';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const daysToCsv = (days: number[]) => days.slice().sort((a, b) => a - b).join(',');
@@ -1054,9 +1051,6 @@ export default function HomeScreen({ navigation }: Props) {
   const panelAnim = useRef(new Animated.Value(0)).current;
   const lastPanelRef = useRef<'filter' | 'sort'>('filter');
   if (activePanel) lastPanelRef.current = activePanel;
-  const [homeFabMode, setHomeFabMode] = useState<FabMode>('manual');
-  const homeFabModeRef = useRef<FabMode>('manual');
-  homeFabModeRef.current = homeFabMode;
   const today = getToday();
   const [selectedDate, setSelectedDate] = useState(today);
   const dateChangeAnim = useRef(new Animated.Value(1)).current;
@@ -1149,29 +1143,6 @@ export default function HomeScreen({ navigation }: Props) {
       }
     }
   }, [db, selectedDate]);
-
-  const restoreHomeFabPosition = useCallback(async () => {
-    try {
-      const modeRaw = await getSetting(db, HOME_FAB_MODE_KEY);
-      const mode: FabMode = modeRaw === 'left_bottom' || modeRaw === 'right_bottom' ? modeRaw : 'manual';
-      setHomeFabMode(mode);
-      if (mode !== 'manual') {
-        const preset = clampFab(mode === 'left_bottom' ? 8 : Math.max(screen.width - 72, 20), Math.max(screen.height - insets.bottom - 132, 120));
-        fabPosition.current = preset;
-        fabAnim.setValue(preset);
-        return;
-      }
-      const saved = await getSetting(db, HOME_FAB_POSITION_KEY);
-      if (!saved) return;
-      const parsed = JSON.parse(saved) as { x?: number; y?: number };
-      const next = clampFab(
-        typeof parsed?.x === 'number' ? parsed.x : fabPosition.current.x,
-        typeof parsed?.y === 'number' ? parsed.y : fabPosition.current.y,
-      );
-      fabPosition.current = next;
-      fabAnim.setValue(next);
-    } catch {}
-  }, [db]);
 
   const refreshAllTaskNotifications = useCallback(async () => {
     const allTasks = await getTasks(db);
@@ -1884,7 +1855,7 @@ export default function HomeScreen({ navigation }: Props) {
   });
   const fabPanResponder = useRef(PanResponder.create({
     onStartShouldSetPanResponder: () => false,
-    onMoveShouldSetPanResponder: (_, gesture) => homeFabModeRef.current === 'manual' && (Math.abs(gesture.dx) > 4 || Math.abs(gesture.dy) > 4),
+    onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dx) > 4 || Math.abs(gesture.dy) > 4,
     onPanResponderGrant: () => { fabStartPosition.current = fabPosition.current; },
     onPanResponderMove: (_, gesture) => {
       const next = clampFab(fabStartPosition.current.x + gesture.dx, fabStartPosition.current.y + gesture.dy);
@@ -1894,17 +1865,9 @@ export default function HomeScreen({ navigation }: Props) {
       const next = clampFab(fabStartPosition.current.x + gesture.dx, fabStartPosition.current.y + gesture.dy);
       fabPosition.current = next;
       fabAnim.setValue(next);
-      if (homeFabModeRef.current === 'manual') setSetting(db, HOME_FAB_POSITION_KEY, JSON.stringify(next)).catch(() => {});
     },
     onPanResponderTerminate: () => { fabAnim.setValue(fabPosition.current); },
   })).current;
-
-  useEffect(() => {
-    const task = InteractionManager.runAfterInteractions(() => {
-      restoreHomeFabPosition();
-    });
-    return () => task.cancel();
-  }, [restoreHomeFabPosition]);
 
   useEffect(() => {
     Animated.timing(progressAnim, { toValue: progress, duration: 450, useNativeDriver: false }).start();

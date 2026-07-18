@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, StatusBar, Alert, ScrollView, Modal, Dimensions, TextInput, Animated, Easing, InteractionManager } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, StatusBar, Alert, ScrollView, Modal, Dimensions, TextInput, Animated, Easing } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useFocusEffect } from '@react-navigation/native';
@@ -8,7 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import ReanimatedAnimated, { runOnJS, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { RootStackParamList } from '../../App';
-import { Task, TimeLog, deleteTimeLog, getSetting, getTasks, getTimeLogsForTask, setSetting } from '../db/database';
+import { Task, TimeLog, deleteTimeLog, getTasks, getTimeLogsForTask } from '../db/database';
 import { GRAD_START, GRAD_END } from '../constants/theme';
 import TabBar from '../components/TabBar';
 import { useTheme, ColorSet } from '../contexts/ThemeContext';
@@ -16,9 +16,6 @@ import { useTimerActions, useTimerState, useTimerClock, timerSeconds, displayTim
 import { useAds } from '../contexts/AdsContext';
 
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'Timer'> };
-const TIMER_FAB_POSITION_KEY = 'timerFabPosition';
-const TIMER_FAB_MODE_KEY = 'timerFabMode';
-type FabMode = 'manual' | 'left_bottom' | 'right_bottom';
 
 function splitSeconds(totalSeconds: number): { minutes: string; seconds: string } {
   const safe = Math.max(0, Math.round(totalSeconds));
@@ -224,7 +221,6 @@ export default function TimerScreen({ navigation }: Props) {
   const [minuteInputs, setMinuteInputs] = useState<Record<string, string>>({});
   const [secondInputs, setSecondInputs] = useState<Record<string, string>>({});
   const [editingTimerId, setEditingTimerId] = useState<string | null>(null);
-  const [timerFabMode, setTimerFabMode] = useState<FabMode>('manual');
   const fabStartX = Math.max(screen.width - 72, 20);
   const fabStartY = Math.max(screen.height - insets.bottom - 132, 120);
   const fabMaxX = screen.width - 60;
@@ -233,38 +229,6 @@ export default function TimerScreen({ navigation }: Props) {
   const fabY = useSharedValue(fabStartY);
   const fabGestureStartX = useSharedValue(fabStartX);
   const fabGestureStartY = useSharedValue(fabStartY);
-
-  const persistFabPosition = useCallback(async (x: number, y: number) => {
-    try {
-      await setSetting(db, TIMER_FAB_POSITION_KEY, JSON.stringify({ x, y }));
-    } catch {}
-  }, [db]);
-
-  const restoreFabPosition = useCallback(async () => {
-    try {
-      const modeRaw = await getSetting(db, TIMER_FAB_MODE_KEY);
-      const mode: FabMode = modeRaw === 'left_bottom' || modeRaw === 'right_bottom' ? modeRaw : 'manual';
-      setTimerFabMode(mode);
-      if (mode !== 'manual') {
-        const x = mode === 'left_bottom' ? 8 : fabStartX;
-        const y = fabStartY;
-        fabX.value = x;
-        fabY.value = y;
-        fabGestureStartX.value = x;
-        fabGestureStartY.value = y;
-        return;
-      }
-      const saved = await getSetting(db, TIMER_FAB_POSITION_KEY);
-      if (!saved) return;
-      const parsed = JSON.parse(saved) as { x?: number; y?: number };
-      const x = typeof parsed?.x === 'number' ? Math.max(8, Math.min(parsed.x, fabMaxX)) : fabStartX;
-      const y = typeof parsed?.y === 'number' ? Math.max(100, Math.min(parsed.y, fabMaxY)) : fabStartY;
-      fabX.value = x;
-      fabY.value = y;
-      fabGestureStartX.value = x;
-      fabGestureStartY.value = y;
-    } catch {}
-  }, [db, fabGestureStartX, fabGestureStartY, fabMaxX, fabMaxY, fabStartX, fabStartY, fabX, fabY]);
 
   const getExpandAnim = (itemKey: string) => {
     if (!expandAnims.current[itemKey]) expandAnims.current[itemKey] = new Animated.Value(0);
@@ -276,7 +240,6 @@ export default function TimerScreen({ navigation }: Props) {
   }));
   const panGesture = useMemo(() => Gesture.Pan()
     .minDistance(0)
-    .enabled(timerFabMode === 'manual')
     .onStart(() => {
       fabGestureStartX.value = fabX.value;
       fabGestureStartY.value = fabY.value;
@@ -290,8 +253,7 @@ export default function TimerScreen({ navigation }: Props) {
       const nextY = Math.max(100, Math.min(fabGestureStartY.value + event.translationY, fabMaxY));
       fabX.value = nextX;
       fabY.value = nextY;
-      runOnJS(persistFabPosition)(nextX, nextY);
-    }), [fabGestureStartX, fabGestureStartY, fabMaxX, fabMaxY, fabX, fabY, persistFabPosition, timerFabMode]);
+    }), [fabGestureStartX, fabGestureStartY, fabMaxX, fabMaxY, fabX, fabY]);
   const tapGesture = useMemo(() => Gesture.Tap()
     .maxDistance(8)
     .onEnd((_event, success) => {
@@ -309,11 +271,7 @@ export default function TimerScreen({ navigation }: Props) {
 
   useFocusEffect(useCallback(() => {
     load();
-    const task = InteractionManager.runAfterInteractions(() => {
-      restoreFabPosition();
-    });
-    return () => task.cancel();
-  }, [load, restoreFabPosition]));
+  }, [load]));
 
   const availableTasks = tasks.filter((task) => !timers.some((item) => item.task.id === task.id && item.mode === currentTab));
   const iconGroups = useMemo(() => {
