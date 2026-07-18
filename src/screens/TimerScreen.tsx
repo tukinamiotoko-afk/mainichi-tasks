@@ -8,7 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import ReanimatedAnimated, { runOnJS, useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { RootStackParamList } from '../../App';
-import { Task, TimeLog, getTasks, getTimeLogsForTask } from '../db/database';
+import { Task, TimeLog, getSetting, getTasks, getTimeLogsForTask, setSetting } from '../db/database';
 import { GRAD_START, GRAD_END } from '../constants/theme';
 import TabBar from '../components/TabBar';
 import { useTheme, ColorSet } from '../contexts/ThemeContext';
@@ -16,6 +16,7 @@ import { useTimerActions, useTimerState, useTimerClock, timerSeconds, displayTim
 import { useAds } from '../contexts/AdsContext';
 
 type Props = { navigation: NativeStackNavigationProp<RootStackParamList, 'Timer'> };
+const TIMER_FAB_POSITION_KEY = 'timerFabPosition';
 
 function splitSeconds(totalSeconds: number): { minutes: string; seconds: string } {
   const safe = Math.max(0, Math.round(totalSeconds));
@@ -227,6 +228,26 @@ export default function TimerScreen({ navigation }: Props) {
   const fabGestureStartX = useSharedValue(fabStartX);
   const fabGestureStartY = useSharedValue(fabStartY);
 
+  const persistFabPosition = useCallback(async (x: number, y: number) => {
+    try {
+      await setSetting(db, TIMER_FAB_POSITION_KEY, JSON.stringify({ x, y }));
+    } catch {}
+  }, [db]);
+
+  const restoreFabPosition = useCallback(async () => {
+    try {
+      const saved = await getSetting(db, TIMER_FAB_POSITION_KEY);
+      if (!saved) return;
+      const parsed = JSON.parse(saved) as { x?: number; y?: number };
+      const x = typeof parsed?.x === 'number' ? Math.max(8, Math.min(parsed.x, fabMaxX)) : fabStartX;
+      const y = typeof parsed?.y === 'number' ? Math.max(100, Math.min(parsed.y, fabMaxY)) : fabStartY;
+      fabX.value = x;
+      fabY.value = y;
+      fabGestureStartX.value = x;
+      fabGestureStartY.value = y;
+    } catch {}
+  }, [db, fabGestureStartX, fabGestureStartY, fabMaxX, fabMaxY, fabStartX, fabStartY, fabX, fabY]);
+
   const getExpandAnim = (itemKey: string) => {
     if (!expandAnims.current[itemKey]) expandAnims.current[itemKey] = new Animated.Value(0);
     return expandAnims.current[itemKey];
@@ -246,8 +267,11 @@ export default function TimerScreen({ navigation }: Props) {
       fabY.value = Math.max(100, Math.min(fabGestureStartY.value + event.translationY, fabMaxY));
     })
     .onEnd((event) => {
-      fabX.value = Math.max(8, Math.min(fabGestureStartX.value + event.translationX, fabMaxX));
-      fabY.value = Math.max(100, Math.min(fabGestureStartY.value + event.translationY, fabMaxY));
+      const nextX = Math.max(8, Math.min(fabGestureStartX.value + event.translationX, fabMaxX));
+      const nextY = Math.max(100, Math.min(fabGestureStartY.value + event.translationY, fabMaxY));
+      fabX.value = nextX;
+      fabY.value = nextY;
+      runOnJS(persistFabPosition)(nextX, nextY);
     }), [fabGestureStartX, fabGestureStartY, fabMaxX, fabMaxY, fabX, fabY]);
   const tapGesture = useMemo(() => Gesture.Tap()
     .maxDistance(8)
@@ -264,7 +288,10 @@ export default function TimerScreen({ navigation }: Props) {
     setTasks(loadedTasks);
   }, [db]);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  useFocusEffect(useCallback(() => {
+    load();
+    restoreFabPosition();
+  }, [load, restoreFabPosition]));
 
   const availableTasks = tasks.filter((task) => !timers.some((item) => item.task.id === task.id && item.mode === currentTab));
   const iconGroups = useMemo(() => {
