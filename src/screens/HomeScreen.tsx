@@ -104,6 +104,7 @@ type AutoTimerSchedulable = {
 
 async function ensurePermission(): Promise<boolean> {
   const { status } = await Notifications.requestPermissionsAsync();
+  console.log('[Notif] permission request status', status);
   if (status !== 'granted') {
     Alert.alert('通知の許可が必要です', '端末の設定から通知を許可してください。');
     return false;
@@ -156,6 +157,14 @@ async function scheduleTaskNotifs(task: Schedulable): Promise<string[]> {
   } catch {
     // ignore scheduling failures (e.g. permission revoked); UI still works.
   }
+  console.log('[Notif] scheduleTaskNotifs', JSON.stringify({
+    title: task.title,
+    scheduled_time: task.scheduled_time,
+    freq_type: task.freq_type,
+    notify: task.notify,
+    notify_type: task.notify_type,
+    ids,
+  }));
   return ids;
 }
 
@@ -171,6 +180,7 @@ async function rescheduleTask(task: Schedulable): Promise<string | null> {
   await cancelIds(task.notify_id);
   if (!task.notify || !task.scheduled_time) return null;
   const ids = await scheduleTaskNotifs(task);
+  console.log('[Notif] rescheduleTask result', task.title, ids.join(','));
   return ids.length ? ids.join(',') : null;
 }
 
@@ -230,6 +240,7 @@ async function rescheduleAutoTimer(task: AutoTimerSchedulable): Promise<string |
   await cancelIds(task.auto_timer_notify_id);
   if (!task.auto_timer_enabled || !task.auto_timer_time) return null;
   const ids = await scheduleAutoTimerNotifs(task);
+  console.log('[Notif] rescheduleAutoTimer result', task.title, ids.join(','));
   return ids.length ? ids.join(',') : null;
 }
 
@@ -937,6 +948,20 @@ export default function HomeScreen({ navigation }: Props) {
         const auto_timer_notify_id = await rescheduleAutoTimer(t);
         await updateTask(db, t.id, { auto_timer_notify_id });
       }
+    }
+    try {
+      const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+      console.log('[Notif] scheduled count', scheduled.length);
+      console.log('[Notif] scheduled requests', JSON.stringify(
+        scheduled.map((n) => ({
+          identifier: n.identifier,
+          title: n.content.title,
+          body: n.content.body,
+          trigger: n.trigger,
+        }))
+      ));
+    } catch (e) {
+      console.log('[Notif] scheduled fetch failed', String(e));
     }
   }, [db]);
 
