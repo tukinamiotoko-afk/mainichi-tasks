@@ -18,7 +18,13 @@
     },
     "plugins": [
       "expo-sqlite",
-      "expo-notifications",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/app/notification-icon.png",
+          "color": "#2563eb"
+        }
+      ],
       "expo-splash-screen",
       [
         "react-native-google-mobile-ads",
