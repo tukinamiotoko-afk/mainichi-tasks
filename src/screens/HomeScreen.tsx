@@ -185,6 +185,12 @@ function dateTrigger(date: Date, channelId: string) {
   } as any;
 }
 
+function parseLocalDateTime(dateText: string, timeText: string): Date {
+  const [year, month, day] = dateText.split('-').map(Number);
+  const [hour, minute] = timeText.split(':').map(Number);
+  return new Date(year, (month || 1) - 1, day || 1, hour || 0, minute || 0, 0, 0);
+}
+
 // Schedule reminders for a task according to its recurrence. Returns identifiers.
 async function scheduleTaskNotifs(task: Schedulable): Promise<string[]> {
   if (!task.scheduled_time) return [];
@@ -217,13 +223,13 @@ async function scheduleTaskNotifs(task: Schedulable): Promise<string[]> {
         ids.push(await Notifications.scheduleNotificationAsync({ content, trigger: dateTrigger(when, channelId) }));
       }
     } else if (task.freq_type === 'once') {
-      const when = task.once_date ? new Date(`${task.once_date}T${task.scheduled_time}:00`) : new Date();
+      const when = task.once_date ? parseLocalDateTime(task.once_date, task.scheduled_time) : new Date();
       if (when.getTime() > Date.now()) {
         ids.push(await Notifications.scheduleNotificationAsync({ content, trigger: dateTrigger(when, channelId) }));
       }
     } else if (task.freq_type === 'dates') {
       for (const ds of parseDateList(task.freq_dates)) {
-        const when = new Date(`${ds}T${task.scheduled_time}:00`);
+        const when = parseLocalDateTime(ds, task.scheduled_time);
         if (when.getTime() > Date.now()) {
           ids.push(await Notifications.scheduleNotificationAsync({ content, trigger: dateTrigger(when, channelId) }));
         }
@@ -295,13 +301,13 @@ async function scheduleAutoTimerNotifs(task: AutoTimerSchedulable): Promise<stri
         ids.push(await Notifications.scheduleNotificationAsync({ content, trigger: dateTrigger(when, channelId) }));
       }
     } else if (task.freq_type === 'once') {
-      const when = task.once_date ? new Date(`${task.once_date}T${task.auto_timer_time}:00`) : new Date();
+      const when = task.once_date ? parseLocalDateTime(task.once_date, task.auto_timer_time) : new Date();
       if (when.getTime() > Date.now()) {
         ids.push(await Notifications.scheduleNotificationAsync({ content, trigger: dateTrigger(when, channelId) }));
       }
     } else if (task.freq_type === 'dates') {
       for (const ds of parseDateList(task.freq_dates)) {
-        const when = new Date(`${ds}T${task.auto_timer_time}:00`);
+        const when = parseLocalDateTime(ds, task.auto_timer_time);
         if (when.getTime() > Date.now()) {
           ids.push(await Notifications.scheduleNotificationAsync({ content, trigger: dateTrigger(when, channelId) }));
         }
@@ -1108,6 +1114,7 @@ export default function HomeScreen({ navigation }: Props) {
 
   const splashHiddenRef = useRef(false);
   const notificationRefreshDoneRef = useRef(false);
+  const notificationRefreshInFlightRef = useRef<Promise<void> | null>(null);
   const exactAlarmRefreshPendingRef = useRef(false);
   const load = useCallback(async () => {
     try {
@@ -1142,30 +1149,49 @@ export default function HomeScreen({ navigation }: Props) {
   }, [fabAnim, insets.bottom, screen.height, screen.width]);
 
   const refreshAllTaskNotifications = useCallback(async () => {
-    const allTasks = await getTasks(db);
-    for (const t of allTasks) {
-      if (t.notify && t.scheduled_time) {
-        const notify_id = await rescheduleTask(t);
-        await updateTask(db, t.id, { notify_id });
-      }
-      if (t.auto_timer_enabled && t.auto_timer_time) {
-        const auto_timer_notify_id = await rescheduleAutoTimer(t);
-        await updateTask(db, t.id, { auto_timer_notify_id });
-      }
+    if (notificationRefreshInFlightRef.current) {
+      await notificationRefreshInFlightRef.current;
+      return;
     }
+    const run = (async () => {
+      const allTasks = await getTasks(db);
+      await Notifications.cancelAllScheduledNotificationsAsync();
+      for (const t of allTasks) {
+        let notify_id: string | null = null;
+        let auto_timer_notify_id: string | null = null;
+        if (t.notify && t.scheduled_time) {
+          const ids = await scheduleTaskNotifs(t);
+          notify_id = ids.length ? ids.join(',') : null;
+        }
+        if (t.auto_timer_enabled && t.auto_timer_time) {
+          const ids = await scheduleAutoTimerNotifs(t);
+          auto_timer_notify_id = ids.length ? ids.join(',') : null;
+        }
+        await updateTask(db, t.id, {
+          notify_id,
+          auto_timer_notify_id,
+        });
+      }
+      try {
+        const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+        console.log('[Notif] scheduled count', scheduled.length);
+        console.log('[Notif] scheduled requests', JSON.stringify(
+          scheduled.map((n) => ({
+            identifier: n.identifier,
+            title: n.content.title,
+            body: n.content.body,
+            trigger: n.trigger,
+          }))
+        ));
+      } catch (e) {
+        console.log('[Notif] scheduled fetch failed', String(e));
+      }
+    })();
+    notificationRefreshInFlightRef.current = run;
     try {
-      const scheduled = await Notifications.getAllScheduledNotificationsAsync();
-      console.log('[Notif] scheduled count', scheduled.length);
-      console.log('[Notif] scheduled requests', JSON.stringify(
-        scheduled.map((n) => ({
-          identifier: n.identifier,
-          title: n.content.title,
-          body: n.content.body,
-          trigger: n.trigger,
-        }))
-      ));
-    } catch (e) {
-      console.log('[Notif] scheduled fetch failed', String(e));
+      await run;
+    } finally {
+      notificationRefreshInFlightRef.current = null;
     }
   }, [db]);
 
@@ -1209,8 +1235,8 @@ export default function HomeScreen({ navigation }: Props) {
         const granted = await ensurePermission();
         await setSetting(db, 'notifyGuideDone', '1');
         if (granted) {
-          await refreshAllTaskNotifications();
           notificationRefreshDoneRef.current = true;
+          await refreshAllTaskNotifications();
         }
       }
       if (Platform.OS === 'android') {
@@ -1230,8 +1256,8 @@ export default function HomeScreen({ navigation }: Props) {
     (async () => {
       const perms = await Notifications.getPermissionsAsync();
       if (perms.status !== 'granted') return;
-      await refreshAllTaskNotifications();
       notificationRefreshDoneRef.current = true;
+      await refreshAllTaskNotifications();
     })();
   }, [tasksLoaded, refreshAllTaskNotifications]);
 
@@ -1505,19 +1531,13 @@ export default function HomeScreen({ navigation }: Props) {
   const toggleNewNotify = async (value: boolean) => {
     if (value && !(await ensurePermission())) return;
     setNewNotify(value);
-    if (value) {
-      await refreshAllTaskNotifications();
-      notificationRefreshDoneRef.current = true;
-    }
+    if (value) notificationRefreshDoneRef.current = true;
   };
 
   const toggleDetailNotify = async (value: boolean) => {
     if (value && !(await ensurePermission())) return;
     await patchDetail({ notify: value ? 1 : 0 });
-    if (value) {
-      await refreshAllTaskNotifications();
-      notificationRefreshDoneRef.current = true;
-    }
+    if (value) notificationRefreshDoneRef.current = true;
   };
 
   const closeBatteryGuide = useCallback(async () => {

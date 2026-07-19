@@ -228,14 +228,19 @@ export function getToday(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+function parseLocalDate(value: string): Date {
+  const [year, month, day] = value.split('-').map(Number);
+  return new Date(year, (month || 1) - 1, day || 1, 0, 0, 0, 0);
+}
+
 export function subtractDays(from: string, days: number): string {
-  const d = new Date(from);
+  const d = parseLocalDate(from);
   d.setDate(d.getDate() - days);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 export function daysBetween(start: string, end: string): number {
-  const ms = new Date(end).getTime() - new Date(start).getTime();
+  const ms = parseLocalDate(end).getTime() - parseLocalDate(start).getTime();
   return Math.round(ms / 86_400_000) + 1;
 }
 
