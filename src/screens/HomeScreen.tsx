@@ -2680,6 +2680,7 @@ export default function HomeScreen({ navigation }: Props) {
 
       {/* Task detail — full-screen editor */}
       <Modal visible={!!detailTask} animationType="slide" onRequestClose={() => setDetailTask(null)}>
+        {!!detailTask && <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />}
         <View style={[s.detailScreen, { paddingTop: insets.top }]}>
           <View style={s.detailHeader}>
             <TouchableOpacity onPress={() => setDetailTask(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
