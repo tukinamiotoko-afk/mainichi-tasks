@@ -197,7 +197,7 @@ async function scheduleTaskNotifs(task: Schedulable): Promise<string[]> {
   if (!task.scheduled_time) return [];
   await ensureAndroidNotificationChannels();
   const [h, m] = task.scheduled_time.split(':').map(Number);
-  const body = `${task.icon ? task.icon + ' ' : ''}${task.title} の時間です`;
+  const body = `${task.icon ? task.icon + ' ' : ''}${task.title}（${task.scheduled_time}）の時間です`;
   const isAlarm = task.notify_type === 'alarm';
   const channelId = isAlarm ? 'full' : 'silent';
   const content = {
@@ -275,7 +275,7 @@ async function scheduleAutoTimerNotifs(task: AutoTimerSchedulable): Promise<stri
   await ensureAndroidNotificationChannels();
   const [h, m] = task.auto_timer_time.split(':').map(Number);
   const modeLabel = task.auto_timer_mode === 'timer' ? 'タイマー' : 'ストップウォッチ';
-  const body = `${task.icon ? task.icon + ' ' : ''}${task.title} の${modeLabel}計測を開始する時間です（タップで開始）`;
+  const body = `${task.icon ? task.icon + ' ' : ''}${task.title}（${task.auto_timer_time}）の${modeLabel}計測を開始する時間です（タップで開始）`;
   const isAlarm = (task.auto_timer_notify_type ?? 'alarm') === 'alarm';
   const channelId = isAlarm ? 'full' : 'silent';
   const content = {
