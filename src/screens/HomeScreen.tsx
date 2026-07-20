@@ -113,6 +113,7 @@ type AutoTimerSchedulable = {
   auto_timer_mode: string;
   auto_timer_minutes: number;
   auto_timer_notify_id?: string | null;
+  auto_timer_notify_type?: string;
   freq_type: FreqType;
   freq_days: string | null;
   freq_week: number | null;
@@ -275,10 +276,11 @@ async function scheduleAutoTimerNotifs(task: AutoTimerSchedulable): Promise<stri
   const [h, m] = task.auto_timer_time.split(':').map(Number);
   const modeLabel = task.auto_timer_mode === 'timer' ? 'タイマー' : 'ストップウォッチ';
   const body = `${task.icon ? task.icon + ' ' : ''}${task.title} の${modeLabel}計測を開始する時間です（タップで開始）`;
-  const channelId = 'full';
+  const isAlarm = (task.auto_timer_notify_type ?? 'alarm') === 'alarm';
+  const channelId = isAlarm ? 'full' : 'silent';
   const content = {
     title: '', body,
-    sound: true,
+    sound: isAlarm,
     android: { channelId },
     data: { kind: 'auto-timer', taskId: task.id, mode: task.auto_timer_mode, minutes: task.auto_timer_minutes },
   } as any;
@@ -1095,6 +1097,7 @@ export default function HomeScreen({ navigation }: Props) {
   const [newAutoTimerTime, setNewAutoTimerTime] = useState<string | null>(null);
   const [newAutoTimerMode, setNewAutoTimerMode] = useState<'stopwatch' | 'timer'>('stopwatch');
   const [newAutoTimerMinutes, setNewAutoTimerMinutes] = useState(25);
+  const [newAutoTimerNotifyType, setNewAutoTimerNotifyType] = useState<'push' | 'alarm'>('alarm');
   const [newRepeatEnabled, setNewRepeatEnabled] = useState(false);
   const [newRepeatTarget, setNewRepeatTarget] = useState(2);
   const [showExactAlarmGuide, setShowExactAlarmGuide] = useState(false);
@@ -1392,6 +1395,7 @@ export default function HomeScreen({ navigation }: Props) {
     setNewAutoTimerTime(null);
     setNewAutoTimerMode('stopwatch');
     setNewAutoTimerMinutes(25);
+    setNewAutoTimerNotifyType('alarm');
     setNewRepeatEnabled(false);
     setNewRepeatTarget(2);
   };
@@ -1420,6 +1424,7 @@ export default function HomeScreen({ navigation }: Props) {
       auto_timer_time: newAutoTimerTime,
       auto_timer_mode: newAutoTimerMode,
       auto_timer_minutes: newAutoTimerMinutes,
+      auto_timer_notify_type: newAutoTimerNotifyType,
       repeat_enabled: newRepeatEnabled ? 1 : 0,
       repeat_target: newRepeatTarget,
     };
@@ -1438,6 +1443,7 @@ export default function HomeScreen({ navigation }: Props) {
       const auto_timer_notify_id = await rescheduleAutoTimer({
         id: taskId, title, icon: newIcon,
         auto_timer_enabled: 1, auto_timer_time: newAutoTimerTime, auto_timer_mode: newAutoTimerMode, auto_timer_minutes: newAutoTimerMinutes,
+        auto_timer_notify_type: newAutoTimerNotifyType,
         freq_type: fields.freq_type!, freq_days: fields.freq_days ?? null,
         freq_week: fields.freq_week ?? null, freq_weekday: fields.freq_weekday ?? null, freq_day: fields.freq_day ?? null,
         once_date: fields.once_date ?? null, freq_dates: fields.freq_dates ?? null,
@@ -1488,7 +1494,7 @@ export default function HomeScreen({ navigation }: Props) {
     detailTaskRef.current = merged;
     await updateTask(db, current.id, patch);
     const scheduleKeys: (keyof TaskFields)[] = ['scheduled_time', 'notify', 'notify_type', 'freq_type', 'freq_days', 'freq_week', 'freq_weekday', 'freq_day', 'once_date', 'freq_weeks', 'freq_interval'];
-    const autoTimerKeys: (keyof TaskFields)[] = ['auto_timer_enabled', 'auto_timer_time', 'auto_timer_mode', 'auto_timer_minutes', 'freq_type', 'freq_days', 'freq_week', 'freq_weekday', 'freq_day', 'once_date', 'freq_weeks', 'freq_interval'];
+    const autoTimerKeys: (keyof TaskFields)[] = ['auto_timer_enabled', 'auto_timer_time', 'auto_timer_mode', 'auto_timer_minutes', 'auto_timer_notify_type', 'freq_type', 'freq_days', 'freq_week', 'freq_weekday', 'freq_day', 'once_date', 'freq_weeks', 'freq_interval'];
     let next = merged;
     if (scheduleKeys.some(k => k in patch)) {
       const notify_id = await rescheduleTask(merged);
@@ -1998,6 +2004,8 @@ export default function HomeScreen({ navigation }: Props) {
     onPick: () => void,
     onClear: () => void,
     onSetMode: (m: 'stopwatch' | 'timer') => void,
+    notifyType: 'push' | 'alarm',
+    onSetNotifyType: (t: 'push' | 'alarm') => void,
   ) => (
     <View style={s.scheduleCard}>
       <View style={s.scheduleTopRow}>
@@ -2031,6 +2039,15 @@ export default function HomeScreen({ navigation }: Props) {
             </TouchableOpacity>
             <TouchableOpacity style={[s.notifyTypeChip, mode === 'timer' && s.notifyTypeChipActive]} onPress={() => onSetMode('timer')}>
               <Text style={[s.notifyTypeText, mode === 'timer' && s.notifyTypeTextActive]}>⏱ タイマー</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={s.notifyTypeLabel}>通知の種類</Text>
+          <View style={s.notifyTypeRow}>
+            <TouchableOpacity style={[s.notifyTypeChip, notifyType === 'push' && s.notifyTypeChipActive]} onPress={() => onSetNotifyType('push')}>
+              <Text style={[s.notifyTypeText, notifyType === 'push' && s.notifyTypeTextActive]}>🔔 プッシュ通知</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[s.notifyTypeChip, notifyType === 'alarm' && s.notifyTypeChipActive]} onPress={() => onSetNotifyType('alarm')}>
+              <Text style={[s.notifyTypeText, notifyType === 'alarm' && s.notifyTypeTextActive]}>⏰ アラート</Text>
             </TouchableOpacity>
           </View>
           <Text style={[s.scheduleHint, { color: C.onDark }]}>指定時刻に通知が届き、タップするとその場で計測が始まります</Text>
@@ -2640,6 +2657,8 @@ export default function HomeScreen({ navigation }: Props) {
                       }
                       setNewAutoTimerMode(mode);
                     },
+                    newAutoTimerNotifyType,
+                    setNewAutoTimerNotifyType,
                   )}
 
                   <Text style={[s.sheetSection, { marginTop: 16 }]}>複数回</Text>
@@ -2801,6 +2820,8 @@ export default function HomeScreen({ navigation }: Props) {
                           }
                           await patchDetail({ auto_timer_mode: mode });
                         },
+                        (detailTask.auto_timer_notify_type === 'push' ? 'push' : 'alarm'),
+                        (t) => patchDetail({ auto_timer_notify_type: t }),
                       )}
 
                       <Text style={[s.sheetSection, { marginTop: 16 }]}>複数回</Text>

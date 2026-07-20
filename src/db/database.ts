@@ -12,6 +12,7 @@ export type Task = {
   note: string | null;
   auto_timer_enabled: number; auto_timer_time: string | null;
   auto_timer_mode: string; auto_timer_minutes: number; auto_timer_notify_id: string | null;
+  auto_timer_notify_type: string;
   repeat_enabled: number; repeat_target: number;
 };
 export type NotificationSetting = { id: number; time: string; notification_type: string; identifier: string | null; task_id: number | null };
@@ -130,6 +131,7 @@ export async function migrateDb(db: SQLite.SQLiteDatabase): Promise<void> {
   try { await db.execAsync('ALTER TABLE tasks ADD COLUMN freq_interval INTEGER'); } catch {}
   try { await db.execAsync("ALTER TABLE flow_branches ADD COLUMN branch_side TEXT NOT NULL DEFAULT 'left'"); } catch {}
   try { await db.execAsync("ALTER TABLE time_logs ADD COLUMN mode TEXT NOT NULL DEFAULT 'stopwatch'"); } catch {}
+  try { await db.execAsync("ALTER TABLE tasks ADD COLUMN auto_timer_notify_type TEXT NOT NULL DEFAULT 'alarm'"); } catch {}
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS flow_projects (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -262,6 +264,7 @@ export type TaskFields = {
   note?: string | null;
   auto_timer_enabled?: number; auto_timer_time?: string | null;
   auto_timer_mode?: string; auto_timer_minutes?: number; auto_timer_notify_id?: string | null;
+  auto_timer_notify_type?: string;
   repeat_enabled?: number; repeat_target?: number;
   freq_weeks?: string | null; freq_interval?: number | null;
 };
@@ -270,6 +273,7 @@ const TASK_COLUMNS: (keyof TaskFields)[] = [
   'title', 'icon', 'priority', 'scheduled_time', 'notify', 'notify_id', 'notify_type',
   'freq_type', 'freq_days', 'freq_week', 'freq_weekday', 'freq_day', 'once_date', 'freq_dates', 'note',
   'auto_timer_enabled', 'auto_timer_time', 'auto_timer_mode', 'auto_timer_minutes', 'auto_timer_notify_id',
+  'auto_timer_notify_type',
   'repeat_enabled', 'repeat_target', 'freq_weeks', 'freq_interval',
 ];
 
