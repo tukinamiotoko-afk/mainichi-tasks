@@ -1103,6 +1103,11 @@ export default function HomeScreen({ navigation }: Props) {
 
   // Task detail sheet
   const [detailTask, setDetailTask] = useState<Task | null>(null);
+  // Mirrors detailTask synchronously so overlapping patchDetail calls (e.g.
+  // two fields edited in quick succession) always merge onto the latest
+  // notify_id/auto_timer_notify_id, instead of a stale closure racing to
+  // cancel the wrong (or no longer current) scheduled notification.
+  const detailTaskRef = useRef<Task | null>(null);
   const [detailTitle, setDetailTitle] = useState('');
   const [detailPicker, setDetailPicker] = useState<MetaPicker>(null);
   const [detailIntervalPickerOpen, setDetailIntervalPickerOpen] = useState(false);
@@ -1215,6 +1220,10 @@ export default function HomeScreen({ navigation }: Props) {
   useEffect(() => {
     tasksRef.current = tasks;
   }, [tasks]);
+
+  useEffect(() => {
+    detailTaskRef.current = detailTask;
+  }, [detailTask]);
 
   useEffect(() => {
     completionCountsRef.current = completionCounts;
@@ -1449,6 +1458,7 @@ export default function HomeScreen({ navigation }: Props) {
   };
 
   const openDetail = useCallback((task: Task) => {
+    detailTaskRef.current = task;
     setDetailTask(task);
     setDetailTitle(task.title);
     setDetailPicker(null);
@@ -1467,24 +1477,32 @@ export default function HomeScreen({ navigation }: Props) {
   };
 
   // Persist a change to the open task; reschedule reminders when relevant.
+  // Reads/writes detailTaskRef (not the detailTask state) so that two
+  // fields patched in quick succession always merge onto each other's
+  // result — otherwise a stale closure could cancel the wrong
+  // notify_id, leaving an old scheduled reminder running alongside a new one.
   const patchDetail = async (patch: TaskFields) => {
-    if (!detailTask) return;
-    const merged = { ...detailTask, ...patch } as Task;
-    await updateTask(db, detailTask.id, patch);
+    const current = detailTaskRef.current;
+    if (!current) return;
+    const merged = { ...current, ...patch } as Task;
+    detailTaskRef.current = merged;
+    await updateTask(db, current.id, patch);
     const scheduleKeys: (keyof TaskFields)[] = ['scheduled_time', 'notify', 'notify_type', 'freq_type', 'freq_days', 'freq_week', 'freq_weekday', 'freq_day', 'once_date', 'freq_weeks', 'freq_interval'];
     const autoTimerKeys: (keyof TaskFields)[] = ['auto_timer_enabled', 'auto_timer_time', 'auto_timer_mode', 'auto_timer_minutes', 'freq_type', 'freq_days', 'freq_week', 'freq_weekday', 'freq_day', 'once_date', 'freq_weeks', 'freq_interval'];
     let next = merged;
     if (scheduleKeys.some(k => k in patch)) {
       const notify_id = await rescheduleTask(merged);
-      await updateTask(db, detailTask.id, { notify_id });
+      await updateTask(db, current.id, { notify_id });
       next = { ...next, notify_id };
+      detailTaskRef.current = detailTaskRef.current ? { ...detailTaskRef.current, notify_id } : detailTaskRef.current;
     }
     if (autoTimerKeys.some(k => k in patch)) {
       const auto_timer_notify_id = await rescheduleAutoTimer(next);
-      await updateTask(db, detailTask.id, { auto_timer_notify_id });
+      await updateTask(db, current.id, { auto_timer_notify_id });
       next = { ...next, auto_timer_notify_id };
+      detailTaskRef.current = detailTaskRef.current ? { ...detailTaskRef.current, auto_timer_notify_id } : detailTaskRef.current;
     }
-    setDetailTask(next);
+    setDetailTask(detailTaskRef.current);
     load();
   };
 
