@@ -211,8 +211,13 @@ export function TimerProvider({ children }: { children: ReactNode }) {
     const timerMode: TimerMode = data.mode === 'timer' ? 'timer' : 'stopwatch';
     const targetSeconds = timerMode === 'timer' ? Math.max(60, (Number(data.minutes) || 25) * 60) : undefined;
     await addTimer(task, { autoStart: true, mode: timerMode, targetSeconds });
+    // addTimer only auto-starts a brand-new item — if this task/mode was
+    // already pinned to the timer list (just idle, not running), it
+    // short-circuits without starting it. Explicitly start it too so the
+    // notification tap always begins measuring either way.
+    await startTimer(timerItemKey(task.id, timerMode));
     if (navigationRef.isReady()) navigationRef.navigate('Timer');
-  }, [db, addTimer]);
+  }, [db, addTimer, startTimer]);
 
   useEffect(() => {
     Notifications.getLastNotificationResponseAsync().then((response) => {

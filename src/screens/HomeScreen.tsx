@@ -971,8 +971,11 @@ const TaskRow = React.memo(function TaskRow({
                   <View style={s.taskTextWrap}>
                     <Text style={[s.taskTitle, isDone && s.taskTitleDone]} numberOfLines={2}>{item.title}</Text>
                     <View style={s.taskMetaRow}>
-                      {item.scheduled_time && <Text style={[s.scheduleTag, isDone && s.taskMetaDone]}>{item.notify ? '🔔 ' : ''}{item.scheduled_time}</Text>}
                       <Text style={[s.freqTag, isDone && s.taskMetaDone]}>{frequencyLabel(item)}</Text>
+                      {item.scheduled_time && <Text style={[s.scheduleTag, isDone && s.taskMetaDone]}>{item.notify ? '🔔 ' : ''}{item.scheduled_time}</Text>}
+                      {!!item.auto_timer_enabled && item.auto_timer_time && (
+                        <Text style={[s.scheduleTag, isDone && s.taskMetaDone]}>⏱️ {item.auto_timer_time}</Text>
+                      )}
                     </View>
                   </View>
                   {isRepeat ? (
