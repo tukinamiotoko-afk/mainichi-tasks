@@ -1114,6 +1114,7 @@ export default function HomeScreen({ navigation }: Props) {
   // notify_id/auto_timer_notify_id, instead of a stale closure racing to
   // cancel the wrong (or no longer current) scheduled notification.
   const detailTaskRef = useRef<Task | null>(null);
+  const detailStatusBarEntryRef = useRef<any>(null);
   const [detailTitle, setDetailTitle] = useState('');
   const [detailPicker, setDetailPicker] = useState<MetaPicker>(null);
   const [detailIntervalPickerOpen, setDetailIntervalPickerOpen] = useState(false);
@@ -1231,9 +1232,34 @@ export default function HomeScreen({ navigation }: Props) {
     detailTaskRef.current = detailTask;
   }, [detailTask]);
 
+  const clearDetailStatusBar = useCallback(() => {
+    if (detailStatusBarEntryRef.current) {
+      StatusBar.popStackEntry(detailStatusBarEntryRef.current);
+      detailStatusBarEntryRef.current = null;
+    }
+  }, []);
+
+  const applyDetailStatusBar = useCallback(() => {
+    clearDetailStatusBar();
+    detailStatusBarEntryRef.current = StatusBar.pushStackEntry({
+      barStyle: 'dark-content',
+      backgroundColor: 'transparent',
+      translucent: true,
+    });
+  }, [clearDetailStatusBar]);
+
+  const closeDetail = useCallback(() => {
+    clearDetailStatusBar();
+    setDetailTask(null);
+  }, [clearDetailStatusBar]);
+
   useEffect(() => {
     completionCountsRef.current = completionCounts;
   }, [completionCounts]);
+
+  useEffect(() => () => {
+    clearDetailStatusBar();
+  }, [clearDetailStatusBar]);
 
   useEffect(() => {
     if (Platform.OS === 'android') {
@@ -1467,11 +1493,12 @@ export default function HomeScreen({ navigation }: Props) {
   };
 
   const openDetail = useCallback((task: Task) => {
+    clearDetailStatusBar();
     detailTaskRef.current = task;
     setDetailTask(task);
     setDetailTitle(task.title);
     setDetailPicker(null);
-  }, []);
+  }, [clearDetailStatusBar]);
 
   const handleSaveTitle = async () => {
     if (!detailTask || !detailTitle.trim() || detailTitle === detailTask.title) return;
@@ -1482,7 +1509,7 @@ export default function HomeScreen({ navigation }: Props) {
 
   const handleDetailSave = async () => {
     await handleSaveTitle();
-    setDetailTask(null);
+    closeDetail();
   };
 
   // Persist a change to the open task; reschedule reminders when relevant.
@@ -1523,7 +1550,7 @@ export default function HomeScreen({ navigation }: Props) {
         onPress: async () => {
           const identifiers = await deleteTask(db, task.id);
           await cancelIds(identifiers.join(','));
-          if (detailTask?.id === task.id) setDetailTask(null);
+          if (detailTask?.id === task.id) closeDetail();
           setSwipingId(null);
           load();
         },
@@ -2364,7 +2391,7 @@ export default function HomeScreen({ navigation }: Props) {
 
   return (
     <View style={s.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+      {!detailTask && <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />}
 
       <LinearGradient colors={headerGrad} start={GRAD_START} end={GRAD_END} style={[s.headerCard, { paddingTop: insets.top + 12 }]}>
         <View style={s.dateNavRow}>
@@ -2679,11 +2706,17 @@ export default function HomeScreen({ navigation }: Props) {
       </Modal>
 
       {/* Task detail — full-screen editor */}
-      <Modal visible={!!detailTask} animationType="slide" statusBarTranslucent onRequestClose={() => setDetailTask(null)}>
-        {!!detailTask && <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />}
+      <Modal
+        visible={!!detailTask}
+        animationType="slide"
+        statusBarTranslucent
+        onShow={applyDetailStatusBar}
+        onDismiss={clearDetailStatusBar}
+        onRequestClose={closeDetail}
+      >
         <View style={[s.detailScreen, { paddingTop: insets.top }]}>
           <View style={s.detailHeader}>
-            <TouchableOpacity onPress={() => setDetailTask(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <TouchableOpacity onPress={closeDetail} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Text style={s.detailCloseText}>✕</Text>
             </TouchableOpacity>
             <Text style={s.detailHeaderTitle}>タスクを編集</Text>
