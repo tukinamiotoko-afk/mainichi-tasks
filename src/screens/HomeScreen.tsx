@@ -387,15 +387,18 @@ async function scheduleRepeatFollowNotifs(
   const isAlarm = (task.repeat_follow_notify_type ?? 'push') === 'alarm';
   const channelId = isAlarm ? 'full' : 'silent';
   const remaining = Math.max(0, (task.repeat_target ?? 1) - todayCount);
+  const total = task.repeat_target ?? 1;
   const ids: string[] = [];
   const upcomingDates = getUpcomingOccurrenceDates(task, todayDate, 30);
   for (const ds of upcomingDates) {
     const isToday = ds === todayDate;
     if (isToday && remaining <= 0) continue;
-    for (const timeText of followTimes) {
+    for (let i = 0; i < followTimes.length; i++) {
+      const timeText = followTimes[i];
+      const occurrenceNumber = i + 2;
       const when = parseLocalDateTime(ds, timeText);
       if (when.getTime() <= Date.now()) continue;
-      const body = `${task.icon ? task.icon + ' ' : ''}${task.title} の追いかけ通知です`;
+      const body = `${task.icon ? task.icon + ' ' : ''}${task.title}（${occurrenceNumber}回目/${total}回中・${timeText}）の時間です`;
       const content = {
         title: '',
         body,

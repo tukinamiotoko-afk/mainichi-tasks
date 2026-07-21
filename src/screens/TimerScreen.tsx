@@ -456,6 +456,7 @@ export default function TimerScreen({ navigation }: Props) {
           const seconds = timerSeconds(item, now);
           const shownSeconds = displayTimerSeconds(item, now);
           const running = !!item.startedAtMs;
+          const isEditingTime = editingTimerId === item.key;
           const expanded = !!expandedKeys[item.key];
           const expandAnim = getExpandAnim(item.key);
           return (
@@ -591,9 +592,9 @@ export default function TimerScreen({ navigation }: Props) {
                           ]
                         );
                       }}
-                      disabled={running}
+                      disabled={running || isEditingTime}
                       activeOpacity={0.86}
-                      style={[s.controlBtn, running && s.controlBtnDisabled]}
+                      style={[s.controlBtn, (running || isEditingTime) && s.controlBtnDisabled]}
                     >
                       <Text style={s.startText}>▶</Text>
                     </TouchableOpacity>
