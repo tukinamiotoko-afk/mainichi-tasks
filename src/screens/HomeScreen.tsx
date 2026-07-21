@@ -272,12 +272,15 @@ function sanitizeRepeatFollowValues(
     return { repeat_follow_times: [] as string[] };
   }
   const maxCount = Math.max(0, repeatTarget - 1);
-  const repeat_follow_times = parsedTimes
-    .filter((time) => {
-      const mins = parseTimeToMinutes(time);
-      return mins != null && mins > baseMinutes;
-    })
-    .slice(0, maxCount);
+  // If the (possibly new) base time makes any already-configured follow-up
+  // time invalid (no longer strictly after it), reset the whole list rather
+  // than silently dropping just the offending entries — a partial list would
+  // leave the user unaware their follow-up schedule quietly changed shape.
+  const hasInvalidTime = parsedTimes.some((time) => {
+    const mins = parseTimeToMinutes(time);
+    return mins == null || mins <= baseMinutes;
+  });
+  const repeat_follow_times = hasInvalidTime ? [] : parsedTimes.slice(0, maxCount);
   return { repeat_follow_times };
 }
 
