@@ -724,6 +724,8 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   notifyTypeChipActive: { backgroundColor: C.primary, borderColor: C.primary },
   notifyTypeText: { color: C.onDark, fontSize: 12, fontWeight: '700' },
   notifyTypeTextActive: { color: C.onPrimary },
+  baseTimeChip: { flex: 0, borderWidth: 1, borderColor: C.primary, borderRadius: 10, paddingVertical: 8, paddingHorizontal: 10, alignItems: 'center', backgroundColor: C.primarySoft },
+  baseTimeChipText: { color: C.primary, fontSize: 12, fontWeight: '700' },
 
   // Icon
   metaSelectBtn: {
@@ -2477,6 +2479,7 @@ export default function HomeScreen({ navigation }: Props) {
     onSetFollowMode: (mode: 'interval' | 'times') => void,
     followIntervalMinutes: number,
     onSetFollowIntervalMinutes: (minutes: number) => void,
+    baseTime: string | null,
     followTimes: string[],
     onOpenFollowTime: () => void,
     onRemoveFollowTime: (time: string) => void,
@@ -2562,13 +2565,18 @@ export default function HomeScreen({ navigation }: Props) {
                     最初の通知より後の時間だけ、あと{Math.max(0, targetCount - 1 - followTimes.length)}回分追加できます
                   </Text>
                   <View style={s.taskMetaRow}>
+                    {!!baseTime && (
+                      <View style={s.baseTimeChip}>
+                        <Text style={s.baseTimeChipText}>{baseTime}</Text>
+                      </View>
+                    )}
                     {followTimes.map((time) => (
-                      <TouchableOpacity key={time} style={s.notifyTypeChip} onPress={() => onRemoveFollowTime(time)}>
+                      <TouchableOpacity key={time} style={[s.notifyTypeChip, { flex: 0 }]} onPress={() => onRemoveFollowTime(time)}>
                         <Text style={s.notifyTypeText}>{time} ×</Text>
                       </TouchableOpacity>
                     ))}
                     {followTimes.length < Math.max(0, targetCount - 1) && (
-                      <TouchableOpacity style={[s.notifyTypeChip, { minWidth: 96 }]} onPress={onOpenFollowTime}>
+                      <TouchableOpacity style={[s.notifyTypeChip, { flex: 0, minWidth: 96 }]} onPress={onOpenFollowTime}>
                         <Text style={s.notifyTypeText}>+ 時刻追加</Text>
                       </TouchableOpacity>
                     )}
@@ -3174,6 +3182,7 @@ export default function HomeScreen({ navigation }: Props) {
                     },
                     newRepeatFollowIntervalMinutes,
                     setNewRepeatFollowIntervalMinutes,
+                    newTime,
                     newRepeatFollowTimes,
                     () => { setRepeatFollowTimePickerFor('addTime'); openTimeEditor('add', null); },
                     (time) => setNewRepeatFollowTimes((current) => current.filter((item) => item !== time)),
@@ -3374,6 +3383,7 @@ export default function HomeScreen({ navigation }: Props) {
                         }),
                         detailTask.repeat_follow_interval_minutes ?? 60,
                         (minutes) => patchDetail({ repeat_follow_interval_minutes: minutes }),
+                        detailTask.scheduled_time,
                         parseTimeList(detailTask.repeat_follow_times),
                         () => { setRepeatFollowTimePickerFor('editTime'); openTimeEditor('edit', null); },
                         (time) => patchDetail({ repeat_follow_times: parseTimeList(detailTask.repeat_follow_times).filter((item) => item !== time).join(',') || null }),
