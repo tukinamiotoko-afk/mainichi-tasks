@@ -95,7 +95,10 @@ export default function ScheduleScreen({ navigation }: Props) {
 
   const toggle = async (id: number) => {
     if (completedIds.has(id)) await markIncomplete(db, id, selectedDate);
-    else await markComplete(db, id, selectedDate);
+    else {
+      const task = tasks.find((t) => t.id === id);
+      await markComplete(db, id, selectedDate, task?.repeat_enabled ?? 0, task?.repeat_target ?? 1);
+    }
     load();
   };
 

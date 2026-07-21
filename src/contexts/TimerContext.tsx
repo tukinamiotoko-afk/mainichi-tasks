@@ -184,7 +184,7 @@ export function TimerProvider({ children }: { children: ReactNode }) {
     const endedAt = new Date(endedAtMs).toISOString();
     const startedAt = timer.startedAtIso ?? new Date(endedAtMs - duration * 1000).toISOString();
     await addTimeLog(db, timer.task.id, duration, startedAt, endedAt, timer.mode);
-    await markComplete(db, timer.task.id, today);
+    await markComplete(db, timer.task.id, today, timer.task.repeat_enabled, timer.task.repeat_target);
     setTimers((current) => current.map((item) => (
       item.key === itemKey ? { ...item, baseSeconds: 0, startedAtMs: null, startedAtIso: null } : item
     )));

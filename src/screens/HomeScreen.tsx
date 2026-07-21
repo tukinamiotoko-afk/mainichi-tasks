@@ -1600,7 +1600,7 @@ export default function HomeScreen({ navigation }: Props) {
       // tapping resets it back to zero rather than piling on further.
       await resetCompletion(db, id, selectedDate);
     } else {
-      await markComplete(db, id, selectedDate);
+      await markComplete(db, id, selectedDate, task?.repeat_enabled ?? 0, task?.repeat_target ?? 1);
       if (count + 1 >= target) triggerCelebration();
       recordAction('complete');
       maybeRequestReview();

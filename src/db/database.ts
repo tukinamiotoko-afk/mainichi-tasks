@@ -20,7 +20,10 @@ export type Task = {
   repeat_follow_notify_type: string;
 };
 export type NotificationSetting = { id: number; time: string; notification_type: string; identifier: string | null; task_id: number | null };
-export type CompletionDetail = { task_id: number; title: string; icon: string | null; date: string; completed_at: string | null };
+export type CompletionDetail = {
+  task_id: number; title: string; icon: string | null; date: string; completed_at: string | null;
+  count: number; repeat_enabled: number; repeat_target: number;
+};
 export type TimeLog = { id: number; task_id: number; title: string; icon: string | null; date: string; duration_seconds: number; started_at: string; ended_at: string; mode: 'stopwatch' | 'timer' };
 export type TimerSetting = { task_id: number; target_seconds: number };
 export type FlowProject = { id: number; title: string; sort_order: number };
@@ -81,6 +84,8 @@ export async function migrateDb(db: SQLite.SQLiteDatabase): Promise<void> {
       date TEXT NOT NULL,
       count INTEGER NOT NULL DEFAULT 1,
       completed_at TEXT,
+      repeat_enabled_snapshot INTEGER,
+      repeat_target_snapshot INTEGER,
       PRIMARY KEY (task_id, date)
     );
     CREATE TABLE IF NOT EXISTS notification_settings (
@@ -150,6 +155,8 @@ export async function migrateDb(db: SQLite.SQLiteDatabase): Promise<void> {
   try { await db.execAsync("ALTER TABLE flow_branches ADD COLUMN branch_side TEXT NOT NULL DEFAULT 'left'"); } catch {}
   try { await db.execAsync("ALTER TABLE time_logs ADD COLUMN mode TEXT NOT NULL DEFAULT 'stopwatch'"); } catch {}
   try { await db.execAsync("ALTER TABLE tasks ADD COLUMN auto_timer_notify_type TEXT NOT NULL DEFAULT 'alarm'"); } catch {}
+  try { await db.execAsync('ALTER TABLE completions ADD COLUMN repeat_enabled_snapshot INTEGER'); } catch {}
+  try { await db.execAsync('ALTER TABLE completions ADD COLUMN repeat_target_snapshot INTEGER'); } catch {}
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS flow_projects (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -355,8 +362,12 @@ export async function deleteTask(db: SQLite.SQLiteDatabase, id: number): Promise
 }
 
 // A task/day counts as fully done once its completion count reaches the
-// task's target (repeat tasks) or 1 (regular, non-repeat tasks).
-const DONE_CONDITION = 'c.count >= (CASE WHEN t.repeat_enabled = 1 THEN t.repeat_target ELSE 1 END)';
+// target that was in effect when it was recorded (falling back to the
+// task's current settings for completions recorded before this snapshot
+// existed), rather than whatever the task's repeat settings are today.
+const EFFECTIVE_REPEAT_ENABLED = 'COALESCE(c.repeat_enabled_snapshot, t.repeat_enabled)';
+const EFFECTIVE_REPEAT_TARGET = 'COALESCE(c.repeat_target_snapshot, t.repeat_target)';
+const DONE_CONDITION = `c.count >= (CASE WHEN ${EFFECTIVE_REPEAT_ENABLED} = 1 THEN ${EFFECTIVE_REPEAT_TARGET} ELSE 1 END)`;
 
 export async function getCompletedTaskIds(db: SQLite.SQLiteDatabase, date: string): Promise<number[]> {
   const rows = await db.getAllAsync<{ task_id: number }>(
@@ -374,12 +385,19 @@ export async function getCompletionCounts(db: SQLite.SQLiteDatabase, date: strin
   return new Map(rows.map((r) => [r.task_id, r.count]));
 }
 
-export async function markComplete(db: SQLite.SQLiteDatabase, taskId: number, date: string): Promise<void> {
+export async function markComplete(
+  db: SQLite.SQLiteDatabase, taskId: number, date: string,
+  repeatEnabled: number, repeatTarget: number
+): Promise<void> {
   const now = new Date().toISOString();
   await db.runAsync(
-    `INSERT INTO completions (task_id, date, count, completed_at) VALUES (?, ?, 1, ?)
-     ON CONFLICT(task_id, date) DO UPDATE SET count = count + 1, completed_at = excluded.completed_at`,
-    [taskId, date, now]
+    `INSERT INTO completions (task_id, date, count, completed_at, repeat_enabled_snapshot, repeat_target_snapshot)
+     VALUES (?, ?, 1, ?, ?, ?)
+     ON CONFLICT(task_id, date) DO UPDATE SET
+       count = count + 1, completed_at = excluded.completed_at,
+       repeat_enabled_snapshot = excluded.repeat_enabled_snapshot,
+       repeat_target_snapshot = excluded.repeat_target_snapshot`,
+    [taskId, date, now, repeatEnabled, repeatTarget]
   );
 }
 
@@ -409,7 +427,7 @@ export async function getCompletionInstancesInRange(
   db: SQLite.SQLiteDatabase, taskId: number, startDate: string, endDate: string
 ): Promise<number> {
   const row = await db.getFirstAsync<{ total: number }>(
-    `SELECT COALESCE(SUM(MIN(c.count, CASE WHEN t.repeat_enabled = 1 THEN t.repeat_target ELSE 1 END)), 0) as total
+    `SELECT COALESCE(SUM(MIN(c.count, CASE WHEN ${EFFECTIVE_REPEAT_ENABLED} = 1 THEN ${EFFECTIVE_REPEAT_TARGET} ELSE 1 END)), 0) as total
      FROM completions c JOIN tasks t ON t.id = c.task_id
      WHERE c.task_id = ? AND c.date >= ? AND c.date <= ?`,
     [taskId, startDate, endDate]
@@ -432,7 +450,8 @@ export async function getCompletionsForMonth(
   const start = `${year}-${String(month).padStart(2, '0')}-01`;
   const end = `${year}-${String(month).padStart(2, '0')}-31`;
   return db.getAllAsync<CompletionDetail>(
-    `SELECT c.task_id, t.title, t.icon, c.date, c.completed_at
+    `SELECT c.task_id, t.title, t.icon, c.date, c.completed_at, c.count,
+       ${EFFECTIVE_REPEAT_ENABLED} as repeat_enabled, ${EFFECTIVE_REPEAT_TARGET} as repeat_target
      FROM completions c JOIN tasks t ON c.task_id = t.id
      WHERE c.date >= ? AND c.date <= ? AND ${DONE_CONDITION}
      ORDER BY c.date, c.completed_at`,

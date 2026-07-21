@@ -168,11 +168,15 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   cell: { width: '14.28%', alignItems: 'center', paddingVertical: 1.5, paddingHorizontal: 1 },
   dayBox: { width: '100%', aspectRatio: 1, borderRadius: 6, backgroundColor: C.cellEmpty, alignItems: 'center', justifyContent: 'center' },
   dayBoxDone: { backgroundColor: C.primary },
+  dayBoxRepeat: { backgroundColor: '#f59e0b' },
   dayBoxToday: { borderWidth: 1.5, borderColor: C.primary },
   dayNum: { fontWeight: '600', color: C.onDark },
   dayNumDone: { color: C.onPrimary, fontWeight: '800' },
   sun: { color: '#e53e3e' },
   sat: { color: C.onDark },
+  calLegend: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4, flexWrap: 'wrap' },
+  calLegendDot: { width: 10, height: 10, borderRadius: 5 },
+  calLegendText: { color: C.muted, fontSize: 11, fontWeight: '700', marginRight: 10 },
   calEmpty: { paddingVertical: 60, alignItems: 'center', gap: 8 },
   calEmptyTitle: { color: C.stone, fontSize: 16, fontWeight: '700' },
   calEmptyBody: { color: C.muted, fontSize: 13, textAlign: 'center', paddingHorizontal: 24 },
@@ -231,7 +235,7 @@ export default function StatsScreen({ navigation }: Props) {
     setColumns(n);
     setSetting(db, 'calendar_columns', String(n));
   };
-  const [doneByTask, setDoneByTask] = useState<Record<number, Set<number>>>({});
+  const [doneByTask, setDoneByTask] = useState<Record<number, Record<number, boolean>>>({});
 
   // ── Timer history state ──
   const [timerSubMode, setTimerSubMode] = useState<TimerSubMode>('daily');
@@ -276,10 +280,10 @@ export default function StatsScreen({ navigation }: Props) {
       getTasks(db),
       getCompletionsForMonth(db, year, month),
     ]);
-    const map: Record<number, Set<number>> = {};
+    const map: Record<number, Record<number, boolean>> = {};
     for (const c of completions) {
       const day = Number(c.date.slice(8, 10));
-      (map[c.task_id] ??= new Set()).add(day);
+      (map[c.task_id] ??= {})[day] = !!c.repeat_enabled && c.repeat_target > 1;
     }
     setCalTasks(allTasks);
     setDoneByTask(map);
@@ -334,12 +338,13 @@ export default function StatsScreen({ navigation }: Props) {
       <View style={s.grid}>
         {cells.map((day, i) => {
           if (!day) return <View key={`e-${i}`} style={s.cell} />;
-          const isDone = !!done?.has(day);
+          const isDone = done?.[day] != null;
+          const isRepeat = !!done?.[day];
           const isToday = isThisMonth && day === todayDay;
           const dow = i % 7;
           return (
             <View key={`d-${i}`} style={s.cell}>
-              <View style={[s.dayBox, isDone && s.dayBoxDone, isToday && !isDone && s.dayBoxToday]}>
+              <View style={[s.dayBox, isDone && s.dayBoxDone, isDone && isRepeat && s.dayBoxRepeat, isToday && !isDone && s.dayBoxToday]}>
                 <Text style={[s.dayNum, { fontSize: numSize }, dow === 0 && s.sun, dow === 6 && s.sat, isDone && s.dayNumDone]}>
                   {day}
                 </Text>
@@ -636,6 +641,14 @@ export default function StatsScreen({ navigation }: Props) {
         </>
       ) : mode === 'calendar' ? (
         <ScrollView style={s.calBody} contentContainerStyle={[s.gridPage, { paddingBottom: 24 }]}>
+          {calTasks.length > 0 && (
+            <View style={[s.calLegend, { width: '100%' }]}>
+              <View style={[s.calLegendDot, { backgroundColor: C.primary }]} />
+              <Text style={s.calLegendText}>通常の完了</Text>
+              <View style={[s.calLegendDot, { backgroundColor: '#f59e0b' }]} />
+              <Text style={s.calLegendText}>複数回タスクとして完了した日</Text>
+            </View>
+          )}
           {calTasks.length === 0 ? (
             calTasksLoaded ? (
               <View style={[s.calEmpty, { width: '100%' }]}>
@@ -645,7 +658,7 @@ export default function StatsScreen({ navigation }: Props) {
             ) : null
           ) : (
             calTasks.map((task) => {
-              const count = doneByTask[task.id]?.size ?? 0;
+              const count = Object.keys(doneByTask[task.id] ?? {}).length;
               return (
                 <View key={task.id} style={[s.calCard, { width: cardW }]}>
                   <View style={s.calHeader}>
