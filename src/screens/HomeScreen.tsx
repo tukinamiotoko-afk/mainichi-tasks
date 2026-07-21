@@ -254,6 +254,32 @@ function buildRepeatFollowTimes(task: Schedulable): string[] {
   return times;
 }
 
+function sanitizeRepeatFollowValues(
+  scheduledTime: string | null | undefined,
+  followMode: 'interval' | 'times',
+  followUntil: string | null | undefined,
+  followTimes: string[] | string | null | undefined,
+) {
+  const baseMinutes = parseTimeToMinutes(scheduledTime);
+  const parsedTimes = Array.isArray(followTimes) ? followTimes : parseTimeList(followTimes);
+  if (baseMinutes == null) {
+    return {
+      repeat_follow_until: null as string | null,
+      repeat_follow_times: [] as string[],
+    };
+  }
+  const repeat_follow_times = parsedTimes.filter((time) => {
+    const mins = parseTimeToMinutes(time);
+    return mins != null && mins > baseMinutes;
+  });
+  const untilMinutes = parseTimeToMinutes(followUntil);
+  const repeat_follow_until =
+    followMode === 'interval' && untilMinutes != null && untilMinutes > baseMinutes
+      ? followUntil ?? null
+      : null;
+  return { repeat_follow_until, repeat_follow_times };
+}
+
 // Schedule reminders for a task according to its recurrence. Returns identifiers.
 async function scheduleTaskNotifs(task: Schedulable): Promise<string[]> {
   if (!task.scheduled_time) return [];
@@ -1790,6 +1816,14 @@ export default function HomeScreen({ navigation }: Props) {
       const [h, m] = current.split(':');
       setHourInput(String(Number(h)));
       setMinuteInput(m);
+    } else if (repeatFollowTimePickerFor === 'addTime' && newTime) {
+      const [h, m] = newTime.split(':');
+      setHourInput(String(Number(h)));
+      setMinuteInput(m);
+    } else if (repeatFollowTimePickerFor === 'editTime' && detailTaskRef.current?.scheduled_time) {
+      const [h, m] = detailTaskRef.current.scheduled_time.split(':');
+      setHourInput(String(Number(h)));
+      setMinuteInput(m);
     } else {
       setHourInput('8');
       setMinuteInput('00');
@@ -1803,6 +1837,25 @@ export default function HomeScreen({ navigation }: Props) {
     const time = `${pad(h)}:${pad(m)}`;
     const target = timePickerFor;
     const repeatTarget = repeatFollowTimePickerFor;
+    const pickedMinutes = parseTimeToMinutes(time);
+    const addBaseMinutes = parseTimeToMinutes(newTime);
+    const editBaseMinutes = parseTimeToMinutes(detailTaskRef.current?.scheduled_time ?? null);
+    if (repeatTarget === 'addTime' && pickedMinutes != null && addBaseMinutes != null && pickedMinutes <= addBaseMinutes) {
+      Alert.alert('時刻を確認', '追いかけ通知の時刻は、最初の通知より後の時間だけ追加できます。');
+      return;
+    }
+    if (repeatTarget === 'editTime' && pickedMinutes != null && editBaseMinutes != null && pickedMinutes <= editBaseMinutes) {
+      Alert.alert('時刻を確認', '追いかけ通知の時刻は、最初の通知より後の時間だけ追加できます。');
+      return;
+    }
+    if (repeatTarget === 'addUntil' && pickedMinutes != null && addBaseMinutes != null && pickedMinutes <= addBaseMinutes) {
+      Alert.alert('時刻を確認', '終了時刻は、最初の通知より後の時間にしてください。');
+      return;
+    }
+    if (repeatTarget === 'editUntil' && pickedMinutes != null && editBaseMinutes != null && pickedMinutes <= editBaseMinutes) {
+      Alert.alert('時刻を確認', '終了時刻は、最初の通知より後の時間にしてください。');
+      return;
+    }
     setTimePickerFor(null);
     setRepeatFollowTimePickerFor(null);
     if (repeatTarget === 'addUntil') setNewRepeatFollowUntil(time);
@@ -1813,8 +1866,26 @@ export default function HomeScreen({ navigation }: Props) {
     } else if (repeatTarget === 'editTime') {
       const current = parseTimeList(detailTaskRef.current?.repeat_follow_times ?? null);
       await patchDetail({ repeat_follow_times: Array.from(new Set([...current, time])).sort().join(',') });
-    } else if (target === 'add') setNewTime(time);
-    else if (target === 'edit') await patchDetail({ scheduled_time: time });
+    } else if (target === 'add') {
+      setNewTime(time);
+      const sanitized = sanitizeRepeatFollowValues(time, newRepeatFollowMode, newRepeatFollowUntil, newRepeatFollowTimes);
+      setNewRepeatFollowUntil(sanitized.repeat_follow_until);
+      setNewRepeatFollowTimes(sanitized.repeat_follow_times);
+    } else if (target === 'edit') {
+      const current = detailTaskRef.current;
+      if (!current) return;
+      const sanitized = sanitizeRepeatFollowValues(
+        time,
+        current.repeat_follow_mode === 'times' ? 'times' : 'interval',
+        current.repeat_follow_until,
+        current.repeat_follow_times,
+      );
+      await patchDetail({
+        scheduled_time: time,
+        repeat_follow_until: sanitized.repeat_follow_until,
+        repeat_follow_times: sanitized.repeat_follow_times.join(',') || null,
+      });
+    }
     else if (target === 'autoTimerAdd') setNewAutoTimerTime(time);
     else if (target === 'autoTimerEdit') await patchDetail({ auto_timer_time: time });
   };
@@ -1841,7 +1912,11 @@ export default function HomeScreen({ navigation }: Props) {
   const toggleNewNotify = async (value: boolean) => {
     if (value && !(await ensurePermission())) return;
     setNewNotify(value);
-    if (!value) setNewRepeatFollowEnabled(false);
+    if (!value) {
+      setNewRepeatFollowEnabled(false);
+      setNewRepeatFollowUntil(null);
+      setNewRepeatFollowTimes([]);
+    }
     if (value) notificationRefreshDoneRef.current = true;
   };
 
@@ -1849,7 +1924,7 @@ export default function HomeScreen({ navigation }: Props) {
     if (value && !(await ensurePermission())) return;
     await patchDetail({
       notify: value ? 1 : 0,
-      ...(value ? {} : { repeat_follow_enabled: 0 }),
+      ...(value ? {} : { repeat_follow_enabled: 0, repeat_follow_until: null, repeat_follow_times: null }),
     });
     if (value) notificationRefreshDoneRef.current = true;
   };
@@ -3103,9 +3178,9 @@ export default function HomeScreen({ navigation }: Props) {
                     newRepeatFollowIntervalMinutes,
                     setNewRepeatFollowIntervalMinutes,
                     newRepeatFollowUntil,
-                    () => { openTimeEditor('add', newRepeatFollowUntil); setRepeatFollowTimePickerFor('addUntil'); },
+                    () => { setRepeatFollowTimePickerFor('addUntil'); openTimeEditor('add', newRepeatFollowUntil); },
                     newRepeatFollowTimes,
-                    () => { openTimeEditor('add', null); setRepeatFollowTimePickerFor('addTime'); },
+                    () => { setRepeatFollowTimePickerFor('addTime'); openTimeEditor('add', null); },
                     (time) => setNewRepeatFollowTimes((current) => current.filter((item) => item !== time)),
                     newRepeatFollowNotifyType,
                     setNewRepeatFollowNotifyType,
@@ -3299,9 +3374,9 @@ export default function HomeScreen({ navigation }: Props) {
                         detailTask.repeat_follow_interval_minutes ?? 60,
                         (minutes) => patchDetail({ repeat_follow_interval_minutes: minutes }),
                         detailTask.repeat_follow_until,
-                        () => { openTimeEditor('edit', detailTask.repeat_follow_until); setRepeatFollowTimePickerFor('editUntil'); },
+                        () => { setRepeatFollowTimePickerFor('editUntil'); openTimeEditor('edit', detailTask.repeat_follow_until); },
                         parseTimeList(detailTask.repeat_follow_times),
-                        () => { openTimeEditor('edit', null); setRepeatFollowTimePickerFor('editTime'); },
+                        () => { setRepeatFollowTimePickerFor('editTime'); openTimeEditor('edit', null); },
                         (time) => patchDetail({ repeat_follow_times: parseTimeList(detailTask.repeat_follow_times).filter((item) => item !== time).join(',') || null }),
                         (detailTask.repeat_follow_notify_type === 'alarm' ? 'alarm' : 'push'),
                         (type) => patchDetail({ repeat_follow_notify_type: type }),
