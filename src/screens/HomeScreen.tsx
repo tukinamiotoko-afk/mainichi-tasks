@@ -2000,12 +2000,12 @@ export default function HomeScreen({ navigation }: Props) {
   const total = tasks.length;
   const progress = total > 0 ? done / total : 0;
   const headerGrad = useMemo(() => grad.header, [grad.header]);
-  // Gauge color changes by completion stage: white → yellow → orange → red, green once fully done.
+  // Gauge color changes by completion stage: white (first) → yellow → orange → red, green once fully done.
   const gaugeColor = (
     progress >= 1 ? '#16a34a' :
-    progress >= 0.67 ? '#ef4444' :
-    progress >= 0.34 ? '#f97316' :
-    progress > 0 ? '#facc15' :
+    progress >= 0.75 ? '#ef4444' :
+    progress >= 0.5 ? '#f97316' :
+    progress >= 0.25 ? '#facc15' :
     '#ffffff'
   );
   const gaugeColors = [gaugeColor, gaugeColor] as readonly [string, string];
