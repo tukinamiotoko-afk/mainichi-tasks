@@ -2714,7 +2714,7 @@ export default function HomeScreen({ navigation }: Props) {
         onDismiss={clearDetailStatusBar}
         onRequestClose={closeDetail}
       >
-        <View style={[s.detailScreen, { paddingTop: insets.top }]}>
+        <View style={[s.detailScreen, { paddingTop: insets.top + 12 }]}>
           <View style={s.detailHeader}>
             <TouchableOpacity onPress={closeDetail} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Text style={s.detailCloseText}>✕</Text>
