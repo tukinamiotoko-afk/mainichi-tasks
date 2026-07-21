@@ -1999,10 +1999,14 @@ export default function HomeScreen({ navigation }: Props) {
   const total = tasks.length;
   const progress = total > 0 ? done / total : 0;
   const headerGrad = useMemo(() => grad.header, [grad.header]);
-  // Gauge gradient: light on the left, darker toward the right; green once done.
-  const gaugeColors = (
-    progress >= 1 ? ['#86efac', '#16a34a'] : [C.primarySoft, C.primary]
-  ) as readonly [string, string];
+  // Gauge color changes by completion stage: yellow → orange → red, green once fully done.
+  const gaugeColor = (
+    progress >= 1 ? '#16a34a' :
+    progress >= 0.67 ? '#ef4444' :
+    progress >= 0.34 ? '#f97316' :
+    '#facc15'
+  );
+  const gaugeColors = [gaugeColor, gaugeColor] as readonly [string, string];
   const sortedTasks = useMemo(() => [...tasks].sort((a, b) => {
     if (a.sort_order !== b.sort_order) return a.sort_order - b.sort_order;
     return a.id - b.id;
