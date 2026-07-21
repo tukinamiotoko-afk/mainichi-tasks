@@ -1841,12 +1841,16 @@ export default function HomeScreen({ navigation }: Props) {
   const toggleNewNotify = async (value: boolean) => {
     if (value && !(await ensurePermission())) return;
     setNewNotify(value);
+    if (!value) setNewRepeatFollowEnabled(false);
     if (value) notificationRefreshDoneRef.current = true;
   };
 
   const toggleDetailNotify = async (value: boolean) => {
     if (value && !(await ensurePermission())) return;
-    await patchDetail({ notify: value ? 1 : 0 });
+    await patchDetail({
+      notify: value ? 1 : 0,
+      ...(value ? {} : { repeat_follow_enabled: 0 }),
+    });
     if (value) notificationRefreshDoneRef.current = true;
   };
 
@@ -2403,6 +2407,7 @@ export default function HomeScreen({ navigation }: Props) {
     targetCount: number,
     onToggleEnabled: (v: boolean) => void,
     onSetTarget: (n: number) => void,
+    followAvailable: boolean,
     followEnabled: boolean,
     onToggleFollowEnabled: (v: boolean) => void,
     followMode: 'interval' | 'times',
@@ -2449,14 +2454,18 @@ export default function HomeScreen({ navigation }: Props) {
             </View>
             <View style={s.scheduleToggleTop}>
               <Switch
-                value={followEnabled}
+                value={followAvailable && followEnabled}
                 onValueChange={onToggleFollowEnabled}
+                disabled={!followAvailable}
                 trackColor={{ true: C.primary, false: C.border }}
                 thumbColor="#ffffff"
               />
             </View>
           </View>
-          {followEnabled && (
+          {!followAvailable && (
+            <Text style={s.scheduleHint}>通常の通知を設定すると追いかけ通知を使えます</Text>
+          )}
+          {followAvailable && followEnabled && (
             <>
               <View style={s.notifyTypeRow}>
                 <TouchableOpacity style={[s.notifyTypeChip, followMode === 'interval' && s.notifyTypeChipActive]} onPress={() => onSetFollowMode('interval')}>
@@ -3086,8 +3095,9 @@ export default function HomeScreen({ navigation }: Props) {
                     newRepeatEnabled, newRepeatTarget,
                     (v) => (v ? requirePremium(() => setNewRepeatEnabled(true)) : setNewRepeatEnabled(false)),
                     setNewRepeatTarget,
+                    !!newNotify && !!newTime,
                     newRepeatFollowEnabled,
-                    setNewRepeatFollowEnabled,
+                    (v) => { if (!!newNotify && !!newTime) setNewRepeatFollowEnabled(v); },
                     newRepeatFollowMode,
                     setNewRepeatFollowMode,
                     newRepeatFollowIntervalMinutes,
@@ -3278,8 +3288,12 @@ export default function HomeScreen({ navigation }: Props) {
                             }))
                           : patchDetail({ repeat_enabled: 0 })),
                         (n) => patchDetail({ repeat_target: n }),
+                        !!detailTask.notify && !!detailTask.scheduled_time,
                         !!detailTask.repeat_follow_enabled,
-                        (v) => patchDetail({ repeat_follow_enabled: v ? 1 : 0 }),
+                        (v) => {
+                          if (!detailTask.notify || !detailTask.scheduled_time) return Promise.resolve();
+                          return patchDetail({ repeat_follow_enabled: v ? 1 : 0 });
+                        },
                         (detailTask.repeat_follow_mode === 'times' ? 'times' : 'interval'),
                         (mode) => patchDetail({ repeat_follow_mode: mode }),
                         detailTask.repeat_follow_interval_minutes ?? 60,
