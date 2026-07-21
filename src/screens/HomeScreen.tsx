@@ -3172,9 +3172,20 @@ export default function HomeScreen({ navigation }: Props) {
                     setNewRepeatTarget,
                     !!newNotify && !!newTime,
                     newRepeatFollowEnabled,
-                    (v) => { if (!!newNotify && !!newTime) setNewRepeatFollowEnabled(v); },
+                    (v) => {
+                      if (!newNotify || !newTime) return;
+                      setNewRepeatFollowEnabled(v);
+                      if (!v) {
+                        setNewRepeatFollowUntil(null);
+                        setNewRepeatFollowTimes([]);
+                      }
+                    },
                     newRepeatFollowMode,
-                    setNewRepeatFollowMode,
+                    (mode) => {
+                      setNewRepeatFollowMode(mode);
+                      if (mode === 'interval') setNewRepeatFollowTimes([]);
+                      else setNewRepeatFollowUntil(null);
+                    },
                     newRepeatFollowIntervalMinutes,
                     setNewRepeatFollowIntervalMinutes,
                     newRepeatFollowUntil,
@@ -3367,10 +3378,18 @@ export default function HomeScreen({ navigation }: Props) {
                         !!detailTask.repeat_follow_enabled,
                         (v) => {
                           if (!detailTask.notify || !detailTask.scheduled_time) return Promise.resolve();
-                          return patchDetail({ repeat_follow_enabled: v ? 1 : 0 });
+                          return patchDetail({
+                            repeat_follow_enabled: v ? 1 : 0,
+                            ...(v ? {} : { repeat_follow_until: null, repeat_follow_times: null }),
+                          });
                         },
                         (detailTask.repeat_follow_mode === 'times' ? 'times' : 'interval'),
-                        (mode) => patchDetail({ repeat_follow_mode: mode }),
+                        (mode) => patchDetail({
+                          repeat_follow_mode: mode,
+                          ...(mode === 'interval'
+                            ? { repeat_follow_times: null }
+                            : { repeat_follow_until: null }),
+                        }),
                         detailTask.repeat_follow_interval_minutes ?? 60,
                         (minutes) => patchDetail({ repeat_follow_interval_minutes: minutes }),
                         detailTask.repeat_follow_until,
