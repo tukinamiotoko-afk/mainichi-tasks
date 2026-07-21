@@ -2574,16 +2574,19 @@ export default function HomeScreen({ navigation }: Props) {
                   </View>
                 </>
               ) : (
-                <View style={s.taskMetaRow}>
-                  {followTimes.map((time) => (
-                    <TouchableOpacity key={time} style={s.notifyTypeChip} onPress={() => onRemoveFollowTime(time)}>
-                      <Text style={s.notifyTypeText}>{time} ×</Text>
+                <>
+                  <Text style={s.notifyTypeLabel}>最初の通知時刻より後の時間だけ追加できます</Text>
+                  <View style={s.taskMetaRow}>
+                    {followTimes.map((time) => (
+                      <TouchableOpacity key={time} style={s.notifyTypeChip} onPress={() => onRemoveFollowTime(time)}>
+                        <Text style={s.notifyTypeText}>{time} ×</Text>
+                      </TouchableOpacity>
+                    ))}
+                    <TouchableOpacity style={[s.notifyTypeChip, { minWidth: 96 }]} onPress={onOpenFollowTime}>
+                      <Text style={s.notifyTypeText}>+ 時刻追加</Text>
                     </TouchableOpacity>
-                  ))}
-                  <TouchableOpacity style={[s.notifyTypeChip, { minWidth: 96 }]} onPress={onOpenFollowTime}>
-                    <Text style={s.notifyTypeText}>+ 時刻追加</Text>
-                  </TouchableOpacity>
-                </View>
+                  </View>
+                </>
               )}
 
               <Text style={s.notifyTypeLabel}>通知の種類</Text>
