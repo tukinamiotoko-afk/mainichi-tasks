@@ -1952,7 +1952,7 @@ export default function FlowScreen({ navigation }: Props) {
                 <Text style={s.pickerDone}>完了</Text>
               </TouchableOpacity>
             </View>
-            <ScrollView keyboardShouldPersistTaps="handled" bounces={false}>
+            <ScrollView keyboardShouldPersistTaps="handled" bounces={false} contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>
               {flowCharts.map(c => {
                 const active = c.id === currentChartId;
                 const isRenaming = renamingChartId === c.id;
@@ -2022,7 +2022,7 @@ export default function FlowScreen({ navigation }: Props) {
                 <Text style={s.pickerDone}>完了</Text>
               </TouchableOpacity>
             </View>
-            <ScrollView keyboardShouldPersistTaps="handled" bounces={false}>
+            <ScrollView keyboardShouldPersistTaps="handled" bounces={false} contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>
               <View style={s.branchEditorSection}>
                 <Text style={s.branchEditorLabel}>分岐の内容</Text>
                 <TextInput
@@ -2151,7 +2151,7 @@ export default function FlowScreen({ navigation }: Props) {
                 <Text style={s.pickerDone}>完了</Text>
               </TouchableOpacity>
             </View>
-            <ScrollView keyboardShouldPersistTaps="handled" bounces={false}>
+            <ScrollView keyboardShouldPersistTaps="handled" bounces={false} contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>
               <View style={s.branchEditorSection}>
                 <Text style={s.branchEditorLabel}>分岐の内容</Text>
                 <TextInput
