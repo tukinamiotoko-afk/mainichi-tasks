@@ -1286,6 +1286,7 @@ export default function HomeScreen({ navigation }: Props) {
   const [newRepeatFollowEnabled, setNewRepeatFollowEnabled] = useState(false);
   const [newRepeatFollowMode, setNewRepeatFollowMode] = useState<'interval' | 'times'>('interval');
   const [newRepeatFollowIntervalMinutes, setNewRepeatFollowIntervalMinutes] = useState(60);
+  const [followIntervalDraft, setFollowIntervalDraft] = useState<string | null>(null);
   const [newRepeatFollowTimes, setNewRepeatFollowTimes] = useState<string[]>([]);
   const [newRepeatFollowNotifyType, setNewRepeatFollowNotifyType] = useState<'push' | 'alarm'>('push');
   const [repeatPickerFor, setRepeatPickerFor] = useState<'add' | 'edit' | null>(null);
@@ -2486,6 +2487,8 @@ export default function HomeScreen({ navigation }: Props) {
     onSetFollowMode: (mode: 'interval' | 'times') => void,
     followIntervalMinutes: number,
     onSetFollowIntervalMinutes: (minutes: number) => void,
+    followIntervalDraft: string | null,
+    onFollowIntervalDraftChange: (v: string | null) => void,
     baseTime: string | null,
     followTimes: string[],
     onOpenFollowTime: () => void,
@@ -2553,14 +2556,35 @@ export default function HomeScreen({ navigation }: Props) {
                     {[30, 60, 120].map((minutes) => (
                       <TouchableOpacity
                         key={minutes}
-                        style={[s.notifyTypeChip, followIntervalMinutes === minutes && s.notifyTypeChipActive]}
-                        onPress={() => onSetFollowIntervalMinutes(minutes)}
+                        style={[s.notifyTypeChip, followIntervalDraft == null && followIntervalMinutes === minutes && s.notifyTypeChipActive]}
+                        onPress={() => { onFollowIntervalDraftChange(null); onSetFollowIntervalMinutes(minutes); }}
                       >
-                        <Text style={[s.notifyTypeText, followIntervalMinutes === minutes && s.notifyTypeTextActive]}>
+                        <Text style={[s.notifyTypeText, followIntervalDraft == null && followIntervalMinutes === minutes && s.notifyTypeTextActive]}>
                           {minutes >= 60 ? `${minutes / 60}時間` : `${minutes}分`}
                         </Text>
                       </TouchableOpacity>
                     ))}
+                  </View>
+                  <View style={s.timerDurationRow}>
+                    <Text style={s.timerDurationLabel}>自由入力：</Text>
+                    <TextInput
+                      style={s.timerDurationInput}
+                      value={followIntervalDraft ?? String(followIntervalMinutes)}
+                      onChangeText={(v) => onFollowIntervalDraftChange(v.replace(/[^0-9]/g, '').slice(0, 4))}
+                      onBlur={() => {
+                        const parsed = parseInt(followIntervalDraft ?? '', 10);
+                        if (!isNaN(parsed) && parsed > 0) onSetFollowIntervalMinutes(Math.max(15, parsed));
+                        onFollowIntervalDraftChange(null);
+                      }}
+                      onSubmitEditing={() => {
+                        const parsed = parseInt(followIntervalDraft ?? '', 10);
+                        if (!isNaN(parsed) && parsed > 0) onSetFollowIntervalMinutes(Math.max(15, parsed));
+                        onFollowIntervalDraftChange(null);
+                      }}
+                      keyboardType="number-pad"
+                      returnKeyType="done"
+                    />
+                    <Text style={s.timerDurationLabel}>分ごと（15分以上）</Text>
                   </View>
                   <Text style={s.notifyTypeLabel}>
                     1回目は通常の通知、残り{Math.max(0, targetCount - 1)}回をこの間隔で届けます
@@ -3189,6 +3213,8 @@ export default function HomeScreen({ navigation }: Props) {
                     },
                     newRepeatFollowIntervalMinutes,
                     setNewRepeatFollowIntervalMinutes,
+                    followIntervalDraft,
+                    setFollowIntervalDraft,
                     newTime,
                     newRepeatFollowTimes,
                     () => { setRepeatFollowTimePickerFor('addTime'); openTimeEditor('add', null); },
@@ -3390,6 +3416,8 @@ export default function HomeScreen({ navigation }: Props) {
                         }),
                         detailTask.repeat_follow_interval_minutes ?? 60,
                         (minutes) => patchDetail({ repeat_follow_interval_minutes: minutes }),
+                        followIntervalDraft,
+                        setFollowIntervalDraft,
                         detailTask.scheduled_time,
                         parseTimeList(detailTask.repeat_follow_times),
                         () => { setRepeatFollowTimePickerFor('editTime'); openTimeEditor('edit', null); },
