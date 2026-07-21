@@ -70,6 +70,9 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   expandWrap: { overflow: 'hidden' },
   expandInner: { gap: 12, paddingTop: 10 },
   timerTime: { color: C.onDark, fontSize: 42, fontWeight: '900', textAlign: 'center', letterSpacing: 1 },
+  timeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
+  setTimeBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: C.border, backgroundColor: C.card },
+  setTimeBtnText: { color: C.primary, fontSize: 12, fontWeight: '800' },
   timerControls: { flexDirection: 'row', gap: 7 },
   controlBtn: { flex: 1, borderRadius: 10, paddingVertical: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: '#ffffff', borderWidth: 1, borderColor: C.border, minHeight: 40 },
   controlBtnDisabled: { opacity: 0.45 },
@@ -533,18 +536,23 @@ export default function TimerScreen({ navigation }: Props) {
                       </View>
                     </View>
                   ) : (
-                    <TouchableOpacity
-                      activeOpacity={item.mode === 'timer' && !running ? 0.8 : 1}
-                      onPress={() => {
-                        if (item.mode !== 'timer' || running) return;
-                        const split = splitSeconds(item.targetSeconds);
-                        setMinuteInputs((prev) => ({ ...prev, [item.key]: split.minutes }));
-                        setSecondInputs((prev) => ({ ...prev, [item.key]: split.seconds }));
-                        setEditingTimerId(item.key);
-                      }}
-                    >
+                    <View style={s.timeRow}>
                       <Text style={s.timerTime}>{formatDuration(shownSeconds, true)}</Text>
-                    </TouchableOpacity>
+                      {item.mode === 'timer' && !running && (
+                        <TouchableOpacity
+                          style={s.setTimeBtn}
+                          activeOpacity={0.8}
+                          onPress={() => {
+                            const split = splitSeconds(item.targetSeconds);
+                            setMinuteInputs((prev) => ({ ...prev, [item.key]: split.minutes }));
+                            setSecondInputs((prev) => ({ ...prev, [item.key]: split.seconds }));
+                            setEditingTimerId(item.key);
+                          }}
+                        >
+                          <Text style={s.setTimeBtnText}>時間を設定</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
                   )}
                   <View style={s.timerControls}>
                     <TouchableOpacity
