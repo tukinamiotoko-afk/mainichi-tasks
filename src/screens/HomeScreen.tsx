@@ -1500,15 +1500,20 @@ export default function HomeScreen({ navigation }: Props) {
   }, [tasksLoaded, refreshAllTaskNotifications]);
 
   // Keep monthly-nth / every-n-days reminders (which can't natively repeat) armed for the next occurrence.
+  // Waits for any in-flight refreshAllTaskNotifications first, and skips repeat-follow
+  // rescheduling entirely — that's already handled by refreshAllTaskNotifications on
+  // initial load and by refreshRepeatFollowForTask on completion changes. Doing it here
+  // too raced with those and produced duplicate scheduled follow-up notifications.
   useFocusEffect(useCallback(() => {
     (async () => {
+      if (notificationRefreshInFlightRef.current) {
+        await notificationRefreshInFlightRef.current;
+      }
       if (exactAlarmRefreshPendingRef.current) {
         await refreshAllTaskNotifications();
         exactAlarmRefreshPendingRef.current = false;
       }
       const ts = await getTasks(db);
-      const todayDate = getToday();
-      const todayCounts = await getCompletionCounts(db, todayDate);
       for (const t of ts) {
         const oneShot = t.freq_type === 'monthly_nth' || t.freq_type === 'every_n_days';
         if (t.notify && t.scheduled_time && oneShot) {
@@ -1518,10 +1523,6 @@ export default function HomeScreen({ navigation }: Props) {
         if (t.auto_timer_enabled && t.auto_timer_time && oneShot) {
           const auto_timer_notify_id = await rescheduleAutoTimer(t);
           await updateTask(db, t.id, { auto_timer_notify_id });
-        }
-        if (t.repeat_enabled && t.repeat_follow_enabled && t.notify && t.scheduled_time) {
-          const repeat_follow_notify_id = await rescheduleRepeatFollow(t, todayCounts.get(t.id) ?? 0, todayDate);
-          await updateTask(db, t.id, { repeat_follow_notify_id });
         }
       }
     })();
