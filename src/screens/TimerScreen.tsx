@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, StatusBar, Alert, ScrollView, Modal, Dimensions, TextInput, Animated, Easing } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSQLiteContext } from 'expo-sqlite';
@@ -368,6 +368,25 @@ export default function TimerScreen({ navigation }: Props) {
       useNativeDriver: false,
     }).start();
   };
+
+  useEffect(() => {
+    const runningVisible = visibleTimers.filter((item) => item.startedAtMs);
+    if (runningVisible.length === 0) return;
+    setExpandedKeys((current) => {
+      let changed = false;
+      const next = { ...current };
+      runningVisible.forEach((item) => {
+        if (!next[item.key]) {
+          next[item.key] = true;
+          changed = true;
+        }
+      });
+      return changed ? next : current;
+    });
+    runningVisible.forEach((item) => {
+      getExpandAnim(item.key).setValue(1);
+    });
+  }, [visibleTimers]);
 
   const openHistory = async (task: Task) => {
     setHistoryTask(task);
