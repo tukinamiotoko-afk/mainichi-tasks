@@ -395,9 +395,7 @@ async function scheduleRepeatFollowNotifs(
     for (const timeText of followTimes) {
       const when = parseLocalDateTime(ds, timeText);
       if (when.getTime() <= Date.now()) continue;
-      const body = isToday
-        ? `${task.icon ? task.icon + ' ' : ''}${task.title} あと${remaining}回です`
-        : `${task.icon ? task.icon + ' ' : ''}${task.title} の追いかけ通知です`;
+      const body = `${task.icon ? task.icon + ' ' : ''}${task.title} の追いかけ通知です`;
       const content = {
         title: '',
         body,

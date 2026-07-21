@@ -348,7 +348,7 @@ export default function TimerScreen({ navigation }: Props) {
     removeTimer(itemKey);
   };
 
-  const commitTimerMinutes = async (itemKey: string) => {
+  const commitTimerMinutes = async (itemKey: string, opts?: { close?: boolean }) => {
     const mins = parseInt(minuteInputs[itemKey] ?? '0', 10);
     const secs = parseInt(secondInputs[itemKey] ?? '0', 10);
     const total = Math.max(1, (Math.max(0, isNaN(mins) ? 0 : mins) * 60) + Math.max(0, Math.min(59, isNaN(secs) ? 0 : secs)));
@@ -356,7 +356,7 @@ export default function TimerScreen({ navigation }: Props) {
     setMinuteInputs((prev) => ({ ...prev, [itemKey]: split.minutes }));
     setSecondInputs((prev) => ({ ...prev, [itemKey]: split.seconds }));
     await updateTargetSeconds(itemKey, total);
-    setEditingTimerId((current) => (current === itemKey ? null : current));
+    if (opts?.close) setEditingTimerId((current) => (current === itemKey ? null : current));
   };
 
   const toggleExpanded = (itemKey: string) => {
@@ -515,7 +515,7 @@ export default function TimerScreen({ navigation }: Props) {
                           onBlur={async () => { await commitTimerMinutes(item.key); }}
                           onSubmitEditing={async () => { await commitTimerMinutes(item.key); }}
                           keyboardType="number-pad"
-                          returnKeyType="done"
+                          returnKeyType="next"
                           editable={!running}
                           autoFocus
                         />
@@ -527,7 +527,7 @@ export default function TimerScreen({ navigation }: Props) {
                           value={secondInputs[item.key] ?? splitSeconds(item.targetSeconds).seconds}
                           onChangeText={(v) => setSecondInputs((prev) => ({ ...prev, [item.key]: v.replace(/[^0-9]/g, '').slice(0, 2) }))}
                           onBlur={async () => { await commitTimerMinutes(item.key); }}
-                          onSubmitEditing={async () => { await commitTimerMinutes(item.key); }}
+                          onSubmitEditing={async () => { await commitTimerMinutes(item.key, { close: true }); }}
                           keyboardType="number-pad"
                           returnKeyType="done"
                           editable={!running}
