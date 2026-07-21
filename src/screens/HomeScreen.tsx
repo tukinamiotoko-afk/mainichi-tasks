@@ -2679,7 +2679,7 @@ export default function HomeScreen({ navigation }: Props) {
       </Modal>
 
       {/* Task detail — full-screen editor */}
-      <Modal visible={!!detailTask} animationType="slide" onRequestClose={() => setDetailTask(null)}>
+      <Modal visible={!!detailTask} animationType="slide" statusBarTranslucent onRequestClose={() => setDetailTask(null)}>
         {!!detailTask && <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />}
         <View style={[s.detailScreen, { paddingTop: insets.top }]}>
           <View style={s.detailHeader}>
