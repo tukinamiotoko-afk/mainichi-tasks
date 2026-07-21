@@ -3,7 +3,6 @@ import { Platform } from 'react-native';
 import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SQLiteProvider } from 'expo-sqlite';
-import { StatusBar } from 'expo-status-bar';
 import * as Notifications from 'expo-notifications';
 import * as SplashScreen from 'expo-splash-screen';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -51,7 +50,11 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 function AppNavigation() {
   return (
     <NavigationContainer ref={navigationRef}>
-      <StatusBar style="light" />
+      {/* Each screen renders its own react-native StatusBar with the bar
+          style it needs (light content on colored headers, dark content
+          on white screens like the task edit modal) — a persistent
+          expo-status-bar directive here would otherwise race with those
+          per-screen overrides and intermittently win. */}
       <Stack.Navigator screenOptions={{ headerShown: false, animation: 'none' }}>
         <Stack.Screen name="Home" component={HomeScreen} />
         <Stack.Screen name="Stats" component={StatsScreen} />
