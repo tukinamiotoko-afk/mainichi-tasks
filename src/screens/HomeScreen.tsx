@@ -42,6 +42,8 @@ const APP_DISPLAY_NAME = '毎日タスク';
 const DRAG_ROW_HEIGHT = 88;
 const DRAG_GAP = 10;
 const DRAG_SLOT = DRAG_ROW_HEIGHT + DRAG_GAP; // actual slot size including gap
+const REPEAT_PICKER_ITEM_HEIGHT = 44;
+const REPEAT_PICKER_VALUES = Array.from({ length: 19 }, (_, i) => i + 2);
 
 function darkenHex(hex: string, amount: number): string {
   const clean = hex.replace('#', '');
@@ -527,6 +529,8 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   timerDurationRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
   timerDurationInput: { width: 56, borderWidth: 1, borderColor: C.border, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, fontSize: 14, color: C.onDark, backgroundColor: C.body, textAlign: 'center' },
   timerDurationLabel: { color: C.muted, fontSize: 12, fontWeight: '700' },
+  repeatPickerBtn: { minWidth: 96, borderWidth: 1, borderColor: C.border, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, backgroundColor: C.body, alignItems: 'center' },
+  repeatPickerBtnText: { color: C.onDark, fontSize: 18, fontWeight: '800' },
   sheetSaveBtn: { backgroundColor: C.primary, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 12, alignItems: 'center', justifyContent: 'center' },
   sheetSaveBtnText: { color: C.onPrimary, fontSize: 13, fontWeight: '700' },
 
@@ -711,6 +715,13 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   timeInput: { width: 76, borderWidth: 1, borderColor: C.border, borderRadius: 12, paddingVertical: 10, fontSize: 30, fontWeight: '800', color: C.onDark, textAlign: 'center', backgroundColor: C.body },
   timeColon: { fontSize: 30, fontWeight: '800', color: C.onDark },
   timeHint: { color: C.muted, fontSize: 11, fontWeight: '600' },
+  repeatWheelWrap: { width: '100%', alignItems: 'center', justifyContent: 'center', height: 228 },
+  repeatWheelViewport: { width: 148, height: 220 },
+  repeatWheelContent: { paddingVertical: 88 },
+  repeatWheelSelection: { position: 'absolute', left: 0, right: 0, top: 88, height: REPEAT_PICKER_ITEM_HEIGHT, borderRadius: 12, borderWidth: 1, borderColor: C.primary, backgroundColor: C.primarySoft },
+  repeatWheelItem: { height: REPEAT_PICKER_ITEM_HEIGHT, alignItems: 'center', justifyContent: 'center' },
+  repeatWheelItemText: { color: C.muted, fontSize: 18, fontWeight: '700' },
+  repeatWheelItemTextActive: { color: C.primary, fontSize: 22, fontWeight: '900' },
   timeBtnRow: { flexDirection: 'row', gap: 10, alignSelf: 'stretch', marginTop: 4 },
   timeCancelBtn: { flex: 1, borderWidth: 1, borderColor: C.border, borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
   timeCancelText: { color: C.stone, fontSize: 14, fontWeight: '700' },
@@ -1104,6 +1115,8 @@ export default function HomeScreen({ navigation }: Props) {
   const [newAutoTimerNotifyType, setNewAutoTimerNotifyType] = useState<'push' | 'alarm'>('alarm');
   const [newRepeatEnabled, setNewRepeatEnabled] = useState(false);
   const [newRepeatTarget, setNewRepeatTarget] = useState(2);
+  const [repeatPickerFor, setRepeatPickerFor] = useState<'add' | 'edit' | null>(null);
+  const [repeatPickerValue, setRepeatPickerValue] = useState(2);
   const [showExactAlarmGuide, setShowExactAlarmGuide] = useState(false);
   const [showBatteryGuide, setShowBatteryGuide] = useState(false);
   const onboardingShownRef = useRef(false);
@@ -1124,6 +1137,7 @@ export default function HomeScreen({ navigation }: Props) {
   const [timePickerFor, setTimePickerFor] = useState<'add' | 'edit' | 'autoTimerAdd' | 'autoTimerEdit' | null>(null);
   const [hourInput, setHourInput] = useState('8');
   const [minuteInput, setMinuteInput] = useState('00');
+  const repeatPickerScrollRef = useRef<ScrollView | null>(null);
 
   const splashHiddenRef = useRef(false);
   const notificationRefreshDoneRef = useRef(false);
@@ -1581,6 +1595,25 @@ export default function HomeScreen({ navigation }: Props) {
     else if (target === 'edit') await patchDetail({ scheduled_time: time });
     else if (target === 'autoTimerAdd') setNewAutoTimerTime(time);
     else if (target === 'autoTimerEdit') await patchDetail({ auto_timer_time: time });
+  };
+
+  const openRepeatPicker = useCallback((target: 'add' | 'edit', currentValue: number) => {
+    const safeValue = Math.max(2, Math.min(REPEAT_PICKER_VALUES[REPEAT_PICKER_VALUES.length - 1], currentValue || 2));
+    setRepeatPickerValue(safeValue);
+    setRepeatPickerFor(target);
+    requestAnimationFrame(() => {
+      const index = REPEAT_PICKER_VALUES.indexOf(safeValue);
+      const offset = Math.max(0, index) * REPEAT_PICKER_ITEM_HEIGHT;
+      repeatPickerScrollRef.current?.scrollTo({ y: offset, animated: false });
+    });
+  }, []);
+
+  const applyRepeatPickerValue = async () => {
+    const safeValue = Math.max(2, repeatPickerValue);
+    const target = repeatPickerFor;
+    setRepeatPickerFor(null);
+    if (target === 'add') setNewRepeatTarget(safeValue);
+    else if (target === 'edit') await patchDetail({ repeat_target: safeValue });
   };
 
   const toggleNewNotify = async (value: boolean) => {
@@ -2095,6 +2128,7 @@ export default function HomeScreen({ navigation }: Props) {
     targetCount: number,
     onToggleEnabled: (v: boolean) => void,
     onSetTarget: (n: number) => void,
+    pickerTarget: 'add' | 'edit',
   ) => (
     <View style={s.scheduleCard}>
       <View style={s.scheduleTopRow}>
@@ -2114,13 +2148,13 @@ export default function HomeScreen({ navigation }: Props) {
         <>
           <View style={s.timerDurationRow}>
             <Text style={s.timerDurationLabel}>1日の目標回数：</Text>
-            <TextInput
-              style={s.timerDurationInput}
-              value={String(targetCount)}
-              onChangeText={(v) => onSetTarget(Math.max(2, parseInt(v.replace(/[^0-9]/g, ''), 10) || 2))}
-              keyboardType="number-pad"
-              maxLength={2}
-            />
+            <TouchableOpacity
+              style={s.repeatPickerBtn}
+              activeOpacity={0.85}
+              onPress={() => openRepeatPicker(pickerTarget, targetCount)}
+            >
+              <Text style={s.repeatPickerBtnText}>{targetCount}</Text>
+            </TouchableOpacity>
             <Text style={s.timerDurationLabel}>回</Text>
           </View>
           <Text style={s.scheduleHint}>タップで1回分チェック、長押しで1回分取り消せます</Text>
@@ -2697,6 +2731,7 @@ export default function HomeScreen({ navigation }: Props) {
                     newRepeatEnabled, newRepeatTarget,
                     (v) => (v ? requirePremium(() => setNewRepeatEnabled(true)) : setNewRepeatEnabled(false)),
                     setNewRepeatTarget,
+                    'add',
                   )}
 
                   <View style={{ height: 12 }} />
@@ -2875,6 +2910,7 @@ export default function HomeScreen({ navigation }: Props) {
                             }))
                           : patchDetail({ repeat_enabled: 0 })),
                         (n) => patchDetail({ repeat_target: n }),
+                        'edit',
                       )}
 
                       <TouchableOpacity style={s.detailDeleteBtn} onPress={() => handleDelete(detailTask)}>
@@ -2887,6 +2923,46 @@ export default function HomeScreen({ navigation }: Props) {
                 </ScrollView>
           </KeyboardAvoidingView>
         </View>
+        </View>
+      </Modal>
+
+      <Modal visible={!!repeatPickerFor} transparent animationType="fade" onRequestClose={() => setRepeatPickerFor(null)}>
+        <View style={s.timeModalBg}>
+          <View style={s.timeModalCard}>
+            <Text style={s.timeModalTitle}>回数を選択</Text>
+            <View style={s.repeatWheelWrap}>
+              <View style={s.repeatWheelViewport}>
+                <View pointerEvents="none" style={s.repeatWheelSelection} />
+                <ScrollView
+                  ref={repeatPickerScrollRef}
+                  showsVerticalScrollIndicator={false}
+                  snapToInterval={REPEAT_PICKER_ITEM_HEIGHT}
+                  decelerationRate="fast"
+                  contentContainerStyle={s.repeatWheelContent}
+                  onMomentumScrollEnd={(e) => {
+                    const index = Math.max(0, Math.min(REPEAT_PICKER_VALUES.length - 1, Math.round(e.nativeEvent.contentOffset.y / REPEAT_PICKER_ITEM_HEIGHT)));
+                    setRepeatPickerValue(REPEAT_PICKER_VALUES[index]);
+                  }}
+                >
+                  {REPEAT_PICKER_VALUES.map((n) => (
+                    <TouchableOpacity key={n} style={s.repeatWheelItem} activeOpacity={0.8} onPress={() => setRepeatPickerValue(n)}>
+                      <Text style={[s.repeatWheelItemText, repeatPickerValue === n && s.repeatWheelItemTextActive]}>{n}回</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            </View>
+            <View style={s.timeBtnRow}>
+              <TouchableOpacity style={s.timeCancelBtn} onPress={() => setRepeatPickerFor(null)}>
+                <Text style={s.timeCancelText}>キャンセル</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.timeConfirmBtnWrap} onPress={applyRepeatPickerValue} activeOpacity={0.85}>
+                <LinearGradient colors={grad.brand} start={GRAD_START} end={GRAD_END} style={s.timeConfirmBtn}>
+                  <Text style={s.timeConfirmText}>決定</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
       </Modal>
 
