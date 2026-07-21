@@ -530,7 +530,8 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   sheetSaveBtn: { backgroundColor: C.primary, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 12, alignItems: 'center', justifyContent: 'center' },
   sheetSaveBtnText: { color: C.onPrimary, fontSize: 13, fontWeight: '700' },
 
-  detailScreen: { flex: 1, backgroundColor: C.body },
+  detailModalBg: { flex: 1, backgroundColor: 'rgba(15,23,42,0.24)' },
+  detailScreen: { flex: 1, backgroundColor: C.body, borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden' },
   detailHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: C.border, backgroundColor: C.card },
   detailHeaderTitle: { color: C.onDark, fontSize: 16, fontWeight: '800' },
   detailCloseText: { fontSize: 22, color: C.muted, paddingHorizontal: 4 },
@@ -1242,7 +1243,7 @@ export default function HomeScreen({ navigation }: Props) {
   const applyDetailStatusBar = useCallback(() => {
     clearDetailStatusBar();
     detailStatusBarEntryRef.current = StatusBar.pushStackEntry({
-      barStyle: 'dark-content',
+      barStyle: 'light-content',
       backgroundColor: 'transparent',
       translucent: true,
     });
@@ -2708,13 +2709,15 @@ export default function HomeScreen({ navigation }: Props) {
       {/* Task detail — full-screen editor */}
       <Modal
         visible={!!detailTask}
+        transparent
         animationType="slide"
         statusBarTranslucent
         onShow={applyDetailStatusBar}
         onDismiss={clearDetailStatusBar}
         onRequestClose={closeDetail}
       >
-        <View style={[s.detailScreen, { paddingTop: insets.top + 12 }]}>
+        <View style={[s.detailModalBg, { paddingTop: insets.top + 12 }]}>
+        <View style={s.detailScreen}>
           <View style={s.detailHeader}>
             <TouchableOpacity onPress={closeDetail} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Text style={s.detailCloseText}>✕</Text>
@@ -2883,6 +2886,7 @@ export default function HomeScreen({ navigation }: Props) {
                   )}
                 </ScrollView>
           </KeyboardAvoidingView>
+        </View>
         </View>
       </Modal>
 
