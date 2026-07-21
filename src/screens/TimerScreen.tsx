@@ -61,7 +61,7 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   timerTitle: { color: C.onDark, fontSize: 15, fontWeight: '900' },
   timerState: { color: C.muted, fontSize: 11, fontWeight: '800', minHeight: 16 },
   removeBtn: { width: 30, height: 30, borderRadius: 15, backgroundColor: C.body, alignItems: 'center', justifyContent: 'center' },
-  removeText: { color: C.muted, fontSize: 18, fontWeight: '900' },
+  removeText: { fontSize: 16 },
   cardActionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', gap: 14 },
   cardActionBtn: { paddingVertical: 2, alignItems: 'center', justifyContent: 'center' },
   cardActionPrimary: {},
@@ -73,6 +73,8 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   timeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
   setTimeBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: C.border, backgroundColor: C.card },
   setTimeBtnText: { color: C.primary, fontSize: 12, fontWeight: '800' },
+  saveTimeBtn: { backgroundColor: C.primary, borderRadius: 10, paddingVertical: 10, alignItems: 'center' },
+  saveTimeBtnText: { color: C.onPrimary, fontSize: 14, fontWeight: '900' },
   timerControls: { flexDirection: 'row', gap: 7 },
   controlBtn: { flex: 1, borderRadius: 10, paddingVertical: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: '#ffffff', borderWidth: 1, borderColor: C.border, minHeight: 40 },
   controlBtnDisabled: { opacity: 0.45 },
@@ -489,7 +491,7 @@ export default function TimerScreen({ navigation }: Props) {
                   )}
                 </View>
                 <TouchableOpacity style={s.removeBtn} onPress={() => handleRemoveTimer(item.key)}>
-                  <Text style={s.removeText}>×</Text>
+                  <Text style={s.removeText}>🗑️</Text>
                 </TouchableOpacity>
               </View>
               <Animated.View
@@ -506,34 +508,43 @@ export default function TimerScreen({ navigation }: Props) {
               >
                 <View style={s.expandInner}>
                   {item.mode === 'timer' && editingTimerId === item.key ? (
-                    <View style={s.minuteRow}>
-                      <View style={s.timeInputBlock}>
-                        <TextInput
-                          style={s.minuteInput}
-                          value={minuteInputs[item.key] ?? splitSeconds(item.targetSeconds).minutes}
-                          onChangeText={(v) => setMinuteInputs((prev) => ({ ...prev, [item.key]: v.replace(/[^0-9]/g, '') }))}
-                          onBlur={async () => { await commitTimerMinutes(item.key); }}
-                          onSubmitEditing={async () => { await commitTimerMinutes(item.key); }}
-                          keyboardType="number-pad"
-                          returnKeyType="next"
-                          editable={!running}
-                          autoFocus
-                        />
-                        <Text style={s.minuteLabel}>分</Text>
+                    <View style={{ gap: 10 }}>
+                      <View style={s.minuteRow}>
+                        <View style={s.timeInputBlock}>
+                          <TextInput
+                            style={s.minuteInput}
+                            value={minuteInputs[item.key] ?? splitSeconds(item.targetSeconds).minutes}
+                            onChangeText={(v) => setMinuteInputs((prev) => ({ ...prev, [item.key]: v.replace(/[^0-9]/g, '') }))}
+                            onBlur={async () => { await commitTimerMinutes(item.key); }}
+                            onSubmitEditing={async () => { await commitTimerMinutes(item.key); }}
+                            keyboardType="number-pad"
+                            returnKeyType="next"
+                            editable={!running}
+                            autoFocus
+                          />
+                          <Text style={s.minuteLabel}>分</Text>
+                        </View>
+                        <View style={s.timeInputBlock}>
+                          <TextInput
+                            style={s.secondInput}
+                            value={secondInputs[item.key] ?? splitSeconds(item.targetSeconds).seconds}
+                            onChangeText={(v) => setSecondInputs((prev) => ({ ...prev, [item.key]: v.replace(/[^0-9]/g, '').slice(0, 2) }))}
+                            onBlur={async () => { await commitTimerMinutes(item.key); }}
+                            onSubmitEditing={async () => { await commitTimerMinutes(item.key, { close: true }); }}
+                            keyboardType="number-pad"
+                            returnKeyType="done"
+                            editable={!running}
+                          />
+                          <Text style={s.minuteLabel}>秒</Text>
+                        </View>
                       </View>
-                      <View style={s.timeInputBlock}>
-                        <TextInput
-                          style={s.secondInput}
-                          value={secondInputs[item.key] ?? splitSeconds(item.targetSeconds).seconds}
-                          onChangeText={(v) => setSecondInputs((prev) => ({ ...prev, [item.key]: v.replace(/[^0-9]/g, '').slice(0, 2) }))}
-                          onBlur={async () => { await commitTimerMinutes(item.key); }}
-                          onSubmitEditing={async () => { await commitTimerMinutes(item.key, { close: true }); }}
-                          keyboardType="number-pad"
-                          returnKeyType="done"
-                          editable={!running}
-                        />
-                        <Text style={s.minuteLabel}>秒</Text>
-                      </View>
+                      <TouchableOpacity
+                        style={s.saveTimeBtn}
+                        activeOpacity={0.85}
+                        onPress={async () => { await commitTimerMinutes(item.key, { close: true }); }}
+                      >
+                        <Text style={s.saveTimeBtnText}>保存</Text>
+                      </TouchableOpacity>
                     </View>
                   ) : (
                     <View style={s.timeRow}>

@@ -2588,10 +2588,10 @@ export default function HomeScreen({ navigation }: Props) {
               <Text style={s.notifyTypeLabel}>通知の種類</Text>
               <View style={s.notifyTypeRow}>
                 <TouchableOpacity style={[s.notifyTypeChip, followNotifyType === 'push' && s.notifyTypeChipActive]} onPress={() => onSetFollowNotifyType('push')}>
-                  <Text style={[s.notifyTypeText, followNotifyType === 'push' && s.notifyTypeTextActive]}>プッシュ通知</Text>
+                  <Text style={[s.notifyTypeText, followNotifyType === 'push' && s.notifyTypeTextActive]}>🔔 プッシュ通知</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={[s.notifyTypeChip, followNotifyType === 'alarm' && s.notifyTypeChipActive]} onPress={() => onSetFollowNotifyType('alarm')}>
-                  <Text style={[s.notifyTypeText, followNotifyType === 'alarm' && s.notifyTypeTextActive]}>アラーム</Text>
+                  <Text style={[s.notifyTypeText, followNotifyType === 'alarm' && s.notifyTypeTextActive]}>⏰ アラート</Text>
                 </TouchableOpacity>
               </View>
             </>
