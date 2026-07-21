@@ -14,6 +14,10 @@ export type Task = {
   auto_timer_mode: string; auto_timer_minutes: number; auto_timer_notify_id: string | null;
   auto_timer_notify_type: string;
   repeat_enabled: number; repeat_target: number;
+  repeat_follow_enabled: number; repeat_follow_mode: string;
+  repeat_follow_interval_minutes: number; repeat_follow_until: string | null;
+  repeat_follow_times: string | null; repeat_follow_notify_id: string | null;
+  repeat_follow_notify_type: string;
 };
 export type NotificationSetting = { id: number; time: string; notification_type: string; identifier: string | null; task_id: number | null };
 export type CompletionDetail = { task_id: number; title: string; icon: string | null; date: string; completed_at: string | null };
@@ -62,6 +66,13 @@ export async function migrateDb(db: SQLite.SQLiteDatabase): Promise<void> {
       freq_dates TEXT,
       repeat_enabled INTEGER NOT NULL DEFAULT 0,
       repeat_target INTEGER NOT NULL DEFAULT 1,
+      repeat_follow_enabled INTEGER NOT NULL DEFAULT 0,
+      repeat_follow_mode TEXT NOT NULL DEFAULT 'interval',
+      repeat_follow_interval_minutes INTEGER NOT NULL DEFAULT 60,
+      repeat_follow_until TEXT,
+      repeat_follow_times TEXT,
+      repeat_follow_notify_id TEXT,
+      repeat_follow_notify_type TEXT NOT NULL DEFAULT 'push',
       freq_weeks TEXT,
       freq_interval INTEGER
     );
@@ -126,6 +137,13 @@ export async function migrateDb(db: SQLite.SQLiteDatabase): Promise<void> {
   try { await db.execAsync('ALTER TABLE tasks ADD COLUMN auto_timer_notify_id TEXT'); } catch {}
   try { await db.execAsync('ALTER TABLE tasks ADD COLUMN repeat_enabled INTEGER NOT NULL DEFAULT 0'); } catch {}
   try { await db.execAsync('ALTER TABLE tasks ADD COLUMN repeat_target INTEGER NOT NULL DEFAULT 1'); } catch {}
+  try { await db.execAsync("ALTER TABLE tasks ADD COLUMN repeat_follow_enabled INTEGER NOT NULL DEFAULT 0"); } catch {}
+  try { await db.execAsync("ALTER TABLE tasks ADD COLUMN repeat_follow_mode TEXT NOT NULL DEFAULT 'interval'"); } catch {}
+  try { await db.execAsync('ALTER TABLE tasks ADD COLUMN repeat_follow_interval_minutes INTEGER NOT NULL DEFAULT 60'); } catch {}
+  try { await db.execAsync('ALTER TABLE tasks ADD COLUMN repeat_follow_until TEXT'); } catch {}
+  try { await db.execAsync('ALTER TABLE tasks ADD COLUMN repeat_follow_times TEXT'); } catch {}
+  try { await db.execAsync('ALTER TABLE tasks ADD COLUMN repeat_follow_notify_id TEXT'); } catch {}
+  try { await db.execAsync("ALTER TABLE tasks ADD COLUMN repeat_follow_notify_type TEXT NOT NULL DEFAULT 'push'"); } catch {}
   try { await db.execAsync('ALTER TABLE completions ADD COLUMN count INTEGER NOT NULL DEFAULT 1'); } catch {}
   try { await db.execAsync('ALTER TABLE tasks ADD COLUMN freq_weeks TEXT'); } catch {}
   try { await db.execAsync('ALTER TABLE tasks ADD COLUMN freq_interval INTEGER'); } catch {}
@@ -266,6 +284,10 @@ export type TaskFields = {
   auto_timer_mode?: string; auto_timer_minutes?: number; auto_timer_notify_id?: string | null;
   auto_timer_notify_type?: string;
   repeat_enabled?: number; repeat_target?: number;
+  repeat_follow_enabled?: number; repeat_follow_mode?: string;
+  repeat_follow_interval_minutes?: number; repeat_follow_until?: string | null;
+  repeat_follow_times?: string | null; repeat_follow_notify_id?: string | null;
+  repeat_follow_notify_type?: string;
   freq_weeks?: string | null; freq_interval?: number | null;
 };
 
@@ -274,7 +296,10 @@ const TASK_COLUMNS: (keyof TaskFields)[] = [
   'freq_type', 'freq_days', 'freq_week', 'freq_weekday', 'freq_day', 'once_date', 'freq_dates', 'note',
   'auto_timer_enabled', 'auto_timer_time', 'auto_timer_mode', 'auto_timer_minutes', 'auto_timer_notify_id',
   'auto_timer_notify_type',
-  'repeat_enabled', 'repeat_target', 'freq_weeks', 'freq_interval',
+  'repeat_enabled', 'repeat_target',
+  'repeat_follow_enabled', 'repeat_follow_mode', 'repeat_follow_interval_minutes', 'repeat_follow_until',
+  'repeat_follow_times', 'repeat_follow_notify_id', 'repeat_follow_notify_type',
+  'freq_weeks', 'freq_interval',
 ];
 
 export async function addTask(db: SQLite.SQLiteDatabase, title: string): Promise<number> {
@@ -314,8 +339,8 @@ export async function deleteTask(db: SQLite.SQLiteDatabase, id: number): Promise
   const rows = await db.getAllAsync<{ identifier: string | null }>(
     'SELECT identifier FROM notification_settings WHERE task_id = ?', [id]
   );
-  const taskRow = await db.getFirstAsync<{ notify_id: string | null; auto_timer_notify_id: string | null }>(
-    'SELECT notify_id, auto_timer_notify_id FROM tasks WHERE id = ?', [id]
+  const taskRow = await db.getFirstAsync<{ notify_id: string | null; auto_timer_notify_id: string | null; repeat_follow_notify_id: string | null }>(
+    'SELECT notify_id, auto_timer_notify_id, repeat_follow_notify_id FROM tasks WHERE id = ?', [id]
   );
   await db.runAsync('DELETE FROM tasks WHERE id = ?', [id]);
   await db.runAsync('DELETE FROM completions WHERE task_id = ?', [id]);
@@ -325,6 +350,7 @@ export async function deleteTask(db: SQLite.SQLiteDatabase, id: number): Promise
   const ids = rows.map(r => r.identifier).filter(Boolean) as string[];
   if (taskRow?.notify_id) ids.push(...taskRow.notify_id.split(',').filter(Boolean));
   if (taskRow?.auto_timer_notify_id) ids.push(...taskRow.auto_timer_notify_id.split(',').filter(Boolean));
+  if (taskRow?.repeat_follow_notify_id) ids.push(...taskRow.repeat_follow_notify_id.split(',').filter(Boolean));
   return ids;
 }
 
