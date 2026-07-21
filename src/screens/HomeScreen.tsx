@@ -235,20 +235,27 @@ function parseTimeList(csv: string | null | undefined): string[] {
     .sort();
 }
 
+// Follow-ups are tied to the repeat-count target: the first completion is
+// the normal notification, so at most (repeat_target - 1) follow-ups ever
+// get scheduled, regardless of mode.
 function buildRepeatFollowTimes(task: Schedulable): string[] {
   const baseMinutes = parseTimeToMinutes(task.scheduled_time);
   if (baseMinutes == null) return [];
+  const maxCount = Math.max(0, (task.repeat_target ?? 1) - 1);
+  if (maxCount === 0) return [];
   if ((task.repeat_follow_mode ?? 'interval') === 'times') {
-    return parseTimeList(task.repeat_follow_times).filter((time) => {
-      const mins = parseTimeToMinutes(time);
-      return mins != null && mins > baseMinutes;
-    });
+    return parseTimeList(task.repeat_follow_times)
+      .filter((time) => {
+        const mins = parseTimeToMinutes(time);
+        return mins != null && mins > baseMinutes;
+      })
+      .slice(0, maxCount);
   }
   const intervalMinutes = Math.max(15, task.repeat_follow_interval_minutes ?? 60);
-  const untilMinutes = parseTimeToMinutes(task.repeat_follow_until);
-  if (untilMinutes == null || untilMinutes <= baseMinutes) return [];
   const times: string[] = [];
-  for (let next = baseMinutes + intervalMinutes; next <= untilMinutes; next += intervalMinutes) {
+  for (let i = 1; i <= maxCount; i++) {
+    const next = baseMinutes + intervalMinutes * i;
+    if (next > 23 * 60 + 59) break;
     times.push(formatMinutesAsTime(next));
   }
   return times;
@@ -256,28 +263,22 @@ function buildRepeatFollowTimes(task: Schedulable): string[] {
 
 function sanitizeRepeatFollowValues(
   scheduledTime: string | null | undefined,
-  followMode: 'interval' | 'times',
-  followUntil: string | null | undefined,
   followTimes: string[] | string | null | undefined,
+  repeatTarget: number,
 ) {
   const baseMinutes = parseTimeToMinutes(scheduledTime);
   const parsedTimes = Array.isArray(followTimes) ? followTimes : parseTimeList(followTimes);
   if (baseMinutes == null) {
-    return {
-      repeat_follow_until: null as string | null,
-      repeat_follow_times: [] as string[],
-    };
+    return { repeat_follow_times: [] as string[] };
   }
-  const repeat_follow_times = parsedTimes.filter((time) => {
-    const mins = parseTimeToMinutes(time);
-    return mins != null && mins > baseMinutes;
-  });
-  const untilMinutes = parseTimeToMinutes(followUntil);
-  const repeat_follow_until =
-    followMode === 'interval' && untilMinutes != null && untilMinutes > baseMinutes
-      ? followUntil ?? null
-      : null;
-  return { repeat_follow_until, repeat_follow_times };
+  const maxCount = Math.max(0, repeatTarget - 1);
+  const repeat_follow_times = parsedTimes
+    .filter((time) => {
+      const mins = parseTimeToMinutes(time);
+      return mins != null && mins > baseMinutes;
+    })
+    .slice(0, maxCount);
+  return { repeat_follow_times };
 }
 
 // Schedule reminders for a task according to its recurrence. Returns identifiers.
@@ -1279,7 +1280,6 @@ export default function HomeScreen({ navigation }: Props) {
   const [newRepeatFollowEnabled, setNewRepeatFollowEnabled] = useState(false);
   const [newRepeatFollowMode, setNewRepeatFollowMode] = useState<'interval' | 'times'>('interval');
   const [newRepeatFollowIntervalMinutes, setNewRepeatFollowIntervalMinutes] = useState(60);
-  const [newRepeatFollowUntil, setNewRepeatFollowUntil] = useState<string | null>('23:00');
   const [newRepeatFollowTimes, setNewRepeatFollowTimes] = useState<string[]>([]);
   const [newRepeatFollowNotifyType, setNewRepeatFollowNotifyType] = useState<'push' | 'alarm'>('push');
   const [repeatPickerFor, setRepeatPickerFor] = useState<'add' | 'edit' | null>(null);
@@ -1302,7 +1302,7 @@ export default function HomeScreen({ navigation }: Props) {
 
   // Shared time editor (numeric input)
   const [timePickerFor, setTimePickerFor] = useState<'add' | 'edit' | 'autoTimerAdd' | 'autoTimerEdit' | null>(null);
-  const [repeatFollowTimePickerFor, setRepeatFollowTimePickerFor] = useState<'addUntil' | 'addTime' | 'editUntil' | 'editTime' | null>(null);
+  const [repeatFollowTimePickerFor, setRepeatFollowTimePickerFor] = useState<'addTime' | 'editTime' | null>(null);
   const [hourInput, setHourInput] = useState('8');
   const [minuteInput, setMinuteInput] = useState('00');
   const repeatPickerScrollRef = useRef<ScrollView | null>(null);
@@ -1638,7 +1638,6 @@ export default function HomeScreen({ navigation }: Props) {
     setNewRepeatFollowEnabled(false);
     setNewRepeatFollowMode('interval');
     setNewRepeatFollowIntervalMinutes(60);
-    setNewRepeatFollowUntil('23:00');
     setNewRepeatFollowTimes([]);
     setNewRepeatFollowNotifyType('push');
   };
@@ -1673,7 +1672,6 @@ export default function HomeScreen({ navigation }: Props) {
       repeat_follow_enabled: newRepeatEnabled && newRepeatFollowEnabled ? 1 : 0,
       repeat_follow_mode: newRepeatFollowMode,
       repeat_follow_interval_minutes: newRepeatFollowIntervalMinutes,
-      repeat_follow_until: newRepeatFollowMode === 'interval' ? newRepeatFollowUntil : null,
       repeat_follow_times: newRepeatFollowMode === 'times' ? newRepeatFollowTimes.slice().sort().join(',') : null,
       repeat_follow_notify_type: newRepeatFollowNotifyType,
     };
@@ -1691,7 +1689,6 @@ export default function HomeScreen({ navigation }: Props) {
         repeat_follow_enabled: fields.repeat_follow_enabled ?? 0,
         repeat_follow_mode: fields.repeat_follow_mode ?? 'interval',
         repeat_follow_interval_minutes: fields.repeat_follow_interval_minutes ?? 60,
-        repeat_follow_until: fields.repeat_follow_until ?? null,
         repeat_follow_times: fields.repeat_follow_times ?? null,
         repeat_follow_notify_type: fields.repeat_follow_notify_type ?? 'push',
       });
@@ -1710,7 +1707,6 @@ export default function HomeScreen({ navigation }: Props) {
         repeat_follow_enabled: fields.repeat_follow_enabled ?? 0,
         repeat_follow_mode: fields.repeat_follow_mode ?? 'interval',
         repeat_follow_interval_minutes: fields.repeat_follow_interval_minutes ?? 60,
-        repeat_follow_until: fields.repeat_follow_until ?? null,
         repeat_follow_times: fields.repeat_follow_times ?? null,
         repeat_follow_notify_type: fields.repeat_follow_notify_type ?? 'push',
       });
@@ -1772,7 +1768,7 @@ export default function HomeScreen({ navigation }: Props) {
     const merged = { ...current, ...patch } as Task;
     detailTaskRef.current = merged;
     await updateTask(db, current.id, patch);
-    const scheduleKeys: (keyof TaskFields)[] = ['scheduled_time', 'notify', 'notify_type', 'freq_type', 'freq_days', 'freq_week', 'freq_weekday', 'freq_day', 'once_date', 'freq_weeks', 'freq_interval', 'repeat_enabled', 'repeat_target', 'repeat_follow_enabled', 'repeat_follow_mode', 'repeat_follow_interval_minutes', 'repeat_follow_until', 'repeat_follow_times', 'repeat_follow_notify_type'];
+    const scheduleKeys: (keyof TaskFields)[] = ['scheduled_time', 'notify', 'notify_type', 'freq_type', 'freq_days', 'freq_week', 'freq_weekday', 'freq_day', 'once_date', 'freq_weeks', 'freq_interval', 'repeat_enabled', 'repeat_target', 'repeat_follow_enabled', 'repeat_follow_mode', 'repeat_follow_interval_minutes', 'repeat_follow_times', 'repeat_follow_notify_type'];
     const autoTimerKeys: (keyof TaskFields)[] = ['auto_timer_enabled', 'auto_timer_time', 'auto_timer_mode', 'auto_timer_minutes', 'auto_timer_notify_type', 'freq_type', 'freq_days', 'freq_week', 'freq_weekday', 'freq_day', 'once_date', 'freq_weeks', 'freq_interval'];
     let next = merged;
     if (scheduleKeys.some(k => k in patch)) {
@@ -1848,41 +1844,25 @@ export default function HomeScreen({ navigation }: Props) {
       Alert.alert('時刻を確認', '追いかけ通知の時刻は、最初の通知より後の時間だけ追加できます。');
       return;
     }
-    if (repeatTarget === 'addUntil' && pickedMinutes != null && addBaseMinutes != null && pickedMinutes <= addBaseMinutes) {
-      Alert.alert('時刻を確認', '終了時刻は、最初の通知より後の時間にしてください。');
-      return;
-    }
-    if (repeatTarget === 'editUntil' && pickedMinutes != null && editBaseMinutes != null && pickedMinutes <= editBaseMinutes) {
-      Alert.alert('時刻を確認', '終了時刻は、最初の通知より後の時間にしてください。');
-      return;
-    }
     setTimePickerFor(null);
     setRepeatFollowTimePickerFor(null);
-    if (repeatTarget === 'addUntil') setNewRepeatFollowUntil(time);
-    else if (repeatTarget === 'addTime') {
-      setNewRepeatFollowTimes((current) => Array.from(new Set([...current, time])).sort());
-    } else if (repeatTarget === 'editUntil') {
-      await patchDetail({ repeat_follow_until: time });
+    if (repeatTarget === 'addTime') {
+      const maxCount = Math.max(0, newRepeatTarget - 1);
+      setNewRepeatFollowTimes((current) => Array.from(new Set([...current, time])).sort().slice(0, maxCount));
     } else if (repeatTarget === 'editTime') {
       const current = parseTimeList(detailTaskRef.current?.repeat_follow_times ?? null);
-      await patchDetail({ repeat_follow_times: Array.from(new Set([...current, time])).sort().join(',') });
+      const maxCount = Math.max(0, (detailTaskRef.current?.repeat_target ?? 1) - 1);
+      await patchDetail({ repeat_follow_times: Array.from(new Set([...current, time])).sort().slice(0, maxCount).join(',') });
     } else if (target === 'add') {
       setNewTime(time);
-      const sanitized = sanitizeRepeatFollowValues(time, newRepeatFollowMode, newRepeatFollowUntil, newRepeatFollowTimes);
-      setNewRepeatFollowUntil(sanitized.repeat_follow_until);
+      const sanitized = sanitizeRepeatFollowValues(time, newRepeatFollowTimes, newRepeatTarget);
       setNewRepeatFollowTimes(sanitized.repeat_follow_times);
     } else if (target === 'edit') {
       const current = detailTaskRef.current;
       if (!current) return;
-      const sanitized = sanitizeRepeatFollowValues(
-        time,
-        current.repeat_follow_mode === 'times' ? 'times' : 'interval',
-        current.repeat_follow_until,
-        current.repeat_follow_times,
-      );
+      const sanitized = sanitizeRepeatFollowValues(time, current.repeat_follow_times, current.repeat_target ?? 1);
       await patchDetail({
         scheduled_time: time,
-        repeat_follow_until: sanitized.repeat_follow_until,
         repeat_follow_times: sanitized.repeat_follow_times.join(',') || null,
       });
     }
@@ -1905,8 +1885,17 @@ export default function HomeScreen({ navigation }: Props) {
     const safeValue = Math.max(2, repeatPickerValue);
     const target = repeatPickerFor;
     setRepeatPickerFor(null);
-    if (target === 'add') setNewRepeatTarget(safeValue);
-    else if (target === 'edit') await patchDetail({ repeat_target: safeValue });
+    const maxCount = Math.max(0, safeValue - 1);
+    if (target === 'add') {
+      setNewRepeatTarget(safeValue);
+      setNewRepeatFollowTimes((current) => current.slice(0, maxCount));
+    } else if (target === 'edit') {
+      const current = parseTimeList(detailTaskRef.current?.repeat_follow_times ?? null);
+      await patchDetail({
+        repeat_target: safeValue,
+        repeat_follow_times: current.slice(0, maxCount).join(',') || null,
+      });
+    }
   };
 
   const toggleNewNotify = async (value: boolean) => {
@@ -1914,7 +1903,6 @@ export default function HomeScreen({ navigation }: Props) {
     setNewNotify(value);
     if (!value) {
       setNewRepeatFollowEnabled(false);
-      setNewRepeatFollowUntil(null);
       setNewRepeatFollowTimes([]);
     }
     if (value) notificationRefreshDoneRef.current = true;
@@ -1924,7 +1912,7 @@ export default function HomeScreen({ navigation }: Props) {
     if (value && !(await ensurePermission())) return;
     await patchDetail({
       notify: value ? 1 : 0,
-      ...(value ? {} : { repeat_follow_enabled: 0, repeat_follow_until: null, repeat_follow_times: null }),
+      ...(value ? {} : { repeat_follow_enabled: 0, repeat_follow_times: null }),
     });
     if (value) notificationRefreshDoneRef.current = true;
   };
@@ -2489,8 +2477,6 @@ export default function HomeScreen({ navigation }: Props) {
     onSetFollowMode: (mode: 'interval' | 'times') => void,
     followIntervalMinutes: number,
     onSetFollowIntervalMinutes: (minutes: number) => void,
-    followUntil: string | null,
-    onOpenFollowUntil: () => void,
     followTimes: string[],
     onOpenFollowTime: () => void,
     onRemoveFollowTime: (time: string) => void,
@@ -2566,25 +2552,26 @@ export default function HomeScreen({ navigation }: Props) {
                       </TouchableOpacity>
                     ))}
                   </View>
-                  <View style={s.timerDurationRow}>
-                    <Text style={s.timerDurationLabel}>終了時刻</Text>
-                    <TouchableOpacity style={s.repeatPickerBtn} activeOpacity={0.85} onPress={onOpenFollowUntil}>
-                      <Text style={s.repeatPickerBtnText}>{followUntil ?? '--:--'}</Text>
-                    </TouchableOpacity>
-                  </View>
+                  <Text style={s.notifyTypeLabel}>
+                    1回目は通常の通知、残り{Math.max(0, targetCount - 1)}回をこの間隔で届けます
+                  </Text>
                 </>
               ) : (
                 <>
-                  <Text style={s.notifyTypeLabel}>最初の通知時刻より後の時間だけ追加できます</Text>
+                  <Text style={s.notifyTypeLabel}>
+                    最初の通知より後の時間だけ、あと{Math.max(0, targetCount - 1 - followTimes.length)}回分追加できます
+                  </Text>
                   <View style={s.taskMetaRow}>
                     {followTimes.map((time) => (
                       <TouchableOpacity key={time} style={s.notifyTypeChip} onPress={() => onRemoveFollowTime(time)}>
                         <Text style={s.notifyTypeText}>{time} ×</Text>
                       </TouchableOpacity>
                     ))}
-                    <TouchableOpacity style={[s.notifyTypeChip, { minWidth: 96 }]} onPress={onOpenFollowTime}>
-                      <Text style={s.notifyTypeText}>+ 時刻追加</Text>
-                    </TouchableOpacity>
+                    {followTimes.length < Math.max(0, targetCount - 1) && (
+                      <TouchableOpacity style={[s.notifyTypeChip, { minWidth: 96 }]} onPress={onOpenFollowTime}>
+                        <Text style={s.notifyTypeText}>+ 時刻追加</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 </>
               )}
@@ -3178,21 +3165,15 @@ export default function HomeScreen({ navigation }: Props) {
                     (v) => {
                       if (!newNotify || !newTime) return;
                       setNewRepeatFollowEnabled(v);
-                      if (!v) {
-                        setNewRepeatFollowUntil(null);
-                        setNewRepeatFollowTimes([]);
-                      }
+                      if (!v) setNewRepeatFollowTimes([]);
                     },
                     newRepeatFollowMode,
                     (mode) => {
                       setNewRepeatFollowMode(mode);
                       if (mode === 'interval') setNewRepeatFollowTimes([]);
-                      else setNewRepeatFollowUntil(null);
                     },
                     newRepeatFollowIntervalMinutes,
                     setNewRepeatFollowIntervalMinutes,
-                    newRepeatFollowUntil,
-                    () => { setRepeatFollowTimePickerFor('addUntil'); openTimeEditor('add', newRepeatFollowUntil); },
                     newRepeatFollowTimes,
                     () => { setRepeatFollowTimePickerFor('addTime'); openTimeEditor('add', null); },
                     (time) => setNewRepeatFollowTimes((current) => current.filter((item) => item !== time)),
@@ -3383,20 +3364,16 @@ export default function HomeScreen({ navigation }: Props) {
                           if (!detailTask.notify || !detailTask.scheduled_time) return Promise.resolve();
                           return patchDetail({
                             repeat_follow_enabled: v ? 1 : 0,
-                            ...(v ? {} : { repeat_follow_until: null, repeat_follow_times: null }),
+                            ...(v ? {} : { repeat_follow_times: null }),
                           });
                         },
                         (detailTask.repeat_follow_mode === 'times' ? 'times' : 'interval'),
                         (mode) => patchDetail({
                           repeat_follow_mode: mode,
-                          ...(mode === 'interval'
-                            ? { repeat_follow_times: null }
-                            : { repeat_follow_until: null }),
+                          ...(mode === 'interval' ? { repeat_follow_times: null } : {}),
                         }),
                         detailTask.repeat_follow_interval_minutes ?? 60,
                         (minutes) => patchDetail({ repeat_follow_interval_minutes: minutes }),
-                        detailTask.repeat_follow_until,
-                        () => { setRepeatFollowTimePickerFor('editUntil'); openTimeEditor('edit', detailTask.repeat_follow_until); },
                         parseTimeList(detailTask.repeat_follow_times),
                         () => { setRepeatFollowTimePickerFor('editTime'); openTimeEditor('edit', null); },
                         (time) => patchDetail({ repeat_follow_times: parseTimeList(detailTask.repeat_follow_times).filter((item) => item !== time).join(',') || null }),
@@ -3463,6 +3440,11 @@ export default function HomeScreen({ navigation }: Props) {
         <View style={s.timeModalBg}>
           <View style={s.timeModalCard}>
             <Text style={s.timeModalTitle}>時間を入力</Text>
+            {(repeatFollowTimePickerFor === 'addTime' || repeatFollowTimePickerFor === 'editTime') && (
+              <Text style={s.timeHint}>
+                通常の通知：{repeatFollowTimePickerFor === 'addTime' ? (newTime ?? '--:--') : (detailTask?.scheduled_time ?? '--:--')}
+              </Text>
+            )}
             <View style={s.timeInputRow}>
               <TextInput
                 style={s.timeInput}
