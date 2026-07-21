@@ -724,8 +724,8 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
   notifyTypeChipActive: { backgroundColor: C.primary, borderColor: C.primary },
   notifyTypeText: { color: C.onDark, fontSize: 12, fontWeight: '700' },
   notifyTypeTextActive: { color: C.onPrimary },
-  baseTimeChip: { flex: 0, borderWidth: 1, borderColor: C.primary, borderRadius: 10, paddingVertical: 8, paddingHorizontal: 10, alignItems: 'center', backgroundColor: C.primarySoft },
-  baseTimeChipText: { color: C.primary, fontSize: 12, fontWeight: '700' },
+  baseTimeChip: { flex: 0, borderWidth: 1, borderColor: '#E0B400', borderRadius: 10, paddingVertical: 8, paddingHorizontal: 10, alignItems: 'center', backgroundColor: '#FFF3C4' },
+  baseTimeChipText: { color: '#8A6800', fontSize: 12, fontWeight: '700' },
 
   // Icon
   metaSelectBtn: {
