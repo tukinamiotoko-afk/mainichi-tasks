@@ -601,7 +601,17 @@ export default function TimerScreen({ navigation }: Props) {
                     <TouchableOpacity style={[s.controlBtn, !running && s.controlBtnDisabled]} onPress={() => pauseTimer(item.key)} disabled={!running}>
                       <Text style={s.pauseText}>❚❚</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={[s.controlBtn, seconds <= 0 && s.controlBtnDisabled]} onPress={() => saveTimer(item.key)} disabled={seconds <= 0}>
+                    <TouchableOpacity
+                      style={[s.controlBtn, seconds <= 0 && s.controlBtnDisabled]}
+                      onPress={async () => {
+                        const savedSeconds = seconds;
+                        await saveTimer(item.key);
+                        if (item.mode === 'stopwatch') {
+                          Alert.alert('記録しました', `${formatDuration(savedSeconds, true)} を記録しました`);
+                        }
+                      }}
+                      disabled={seconds <= 0}
+                    >
                       <Text style={s.saveText}>■</Text>
                     </TouchableOpacity>
                   </View>

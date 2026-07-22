@@ -2341,6 +2341,7 @@ export default function HomeScreen({ navigation }: Props) {
         </View>
       </View>
       {notify && !time && <Text style={s.scheduleHint}>※ 通知するには時間を設定してください</Text>}
+      {!notify && !!time && <Text style={s.scheduleHint}>※ 有効にしないと通知されません</Text>}
       {notify && (
         <>
           <Text style={s.notifyTypeLabel}>通知の種類</Text>
@@ -2394,6 +2395,7 @@ export default function HomeScreen({ navigation }: Props) {
         </TouchableOpacity>
       )}
       {enabled && !time && <Text style={s.scheduleHint}>※ 自動計測には開始時刻の設定が必要です</Text>}
+      {!enabled && !!time && <Text style={s.scheduleHint}>※ 有効にしないと通知されません</Text>}
       {enabled && (
         <>
           <View style={s.notifyTypeRow}>
