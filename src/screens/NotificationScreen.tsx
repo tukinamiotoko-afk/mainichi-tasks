@@ -99,25 +99,6 @@ const makeStyles = (C: ColorSet) => StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
   },
-  debugBox: {
-    borderWidth: 1,
-    borderColor: C.grid,
-    borderRadius: 12,
-    backgroundColor: C.body,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    gap: 6,
-  },
-  debugTitle: {
-    color: C.ink,
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  debugText: {
-    color: C.muted,
-    fontSize: 12,
-    lineHeight: 18,
-  },
 });
 
 export default function NotificationScreen({ navigation }: Props) {
@@ -131,7 +112,6 @@ export default function NotificationScreen({ navigation }: Props) {
   const [scheduleSize, setScheduleSize] = useState<ScheduleSize>('normal');
   const [contactMessage, setContactMessage] = useState('');
   const [contactSending, setContactSending] = useState(false);
-  const [contactResult, setContactResult] = useState<{ ok: boolean; status: number | null; body: string } | null>(null);
   const load = useCallback(async () => {
     const [layout, size] = await Promise.all([
       getSetting(db, 'card_layout'),
@@ -162,7 +142,6 @@ export default function NotificationScreen({ navigation }: Props) {
     const trimmed = contactMessage.trim();
     if (!trimmed || contactSending) return;
     setContactSending(true);
-    setContactResult(null);
     try {
       const response = await fetch(EMAILJS_ENDPOINT, {
         method: 'POST',
@@ -179,20 +158,15 @@ export default function NotificationScreen({ navigation }: Props) {
           },
         }),
       });
-      const text = await response.text();
       const ok = response.status >= 200 && response.status < 300;
-      setContactResult({
-        ok,
-        status: response.status,
-        body: text || '(empty response)',
-      });
-      if (ok) setContactMessage('');
+      if (ok) {
+        setContactMessage('');
+        Alert.alert('送信しました', 'お問い合わせを送信しました。');
+      } else {
+        Alert.alert('送信できませんでした', '時間をおいて、もう一度お試しください。');
+      }
     } catch (error) {
-      setContactResult({
-        ok: false,
-        status: null,
-        body: error instanceof Error ? error.message : String(error),
-      });
+      Alert.alert('送信できませんでした', '通信状態を確認して、もう一度お試しください。');
     } finally {
       setContactSending(false);
     }
@@ -322,14 +296,7 @@ export default function NotificationScreen({ navigation }: Props) {
             >
               {contactSending ? <ActivityIndicator color="#ffffff" /> : <Text style={s.contactBtnText}>送信する</Text>}
             </TouchableOpacity>
-            <Text style={s.contactMeta}>送信結果は下にそのまま表示されます。</Text>
-            {contactResult && (
-              <View style={s.debugBox}>
-                <Text style={s.debugTitle}>{contactResult.ok ? '送信成功' : '送信失敗'}</Text>
-                <Text style={s.debugText}>status: {contactResult.status ?? 'network error'}</Text>
-                <Text style={s.debugText}>{contactResult.body}</Text>
-              </View>
-            )}
+            <Text style={s.contactMeta}>送信すると、その場で完了メッセージが表示されます。</Text>
           </View>
 
         </View>
