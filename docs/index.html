@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>rockonions</title>
+<meta name="description" content="rockonions（ロックオニオンズ）は、日々の生活を少し楽にするシンプルなアプリを開発しています。">
+<style>
+  :root {
+    --blue-light: #60a5fa;
+    --blue-dark: #2563eb;
+    --ink: #1e293b;
+    --muted: #64748b;
+    --bg: #f8fafc;
+    --card: #ffffff;
+    --border: #e2e8f0;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", "Segoe UI", sans-serif;
+    margin: 0;
+    color: var(--ink);
+    background: var(--bg);
+    line-height: 1.8;
+  }
+  a { color: var(--blue-dark); }
+  .hero {
+    background: linear-gradient(135deg, var(--blue-light), var(--blue-dark));
+    color: #fff;
+    padding: 64px 20px 72px;
+    text-align: center;
+  }
+  .hero img {
+    width: 88px;
+    height: 88px;
+    border-radius: 20px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+    margin-bottom: 20px;
+  }
+  .hero h1 {
+    font-size: 30px;
+    margin: 0 0 6px;
+    letter-spacing: 0.02em;
+  }
+  .hero p {
+    font-size: 15px;
+    margin: 0;
+    opacity: 0.92;
+  }
+  .wrap {
+    max-width: 760px;
+    margin: -36px auto 0;
+    padding: 0 20px 60px;
+  }
+  section.card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px 26px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
+  }
+  h2 {
+    font-size: 18px;
+    margin: 0 0 14px;
+    color: var(--blue-dark);
+  }
+  p { font-size: 14px; color: var(--ink); margin: 0 0 12px; }
+  p:last-child { margin-bottom: 0; }
+  .app-row {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+  }
+  .app-row img {
+    width: 64px;
+    height: 64px;
+    border-radius: 14px;
+    flex-shrink: 0;
+  }
+  .app-info h3 { margin: 0 0 6px; font-size: 16px; }
+  .app-info p { font-size: 13px; color: var(--muted); }
+  .btn {
+    display: inline-block;
+    margin-top: 12px;
+    padding: 9px 18px;
+    background: var(--blue-dark);
+    color: #fff !important;
+    text-decoration: none;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 700;
+  }
+  ul { padding-left: 20px; margin: 0; font-size: 14px; }
+  li { margin-bottom: 6px; }
+  footer {
+    text-align: center;
+    font-size: 12px;
+    color: var(--muted);
+    padding: 0 20px 40px;
+  }
+  footer a { color: var(--muted); }
+</style>
+</head>
+<body>
+
+  <div class="hero">
+    <img src="store-assets/rockonions-logo-512.png" alt="rockonions">
+    <h1>rockonions</h1>
+    <p>スマートフォン向けのアプリを開発しています。</p>
+  </div>
+
+  <div class="wrap">
+
+    <section class="card">
+      <h2>rockonions について</h2>
+      <p>
+        rockonions は、モバイルアプリの開発を行う開発チームです。
+        使いやすさとシンプルさを大切に、日々の生活や作業に役立つアプリづくりに取り組んでいます。
+      </p>
+      <p>
+        現在は Android 向けにアプリを提供しており、今後も新しいアプリの開発を予定しています。
+      </p>
+    </section>
+
+    <section class="card">
+      <h2>提供しているアプリ</h2>
+      <div class="app-row">
+        <img src="store-assets/hires-icon-512.png" alt="毎日タスク アイコン">
+        <div class="app-info">
+          <h3>毎日タスク</h3>
+          <p>
+            毎日の習慣やタスクを、通知とタイマーで続けやすくするタスク管理アプリです。
+            頻度設定、複数回タスク、追いかけ通知、タイマー・ストップウォッチ、達成統計など、
+            日々の積み重ねをサポートする機能を備えています。
+          </p>
+          <a class="btn" href="https://play.google.com/store/apps/details?id=com.rockonions.mainichitask">Google Play で見る</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>お問い合わせ</h2>
+      <p>
+        アプリに関するご質問・ご要望は、下記のメールアドレスまでご連絡ください。
+      </p>
+      <p>メールアドレス：huashanz319@gmail.com</p>
+    </section>
+
+  </div>
+
+  <footer>
+    <p>&copy; 2026 rockonions ・ <a href="privacy-policy.html">プライバシーポリシー</a></p>
+  </footer>
+
+</body>
+</html>

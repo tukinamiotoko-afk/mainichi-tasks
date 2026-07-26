@@ -3,10 +3,41 @@
     "name": "毎日タスク",
     "slug": "mainichi-tasks",
     "version": "1.0.0",
+    "icon": "./assets/images/app/app-icon.png",
     "orientation": "portrait",
-    "backgroundColor": "#7a8aba",
-    "ios": { "supportsTablet": false },
-    "android": { "adaptiveIcon": { "backgroundColor": "#7a8aba" } },
-    "plugins": ["expo-sqlite"]
+    "backgroundColor": "#2563eb",
+    "ios": {
+      "supportsTablet": false
+    },
+    "android": {
+      "package": "com.rockonions.mainichitask",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/app/app-icon.png",
+        "backgroundColor": "#2563eb"
+      }
+    },
+    "plugins": [
+      "expo-sqlite",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/app/notification-icon.png",
+          "color": "#2563eb"
+        }
+      ],
+      "expo-splash-screen",
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-6253728869800176~4424472496",
+          "iosAppId": "ca-app-pub-3940256099942544~1458002511"
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "c6182de1-528f-4e75-9d1b-76f3a5698414"
+      }
+    }
   }
 }
