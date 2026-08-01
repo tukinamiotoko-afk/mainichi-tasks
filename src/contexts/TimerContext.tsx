@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, ReactNode } from 'react';
+import { Vibration } from 'react-native';
 import { useSQLiteContext } from 'expo-sqlite';
 import * as Notifications from 'expo-notifications';
 import {
@@ -62,6 +63,7 @@ export function TimerProvider({ children }: { children: ReactNode }) {
   const timersRef = useRef<TimerItem[]>([]);
   timersRef.current = timers;
   const savingRef = useRef<Set<number>>(new Set());
+  const finishedAlertRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 500);
@@ -158,6 +160,7 @@ export function TimerProvider({ children }: { children: ReactNode }) {
     }
     const startedAtMs = Date.now();
     const startedAtIso = new Date(startedAtMs).toISOString();
+    finishedAlertRef.current.delete(itemKey);
     setTimers((current) => current.map((item) => (
       item.key === itemKey && !item.startedAtMs ? { ...item, startedAtMs, startedAtIso } : item
     )));
@@ -229,10 +232,25 @@ export function TimerProvider({ children }: { children: ReactNode }) {
     return () => sub.remove();
   }, [handleAutoTimerResponse]);
 
-  // auto-stop-and-save a countdown once it reaches its target
+  // auto-stop-and-save a countdown once it reaches its target — also alerts
+  // with a vibration and an alarm-sound notification so it's noticeable even
+  // if the phone isn't being looked at.
   useEffect(() => {
     timers.forEach((item) => {
       if (item.mode === 'timer' && item.startedAtMs && timerSeconds(item, now) >= item.targetSeconds) {
+        if (!finishedAlertRef.current.has(item.key)) {
+          finishedAlertRef.current.add(item.key);
+          Vibration.vibrate([0, 500, 250, 500]);
+          Notifications.scheduleNotificationAsync({
+            content: {
+              title: '',
+              body: `${item.task.icon ? item.task.icon + ' ' : ''}${item.task.title} のタイマーが終了しました`,
+              sound: true,
+              android: { channelId: 'full' },
+            } as any,
+            trigger: null,
+          }).catch(() => {});
+        }
         saveTimer(item.key);
       }
     });
